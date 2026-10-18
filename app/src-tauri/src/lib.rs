@@ -1,6 +1,6 @@
 mod audio;
 
-use tauri::webview::{PageLoadEvent, PermissionKind, PermissionResponse};
+use tauri::webview::{NewWindowResponse, PageLoadEvent, PermissionKind, PermissionResponse};
 use tauri::{Manager, Url, WebviewWindowBuilder};
 
 /// ¿`url` es la propia app? Su origen en release (`http://tauri.localhost` en Windows, `tauri://localhost`
@@ -31,10 +31,14 @@ pub fn run() {
             let _ = (w, p, PageLoadEvent::Started);
         })
         // La ventana principal se crea acá (y no desde la config: `create: false`) para poder vigilar su navegación.
+        // Ventanas nuevas (`target=_blank`, "Ver en YouTube" del reproductor) no pasan por `on_navigation`: se niegan todas.
         .setup(|app| {
             let cfg = app.config().app.windows[0].clone();
             let dev = dev_url(app);
-            WebviewWindowBuilder::from_config(app, &cfg)?.on_navigation(move |u| es_origen_app(u, dev.as_ref())).build()?;
+            WebviewWindowBuilder::from_config(app, &cfg)?
+                .on_navigation(move |u| es_origen_app(u, dev.as_ref()))
+                .on_new_window(|_, _| NewWindowResponse::Deny)
+                .build()?;
             Ok(())
         })
         .manage(audio::Captura::default())
