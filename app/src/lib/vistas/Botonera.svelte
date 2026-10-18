@@ -14,13 +14,15 @@
   let archivo = $state<File>();
   let error = $state('');
   let subiendo = $state(false);
+  let modal = $state(false); // `dlg.open` no es reactivo
   let vol = $state(Math.round(leerPrefs().volBotonera * 100));
 
   async function enviar(e: SubmitEvent) {
     e.preventDefault();
+    const form = e.currentTarget as HTMLFormElement;
     if (!archivo) return (error = 'Elegí un archivo de audio.');
     error = ''; subiendo = true;
-    try { await subir(grupoId, nombre, archivo); nombre = ''; archivo = undefined; dlg?.close(); }
+    try { await subir(grupoId, nombre, archivo); form.reset(); nombre = ''; archivo = undefined; dlg?.close(); }
     catch (e) { error = e instanceof Error ? e.message : mensajeError(e); }
     finally { subiendo = false; }
   }
@@ -32,7 +34,7 @@
 
 <details class="seccion" open={abierto} ontoggle={(e) => alAlternar(e.currentTarget.open)}>
   <summary>Botonera</summary>
-  {#if error && !dlg?.open}<p role="alert">{error}</p>{/if}
+  {#if error && !modal}<p role="alert">{error}</p>{/if}
   <ul class="grilla">
     {#each s.estado.lista as x (x.id)}
       <li>
@@ -43,13 +45,13 @@
   </ul>
   {#if !s.estado.lista.length}<p>Todavía no hay sonidos.</p>{/if}
   <div class="fila">
-    <button onclick={() => { error = ''; dlg?.showModal(); }}>+ Sonido</button>
+    <button onclick={() => { error = ''; modal = true; dlg?.showModal(); }}>+ Sonido</button>
     <input type="range" min="0" max="100" step="5" bind:value={vol} aria-label="Volumen de la botonera"
       oninput={() => guardarPrefs({ volBotonera: vol / 100 })} />
   </div>
 </details>
 
-<dialog bind:this={dlg}>
+<dialog bind:this={dlg} onclose={() => { modal = false; error = ''; }}>
   <form onsubmit={enviar}>
     <input bind:value={nombre} required maxlength="30" placeholder="Nombre del sonido" aria-label="Nombre del sonido" />
     <input type="file" accept="audio/*" required aria-label="Archivo de audio" onchange={(e) => (archivo = e.currentTarget.files?.[0])} />
