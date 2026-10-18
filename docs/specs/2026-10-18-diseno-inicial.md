@@ -46,7 +46,7 @@ Uso real: 4 personas normalmente, 5 o 6 a veces y 8 a 10 como máximo absoluto p
 ### Compartir pantalla
 - **Todos** pueden transmitir, sin pago: 720p o 1080p, a 30 o 60 fps, a elección de quien transmite.
 - Requisito central: **impactar lo mínimo posible en los FPS del juego** de quien transmite. Hay que usar el codificador por hardware de la GPU (NVENC / AMF / QuickSync) siempre que esté disponible.
-- Con sonido de lo que se transmite (juego o video), cuando la plataforma lo permita.
+- **El sonido de lo que se transmite (juego o video) se comparte automáticamente, como en Discord**, sin que el usuario active nada en el selector. Solo el audio de lo compartido: no las voces de la sala. **Decisión del usuario (2026-10-18).** La prueba técnica mostró que el motor web solo ofrece el audio de todo el sistema y con un interruptor manual, y que falló de forma intermitente (`NotReadableError`). Lo esperable es un módulo nativo de captura de audio por proceso (WASAPI process loopback) dentro de Tauri.
 
 ### Botonera de sonidos
 - Cada grupo tiene su botonera. Los miembros suben sonidos de **hasta 10 segundos**.
