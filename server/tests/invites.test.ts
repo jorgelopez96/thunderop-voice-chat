@@ -118,4 +118,31 @@ describe('invitaciones', () => {
     await expect(leave(a, g.id)).rejects.toMatchObject({ status: 400 });
     await expect(leave(c, g.id)).rejects.toMatchObject({ status: 404 });
   });
+
+  it('member with invites deletes account', async () => {
+    const { b, inv } = await setup();
+    await join(b, inv.code);
+    const mia = await b.collection('invites').create({ group: inv.group });
+    await b.collection('users').delete(b.authStore.record!.id);
+    await expect(h.admin.collection('invites').getOne(mia.id)).rejects.toMatchObject({ status: 404 });
+  });
+
+  it('owner deletes account cascades group', async () => {
+    const { a, b, g } = await setup();
+    const sala = (await a.collection('rooms').getFullList({ filter: `group = "${g.id}" && kind = "chat"` }))[0];
+    const msg = await a.collection('messages').create({ room: sala.id, author: a.authStore.record!.id, text: 'hola' });
+    const invA = await a.collection('invites').create({ group: g.id });
+    const gb = await b.collection('groups').create({ name: 'gb' });
+    const invB = await b.collection('invites').create({ group: gb.id });
+    await join(a, invB.code);
+    const invAEnB = await a.collection('invites').create({ group: gb.id });
+    await a.collection('users').delete(a.authStore.record!.id);
+    const adm = h.admin;
+    await expect(adm.collection('groups').getOne(g.id)).rejects.toMatchObject({ status: 404 });
+    await expect(adm.collection('rooms').getOne(sala.id)).rejects.toMatchObject({ status: 404 });
+    await expect(adm.collection('messages').getOne(msg.id)).rejects.toMatchObject({ status: 404 });
+    await expect(adm.collection('invites').getOne(invA.id)).rejects.toMatchObject({ status: 404 });
+    await expect(adm.collection('invites').getOne(invAEnB.id)).rejects.toMatchObject({ status: 404 });
+    expect((await adm.collection('groups').getOne(gb.id)).id).toBe(gb.id);
+  });
 });
