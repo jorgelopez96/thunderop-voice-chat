@@ -162,6 +162,24 @@ describe('música', () => {
     expect(r2.reproduccion.actual).not.toBe('');
   });
 
+  it('GET devuelve el estado y la hora del servidor sin tocar nada', async () => {
+    const { b, voz } = await setup();
+    const leer = () => b.send(`/api/rooms/${voz}/musica`, { method: 'GET' });
+    const t0 = Date.now();
+    const vacia = await leer();
+    expect(vacia.reproduccion).toBeNull();
+    expect(Math.abs(vacia.ahora - t0)).toBeLessThan(2000);
+    const r = await musica(b, voz, { accion: 'agregar', url: yt('LLLLLLLLLLL') });
+    const g = await leer();
+    expect(g.reproduccion).toMatchObject({ id: r.reproduccion.id, actual: r.reproduccion.actual, inicioMs: r.reproduccion.inicioMs, pausaS: null });
+  });
+
+  it('GET de alguien de afuera da 403 y en chat 400', async () => {
+    const { b, c, voz, chat } = await setup();
+    await expect(c.send(`/api/rooms/${voz}/musica`, { method: 'GET' })).rejects.toMatchObject({ status: 403 });
+    await expect(b.send(`/api/rooms/${chat}/musica`, { method: 'GET' })).rejects.toMatchObject({ status: 400, response: { message: 'No es una sala de voz.' } });
+  });
+
   it('alguien de afuera recibe 403', async () => {
     const { c, voz } = await setup();
     await expect(musica(c, voz, { accion: 'agregar', url: yt('HHHHHHHHHHH') })).rejects.toMatchObject({ status: 403 });

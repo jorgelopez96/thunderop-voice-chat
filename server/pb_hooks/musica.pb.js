@@ -3,16 +3,20 @@
 // Cualquier miembro del grupo la maneja. Posición = pausaS ?? (ahora - inicioMs) / 1000.
 // Cada acción corre en una transacción, así varios `termino` del mismo tema avanzan una sola vez.
 
+// Solo lectura: estado actual (null si la sala nunca tuvo música) y la hora del servidor, para que el cliente mida su desfase.
+routerAdd("GET", "/api/rooms/{id}/musica", (e) => {
+  const lk = require(`${__hooks}/livekit.js`);
+  const { room } = lk.salaDeVoz(e.app, e.request.pathValue("id"), e.auth.id);
+  let rep = null;
+  try {
+    rep = e.app.findFirstRecordByData("reproducciones", "room", room.id);
+  } catch (_) { /* sin música todavía */ }
+  return e.json(200, { reproduccion: rep, ahora: Date.now() });
+}, $apis.requireAuth("users"));
+
 routerAdd("POST", "/api/rooms/{id}/musica", (e) => {
   const lk = require(`${__hooks}/livekit.js`);
-  let room;
-  try {
-    room = e.app.findRecordById("rooms", e.request.pathValue("id"));
-  } catch (_) {
-    throw new NotFoundError("Sala no encontrada.");
-  }
-  lk.grupoDeMiembro(e.app, room.getString("group"), e.auth.id);
-  if (room.getString("kind") !== "voz") throw new BadRequestError("No es una sala de voz.");
+  const { room } = lk.salaDeVoz(e.app, e.request.pathValue("id"), e.auth.id);
 
   const body = e.requestInfo().body;
   const accion = body.accion;

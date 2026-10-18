@@ -5,14 +5,7 @@
 routerAdd("POST", "/api/rooms/{id}/token", (e) => {
   const lk = require(`${__hooks}/livekit.js`);
   const c = lk.config();
-  let room;
-  try {
-    room = e.app.findRecordById("rooms", e.request.pathValue("id"));
-  } catch (_) {
-    throw new NotFoundError("Sala no encontrada.");
-  }
-  const group = lk.grupoDeMiembro(e.app, room.getString("group"), e.auth.id);
-  if (room.getString("kind") !== "voz") throw new BadRequestError("No es una sala de voz.");
+  const { room, group } = lk.salaDeVoz(e.app, e.request.pathValue("id"), e.auth.id);
 
   const video = { room: room.id, roomJoin: true, canSubscribe: true, canPublish: true, canPublishData: true };
   if (group.getStringSlice("silenciados").includes(e.auth.id)) {
