@@ -23,6 +23,23 @@ let ctx: AudioContext | null = null;
 let intento = 0; // invalida un `entrarVoz` en curso si se sale o se entra a otra sala
 const audios = new WeakMap<RemoteTrack, HTMLMediaElement>(); // <audio data-voz> creado por cada pista remota
 
+// Ganchos para la botonera (sin lógica de ella acá): contexto/sala actuales y listeners de datos que sobreviven a los cambios de sala.
+type OyenteDatos = (payload: Uint8Array, topic?: string) => void;
+const oyentesDatos = new Set<OyenteDatos>();
+export const contextoVoz = () => ctx;
+/** Publica datos a la sala (false si no hay sala conectada). */
+export async function publicarDatos(data: Uint8Array<ArrayBuffer>, topic: string) {
+  if (!room || voz.conectando) return false;
+  try { await room.localParticipant.publishData(data, { reliable: true, topic }); return true; } catch { return false; }
+}
+/** Escucha `DataReceived` de cualquier sala presente o futura. Devuelve la función para dejar de escuchar. */
+export function alRecibirDatos(f: OyenteDatos) { oyentesDatos.add(f); return () => { oyentesDatos.delete(f); }; }
+// Gancho para la música: sala conectada (id) o ninguna (null, en `limpiar`).
+type OyenteSala = (salaId: string | null) => void;
+const oyentesSala = new Set<OyenteSala>();
+const avisarSala = (id: string | null) => { for (const f of oyentesSala) f(id); };
+export function alCambiarSala(f: OyenteSala) { oyentesSala.add(f); return () => { oyentesSala.delete(f); }; }
+
 const microfono = () => room?.localParticipant.getTrackPublication(lk.Track.Source.Microphone)?.track as LocalAudioTrack | undefined;
 
 function actualizar() {
@@ -74,6 +91,7 @@ function limpiar() {
   if (typeof document !== 'undefined') for (const el of document.querySelectorAll('audio[data-voz]')) el.remove();
   Object.assign(voz, { salaId: null, salaNombre: '', grupoId: null, conectando: false, sinPermiso: false, participantes: [], transmitiendo: false, viendo: null });
   void detenerAudioPantalla();
+  avisarSala(null);
   (r?.disconnect() ?? Promise.resolve()).catch(() => {}).finally(() => c?.close().catch(() => {}));
 }
 
@@ -114,6 +132,7 @@ export async function entrarVoz(roomId: string, salaNombre = '', grupoId: string
     void detenerAudioPantalla();
     void despublicarAudio(r);
   });
+  r.on(RoomEvent.DataReceived, (payload, _part, _kind, topic) => { for (const f of oyentesDatos) f(payload, topic); });
   r.on(RoomEvent.LocalTrackPublished, () => { aplicarSupresion(); actualizar(); });
   r.on(RoomEvent.ParticipantPermissionsChanged, (_prev, part) => {
     // El dueño nos des-silenció: se vuelve a publicar el micrófono (LiveKit lo despublicó al silenciar).
@@ -153,6 +172,7 @@ export async function entrarVoz(roomId: string, salaNombre = '', grupoId: string
   }
   if (!vigente()) { r.disconnect(); return; } // por si el connect terminó pese al disconnect de limpiar()
   voz.conectando = false;
+  avisarSala(roomId);
   for (const p of r.remoteParticipants.values()) for (const pub of p.trackPublications.values()) if (pub.source === Track.Source.Microphone) pub.setSubscribed(true);
   actualizar();
   await publicarMic();

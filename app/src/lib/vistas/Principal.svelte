@@ -25,7 +25,7 @@
 
 <main>
   <header class="barra">
-    <h1>Discord mejorado</h1>
+    <h1>Thunderop</h1>
     <span class="yo" style="color:{sesion.usuario?.color || 'inherit'}">{sesion.usuario?.name}</span>
     <button class="plano" onclick={() => (verPerfil = !verPerfil)}>Mi perfil</button>
     <button class="plano" onclick={salir}>Salir</button>

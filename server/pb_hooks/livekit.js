@@ -77,4 +77,17 @@ function grupoDeMiembro(app, groupId, userId) {
   return group;
 }
 
-module.exports = { config, token, roomService, enSalasDeVoz, grupoDeMiembro };
+// Busca la sala de voz `roomId` y exige que `userId` sea miembro de su grupo.
+function salaDeVoz(app, roomId, userId) {
+  let room;
+  try {
+    room = app.findRecordById("rooms", roomId);
+  } catch (_) {
+    throw new NotFoundError("Sala no encontrada.");
+  }
+  const group = grupoDeMiembro(app, room.getString("group"), userId);
+  if (room.getString("kind") !== "voz") throw new BadRequestError("No es una sala de voz.");
+  return { room, group };
+}
+
+module.exports = { config, token, roomService, enSalasDeVoz, grupoDeMiembro, salaDeVoz };

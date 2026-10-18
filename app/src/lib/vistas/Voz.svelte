@@ -1,7 +1,9 @@
 <script lang="ts">
   import type { RecordModel } from 'pocketbase';
   import { pb } from '../pb';
-  import { mensajeError } from '../sesion.svelte';
+  import { mensajeError, sesion } from '../sesion.svelte';
+  import Botonera from './Botonera.svelte';
+  import Musica from './Musica.svelte';
   import { voz, volumen, silenciar, ver, pistaPantalla, pistaPantallaPropia, vistaPrevia, volumenPantalla } from '../voz.svelte';
   import { leerPrefs } from '../prefs';
 
@@ -43,6 +45,14 @@
   });
   const mirar = (id: string | null) => { pctPantalla = 100; if (id) volumenPantalla(id, 1); ver(id); };
   const quien = $derived(voz.participantes.find((p) => p.id === voz.viendo)?.nombre ?? '');
+  // Secciones abiertas o plegadas, por usuario.
+  const clavePleg = `dm.plegado.${sesion.usuario?.id}`;
+  const guardadas = (() => { try { return JSON.parse(localStorage.getItem(clavePleg) ?? '{}'); } catch { return {}; } })();
+  let abiertas = $state({ botonera: guardadas.botonera !== false, musica: guardadas.musica !== false });
+  const plegar = (k: 'botonera' | 'musica') => (a: boolean) => {
+    abiertas[k] = a;
+    try { localStorage.setItem(clavePleg, JSON.stringify(abiertas)); } catch { /* almacenamiento bloqueado */ }
+  };
   function cambiar(id: string, pct: number) { vols[id] = pct / 100; volumen(id, pct / 100); }
 </script>
 
@@ -84,6 +94,8 @@
       </li>
     {/each}
   </ul>
+  <Botonera grupoId={grupo.id} userId={sesion.usuario?.id} {soyDueno} abierto={abiertas.botonera} alAlternar={plegar('botonera')} />
+  <Musica abierto={abiertas.musica} alAlternar={plegar('musica')} />
 </section>
 
 <style>
@@ -97,6 +109,7 @@
   .vivo { font-size: 12px; color: var(--ok); }
   .pantalla { margin-bottom: 12px; display: flex; flex-direction: column; gap: 8px; }
   video { width: 100%; max-height: 60vh; object-fit: contain; background: var(--hondo); border-radius: var(--radio); }
+  :global(.seccion) { margin-top: 16px; }
   .propia { flex-basis: 100%; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
   .previa { width: 240px; max-width: 100%; max-height: none; aspect-ratio: 16 / 9; }
   .pantalla input[type='range'] { flex: 1; min-width: 120px; }
