@@ -24,7 +24,7 @@ function actualizar() {
   voz.participantes = [p(room.localParticipant, true), ...[...room.remoteParticipants.values()].map((x) => p(x, false))];
 }
 
-/** Publica el micrófono si el usuario no está muteado. Sin permiso del dueño falla en silencio: queda `silenciado`. */
+/** Publica el micrófono si el usuario no está muteado. Sin permiso del dueño (403 de LiveKit) falla en silencio: queda `silenciado`. */
 async function publicarMic() {
   if (!room || voz.muteado) return;
   try {
@@ -33,18 +33,24 @@ async function publicarMic() {
     const n = (e as Error)?.name;
     if (n === 'NotAllowedError') voz.error = 'No hay permiso para usar el micrófono.';
     else if (n === 'NotFoundError' || n === 'OverconstrainedError') voz.error = 'No se encontró un micrófono.';
-    // otro error: lo normal es que el dueño nos silenció (token sin permiso de micrófono)
+    else if (!(n === 'PublishTrackError' && (e as { status?: number }).status === 403)) voz.error = 'No se pudo usar el micrófono.';
   }
   actualizar();
 }
 
-async function aplicarSupresion() {
-  const t = microfono();
-  if (!t) return;
-  try {
-    if (voz.supresion && !t.getProcessor()) await t.setProcessor(crearSupresor());
-    else if (!voz.supresion && t.getProcessor()) await t.stopProcessor();
-  } catch { voz.error = 'No se pudo activar la supresión de ruido.'; }
+// En serie: LiveKit recién registra el procesador cuando termina su init (import + wasm), así que un
+// on→off rápido sin cola vería "sin procesador" y dejaría RNNoise puesto. Cada paso decide al llegar su turno.
+let cola = Promise.resolve();
+function aplicarSupresion() {
+  cola = cola.then(async () => {
+    const t = microfono();
+    if (!t) return;
+    try {
+      if (voz.supresion && !t.getProcessor()) await t.setProcessor(crearSupresor());
+      else if (!voz.supresion && t.getProcessor()) await t.stopProcessor();
+    } catch { voz.error = 'No se pudo activar la supresión de ruido.'; }
+  });
+  return cola;
 }
 
 async function existe(kind: MediaDeviceKind, id?: string) {
@@ -72,7 +78,6 @@ export async function entrarVoz(roomId: string) {
   ctx = c; room = r;
   Object.assign(voz, { salaId: roomId, conectando: true, error: '' });
   const vigente = () => mio === intento;
-  const prefs = leerPrefs();
 
   r.on(RoomEvent.TrackSubscribed, (t: RemoteTrack, _pub, part) => {
     if (t.kind !== Track.Kind.Audio) return;
@@ -109,9 +114,13 @@ export async function entrarVoz(roomId: string) {
   if (!vigente()) { r.disconnect(); return; } // por si el connect terminó pese al disconnect de limpiar()
   voz.conectando = false;
   actualizar();
-  if (await existe('audiooutput', prefs.salida)) r.switchActiveDevice('audiooutput', prefs.salida!).catch(() => {});
-  entrada = (await existe('audioinput', prefs.entrada)) ? prefs.entrada! : 'default';
-  if (vigente()) await publicarMic();
+  const salida = leerPrefs().salida;
+  if (await existe('audiooutput', salida) && vigente()) r.switchActiveDevice('audiooutput', salida!).catch(() => {});
+  const guardada = leerPrefs().entrada;
+  const hay = await existe('audioinput', guardada);
+  if (!vigente()) return;
+  if (leerPrefs().entrada === guardada) entrada = hay ? guardada! : 'default'; // si eligió otro mientras tanto, gana ese
+  await publicarMic();
 }
 
 export function salirVoz() {
@@ -146,6 +155,7 @@ export async function elegirSalida(deviceId: string) {
 
 /** Volumen de un usuario (0 a 2; con webAudioMix se puede pasar de 1). Se guarda en prefs. */
 export function volumen(userId: string, v: number) {
+  if (!Number.isFinite(v)) return;
   v = Math.min(2, Math.max(0, v));
   guardarPrefs({ volumenes: { [userId]: v } });
   room?.remoteParticipants.get(userId)?.setVolume(v);

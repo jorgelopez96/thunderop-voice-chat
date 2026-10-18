@@ -1,7 +1,7 @@
 import { ClientResponseError, type RecordModel } from 'pocketbase';
 import { pb } from './pb';
 import { extraerCodigo, linkInvitacion } from './invitacion';
-import { salirVoz } from './voz.svelte';
+import { salirVoz, voz } from './voz.svelte';
 
 export const grupos = $state<{ lista: RecordModel[]; cargado: boolean }>({ lista: [], cargado: false });
 // Svelte no permite reasignar un $state exportado: se expone como propiedad.
@@ -11,7 +11,7 @@ export const enVoz = $state<{ grupo: string | null; salas: Record<string, { id: 
 
 // Al cerrar sesión (o invalidarse) no debe quedar nada del usuario anterior.
 pb.authStore.onChange(() => {
-  if (!pb.authStore.token) { grupos.lista = []; grupos.cargado = false; grupoActual.id = null; enVoz.grupo = null; enVoz.salas = {}; salirVoz(); }
+  if (!pb.authStore.token) { grupos.lista = []; grupos.cargado = false; grupoActual.id = null; enVoz.grupo = null; enVoz.salas = {}; salirVoz(); voz.error = ''; voz.muteado = false; }
 });
 
 const ES = (e: unknown, ...codigos: number[]) => e instanceof ClientResponseError && codigos.includes(e.status);
@@ -34,7 +34,7 @@ export async function presencia(groupId: string) {
 }
 
 async function verificarActual() {
-  if (!grupoActual.id) return;
+  if (!grupoActual.id) { enVoz.grupo = null; enVoz.salas = {}; return; }
   presencia(grupoActual.id);
   try { await pb.collection('groups').getOne(grupoActual.id); }
   catch (e) { if (ES(e, 404)) { grupoActual.id = null; await recargarGrupos(); } }

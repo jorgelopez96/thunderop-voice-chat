@@ -22,12 +22,15 @@ export function crearSupresor(): TrackProcessor<Track.Kind.Audio, AudioProcessor
       wasm ??= loadRnnoise({ url: wasmUrl, simdUrl }).catch((e) => { wasm = null; throw e; });
       if (!registrados.has(ctx)) registrados.set(ctx, ctx.audioWorklet.addModule(workletUrl));
       try { await registrados.get(ctx); } catch (e) { registrados.delete(ctx); throw e; }
+      const wasmBinary = await wasm;
       const fuente = ctx.createMediaStreamSource(new MediaStream([track]));
-      const rnnoise = new RnnoiseWorkletNode(ctx, { maxChannels: 1, wasmBinary: await wasm });
-      const destino = ctx.createMediaStreamDestination();
-      fuente.connect(rnnoise).connect(destino);
-      nodos = [fuente, rnnoise, destino];
-      p.processedTrack = destino.stream.getAudioTracks()[0];
+      try {
+        const rnnoise = new RnnoiseWorkletNode(ctx, { maxChannels: 1, wasmBinary });
+        const destino = ctx.createMediaStreamDestination();
+        fuente.connect(rnnoise).connect(destino);
+        nodos = [fuente, rnnoise, destino];
+        p.processedTrack = destino.stream.getAudioTracks()[0];
+      } catch (e) { fuente.disconnect(); throw e; }
     },
     async restart(opts) { await p.destroy(); await p.init(opts); },
     async destroy() {

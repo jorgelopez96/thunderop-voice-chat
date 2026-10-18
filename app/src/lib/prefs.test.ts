@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { leerPrefs, guardarPrefs } from './prefs';
+import { volumen } from './voz.svelte';
 
 const DEFAULTS = { supresion: false, volumenes: {} };
 
@@ -31,5 +32,11 @@ describe('prefs de voz', () => {
     vi.stubGlobal('localStorage', { getItem: roto, setItem: roto });
     expect(leerPrefs()).toEqual(DEFAULTS);
     expect(() => guardarPrefs({ supresion: true })).not.toThrow();
+  });
+
+  it('volumen se acota a 0..2 e ignora valores no finitos', () => {
+    volumen('a', 5); volumen('b', -1); volumen('c', 1.5);
+    volumen('a', NaN); volumen('d', Infinity);
+    expect(leerPrefs().volumenes).toEqual({ a: 2, b: 0, c: 1.5 });
   });
 });
