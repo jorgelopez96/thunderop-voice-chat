@@ -8,7 +8,10 @@ pb.authStore.onChange(() => { sesion.usuario = pb.authStore.record; });
 /** Revalida el token guardado contra el servidor; si falla (vencido, usuario borrado) cierra la sesión. */
 export async function validarSesionAlIniciar() {
   if (!pb.authStore.token) return;
-  try { await pb.collection('users').authRefresh(); } catch { pb.authStore.clear(); }
+  try { await pb.collection('users').authRefresh(); } catch (e) {
+    // Solo 401/403/404 invalidan la sesión; red caída (0) o 5xx conservan la guardada.
+    if (e instanceof ClientResponseError && [401, 403, 404].includes(e.status)) pb.authStore.clear();
+  }
 }
 
 export async function entrar(email: string, pass: string) {
