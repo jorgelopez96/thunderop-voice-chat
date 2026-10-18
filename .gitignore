@@ -1,0 +1,7 @@
+node_modules/
+target/
+dist/
+*.exe
+*.zip
+spikes/pantalla/server/data/
+.superpowers/
