@@ -37,7 +37,11 @@ $('conectar').addEventListener('submit', async (e) => {
   e.preventDefault();
   try {
     const nombre = $<HTMLInputElement>('nombre').value;
-    const { token, url } = await (await fetch(`${TOKENS}?identity=${encodeURIComponent(nombre)}`)).json();
+    // Desde la red local el link trae #pin=...; en la PC no hace falta.
+    const pin = new URLSearchParams(location.hash.slice(1)).get('pin') ?? '';
+    const resp = await fetch(`${TOKENS}?identity=${encodeURIComponent(nombre)}&pin=${encodeURIComponent(pin)}`);
+    if (!resp.ok) throw new Error(`tokens: ${resp.status} ${await resp.text()}`);
+    const { token, url } = await resp.json();
     await room.connect(url, token);
     $('estado').textContent = `conectado como ${nombre} a sala prueba`;
     $<HTMLButtonElement>('transmitir').disabled = false;
