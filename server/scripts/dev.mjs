@@ -29,7 +29,13 @@ const hijos = [
   }),
 ];
 
-const matar = () => hijos.forEach((h) => h.exitCode === null && h.kill());
+const matar = () => hijos.forEach((h) => h.pid && h.exitCode === null && h.kill()); // sin pid: no llegó a arrancar
 hijos.forEach((h) => h.once('exit', () => { matar(); process.exit(); })); // si uno cae, cae todo
+// Si el .exe no está, spawn no emite 'exit' sino 'error'.
+hijos.forEach((h) => h.once('error', () => {
+  console.error(`Falta ${h.spawnfile}: corré \`npm run descargar\``);
+  matar();
+  process.exit(1);
+}));
 process.on('SIGINT', matar);
 process.on('SIGTERM', matar);
