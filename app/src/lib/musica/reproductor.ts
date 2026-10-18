@@ -2,7 +2,7 @@
 // En DEV, con `globalThis.__ytFalso`, se usa uno falso que avanza con el reloj: los E2E no tocan YouTube ni suenan.
 
 /** Estados del reproductor de YouTube que usamos. */
-export const FIN = 0, SONANDO = 1;
+export const FIN = 0, SONANDO = 1, PAUSADO = 2;
 
 export interface Reproductor {
   /** Carga `videoId` parado en `desdeS` (sin arrancar: después va `play()`). */
@@ -103,7 +103,7 @@ function reproductorFalso(cfg: Falso): Reproductor {
       if (cfg.error) { const c = cfg.error; setTimeout(() => alError(c)); }
     },
     play() { if (!cargado || sonando) return; desde = Date.now(); sonando = true; alEstado(SONANDO); },
-    pause() { if (!sonando) return; base = t(); sonando = false; alEstado(2); },
+    pause() { if (!sonando) return; base = t(); sonando = false; alEstado(PAUSADO); },
     seek(s) { base = s; desde = Date.now(); },
     tiempo: t,
     volumen() {},

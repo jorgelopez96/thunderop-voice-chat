@@ -2,8 +2,8 @@ import { pb } from '../pb';
 import { mensajeError } from '../sesion.svelte';
 import { leerPrefs, guardarPrefs } from '../prefs';
 import { alCambiarSala } from '../voz.svelte';
-import { posicion, desfase } from './posicion';
-import { crearReproductor, FIN, SONANDO, type Reproductor } from './reproductor';
+import { posicion, muestra, mejor, type Muestra } from './posicion';
+import { crearReproductor, FIN, SONANDO, PAUSADO, type Reproductor } from './reproductor';
 
 // Música sincronizada de la sala de voz: el estado vive en PocketBase (solo lo escribe la ruta del servidor)
 // y cada cliente lo reproduce con su propio reproductor, en la posición compartida.
@@ -19,16 +19,21 @@ const TOLERANCIA_S = 2;
 
 let sala: string | null = null;
 let rep: Rep | null = null;
-let offset = 0; // ms que el servidor va adelantado; 0 hasta la primera respuesta de la ruta
+let reloj: Muestra | null = null; // mejor medición del desfase con el servidor (ms que va adelantado)
+let medido = false; // el reproductor no arranca hasta tener la primera medición (o que falle)
+let remedir: ReturnType<typeof setInterval> | undefined;
 let carga = 0; // invalida las lecturas viejas (realtime y respuestas pueden llegar desordenadas)
 let subs: Promise<() => Promise<void>>[] = [];
 let host: HTMLElement | null = null;
 let rp: Reproductor | null = null;
 let cargada: Cancion | null = null; // la que tiene el reproductor
 let estado = -1;
-let reloj: ReturnType<typeof setInterval> | undefined;
+let vigia: ReturnType<typeof setInterval> | undefined;
 
-const ahoraServidor = () => Date.now() + offset;
+const ahoraServidor = () => Date.now() + (reloj?.desfase ?? 0);
+const anotar = (r: { ahora?: unknown }, enviado: number) => {
+  if (typeof r?.ahora === 'number') { const ahora = Date.now(); reloj = mejor(reloj, muestra(r.ahora, enviado, ahora), ahora); }
+};
 
 /** Escucha la cola y la reproducción de la sala de voz `roomId`. */
 export function conectar(roomId: string) {
@@ -37,11 +42,23 @@ export function conectar(roomId: string) {
   const filtro = pb.filter('room = {:r}', { r: roomId });
   // ponytail: sin relectura al reconectar el realtime; cualquier acción o evento siguiente lo pone al día
   subs = ['canciones', 'reproducciones'].map((c) => pb.collection(c).subscribe('*', () => void cargar(), { filter: filtro }));
-  void cargar();
+  void medir().finally(() => { if (sala !== roomId) return; medido = true; void cargar(); });
+  remedir = setInterval(() => void medir(), 60_000);
+}
+
+/** Mide el desfase con el GET de la ruta: 3 muestras seguidas; queda la de menor ida y vuelta. */
+async function medir() {
+  const s = sala;
+  for (let i = 0; i < 3 && s && s === sala; i++) {
+    const enviado = Date.now();
+    try { anotar(await pb.send(`/api/rooms/${s}/musica`, { method: 'GET', requestKey: null }), enviado); }
+    catch { return; } // sin medición se sigue con la anterior (o 0)
+  }
 }
 
 export function desconectar() {
-  sala = null; rep = null; carga++;
+  sala = null; rep = null; carga++; reloj = null; medido = false;
+  clearInterval(remedir);
   for (const s of subs) s.then((f) => f()).catch(() => {});
   subs = [];
   Object.assign(musica, { cola: [], actual: null, pausado: false, error: '' });
@@ -79,7 +96,7 @@ async function enviar(accion: string, extra: Record<string, string> = {}): Promi
   try {
     const r = await pb.send(`/api/rooms/${s}/musica`, { method: 'POST', body: { accion, ...extra }, requestKey: null });
     if (s !== sala) return false;
-    if (typeof r?.ahora === 'number') offset = desfase(r.ahora, enviado, Date.now());
+    if (accion !== 'agregar') anotar(r, enviado); // `agregar` toma `ahora` después del oEmbed: muestra sesgada
     await cargar();
     return true;
   } catch (e) {
@@ -110,23 +127,25 @@ function sincronizar() {
   const c = rep?.actual ? musica.cola.find((x) => x.id === rep!.actual) ?? null : null;
   musica.actual = c;
   musica.pausado = rep?.pausaS != null;
-  if (!c || !rep || !host || !sala) return destruir();
+  if (!c || !rep || !host || !sala || !medido) return destruir();
   if (!rp) {
     const nuevo = rp = crearReproductor(host);
     nuevo.onEstado((e) => { if (rp === nuevo) alEstado(e); });
     nuevo.onError((codigo) => { if (rp === nuevo) alError(codigo); });
     nuevo.volumen(leerPrefs().volMusica);
-    reloj = setInterval(corregir, 5000);
+    vigia = setInterval(corregir, 5000);
   }
   if (cargada?.id !== c.id) { cargada = c; estado = -1; rp.cargar(c.videoId, posicion(rep, ahoraServidor())); }
   else corregir();
   if (musica.pausado) rp.pause(); else rp.play();
 }
 
-/** Si el reproductor se desvió más de 2 s de la posición compartida, salta a ella. Reproduciendo, solo con el video andando (no en anuncios ni cargando). */
+/** Si el reproductor se desvió más de 2 s de la posición compartida, salta a ella.
+ *  Solo con el video andando o pausado de verdad: no en anuncios ni cargando, ni recién cargado en pausa
+ *  (ahí la posición ya la dio `cargar`, y en YouTube un `seekTo` sobre un video sin arrancar lo hace sonar). */
 function corregir() {
   if (!rp || !rep || !cargada) return;
-  if (rep.pausaS == null && estado !== SONANDO) return;
+  if (estado !== (rep.pausaS == null ? SONANDO : PAUSADO)) return;
   const compartida = posicion(rep, ahoraServidor());
   if (Math.abs(rp.tiempo() - compartida) > TOLERANCIA_S) rp.seek(compartida);
 }
@@ -141,12 +160,12 @@ function alEstado(e: number) {
 function alError(codigo: number) {
   if (ERRORES_EMBED.includes(codigo) && cargada) {
     const c = cargada;
-    void enviar('error', { cancionId: c.id }).then(() => { musica.error = `No se puede reproducir acá: ${c.titulo}`; });
+    void enviar('error', { cancionId: c.id }).then((ok) => { if (ok) musica.error = `No se puede reproducir acá: ${c.titulo}`; });
   } else musica.error = 'No se pudo cargar el reproductor de YouTube.';
 }
 
 function destruir() {
-  clearInterval(reloj);
+  clearInterval(vigia);
   rp?.destruir();
   rp = null; cargada = null; estado = -1;
 }
