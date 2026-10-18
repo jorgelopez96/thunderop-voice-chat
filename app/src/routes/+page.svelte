@@ -1,7 +1,10 @@
 <script lang="ts">
   import Entrar from '$lib/vistas/Entrar.svelte';
   import Perfil from '$lib/vistas/Perfil.svelte';
-  import { sesion, salir } from '$lib/sesion.svelte';
+  import { onMount } from 'svelte';
+  import { sesion, salir, validarSesionAlIniciar } from '$lib/sesion.svelte';
+
+  onMount(validarSesionAlIniciar);
 </script>
 
 {#if !sesion.usuario}

@@ -2,8 +2,14 @@ import { ClientResponseError, type RecordModel } from 'pocketbase';
 import { pb } from './pb';
 
 // Svelte no permite reasignar un $state exportado: se expone como propiedad de un objeto.
-export const sesion = $state<{ usuario: RecordModel | null }>({ usuario: pb.authStore.record });
+export const sesion = $state<{ usuario: RecordModel | null }>({ usuario: pb.authStore.isValid ? pb.authStore.record : null });
 pb.authStore.onChange(() => { sesion.usuario = pb.authStore.record; });
+
+/** Revalida el token guardado contra el servidor; si falla (vencido, usuario borrado) cierra la sesión. */
+export async function validarSesionAlIniciar() {
+  if (!pb.authStore.token) return;
+  try { await pb.collection('users').authRefresh(); } catch { pb.authStore.clear(); }
+}
 
 export async function entrar(email: string, pass: string) {
   await pb.collection('users').authWithPassword(email, pass);
