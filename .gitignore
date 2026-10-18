@@ -5,3 +5,6 @@ dist/
 *.zip
 spikes/pantalla/server/data/
 .superpowers/
+server/pb_data/
+server/pocketbase.exe
+server/.tmp/

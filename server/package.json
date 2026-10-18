@@ -1,0 +1,14 @@
+{
+  "name": "discord-mejorado-server",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "descargar": "node scripts/descargar-pocketbase.mjs",
+    "serve": "pocketbase.exe serve"
+  },
+  "devDependencies": {
+    "pocketbase": "^0.28.0",
+    "vitest": "^3.0.0"
+  }
+}
