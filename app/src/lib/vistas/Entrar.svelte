@@ -25,7 +25,7 @@
 
 <main>
   <div class="tarjeta">
-  <h1>Discord mejorado</h1>
+  <h1>Thunderop - voice chat</h1>
   <div role="tablist" class="fila">
     <button role="tab" class="plano" aria-selected={modo === 'entrar'} onclick={() => (modo = 'entrar')}>Entrar</button>
     <button role="tab" class="plano" aria-selected={modo === 'crear'} onclick={() => (modo = 'crear')}>Crear cuenta</button>
