@@ -1,6 +1,6 @@
 /// <reference path="../pb_data/types.d.ts" />
 // Hooks de `groups`: dueño/miembros forzados al crear + salas por defecto; al editar,
-// `members` solo puede achicarse y debe seguir incluyendo al dueño.
+// `members` solo puede achicarse y debe seguir incluyendo al dueño; `silenciados` solo lo cambia el dueño.
 onRecordCreateRequest((e) => {
   // los superusers conservan los valores que mandan
   if (e.auth && e.auth.collection().name === "users") {
@@ -29,6 +29,10 @@ onRecordUpdateRequest((e) => {
     }
     if (!despues.includes(e.record.getString("owner"))) {
       throw new BadRequestError("El dueño debe seguir siendo miembro.");
+    }
+    const silenciados = (r) => JSON.stringify(r.getStringSlice("silenciados"));
+    if (e.auth.id !== e.record.original().getString("owner") && silenciados(e.record) !== silenciados(e.record.original())) {
+      throw new ForbiddenError("Solo el dueño puede silenciar.");
     }
   }
   e.next();
