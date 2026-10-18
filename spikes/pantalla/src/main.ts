@@ -2,7 +2,8 @@ import { Room, RoomEvent, Track, type VideoCodec } from 'livekit-client';
 import { summarizeSender } from './stats';
 import { installBaselineH264Patch } from './sdp';
 
-const TOKENS = 'http://127.0.0.1:7890/token';
+// location.hostname: localhost en la PC, la IP de la PC cuando se abre desde el celular.
+const TOKENS = `http://${location.hostname}:7890/token`;
 const CALIDADES: Record<string, { width: number; height: number; frameRate: number }> = {
   '720p30': { width: 1280, height: 720, frameRate: 30 },
   '720p60': { width: 1280, height: 720, frameRate: 60 },
@@ -57,7 +58,7 @@ $('transmitir').addEventListener('click', async () => {
         videoCodec,
         simulcast: false,
         screenShareEncoding: {
-          maxBitrate: resolution.height === 1080 ? 8_000_000 : 4_000_000,
+          maxBitrate: Number($<HTMLSelectElement>('bitrate').value) * 1_000_000,
           maxFramerate: resolution.frameRate,
         },
       },

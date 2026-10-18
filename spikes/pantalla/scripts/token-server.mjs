@@ -3,9 +3,11 @@
 import http from 'node:http';
 import { AccessToken } from 'livekit-server-sdk';
 
-const URL_LK = 'ws://127.0.0.1:7880';
 // Solo la app (Tauri) y el frontend local; cualquier otra página web recibe 403.
-const ORIGENES = new Set(['http://localhost:1420', 'http://tauri.localhost', 'tauri://localhost']);
+// EXTRA_ORIGINS (separados por coma) habilita, por ejemplo, el frontend abierto desde el celular en la red local.
+const ORIGENES = new Set(['http://localhost:1420', 'http://tauri.localhost', 'tauri://localhost',
+  ...(process.env.EXTRA_ORIGINS ?? '').split(',').filter(Boolean)]);
+const HOST = process.env.HOST ?? '127.0.0.1';
 
 const [apiKey, apiSecret] = (process.env.LIVEKIT_KEYS ?? '').split(':').map((s) => s.trim());
 if (!apiKey || !apiSecret) {
@@ -29,5 +31,8 @@ http.createServer(async (req, res) => {
   const at = new AccessToken(apiKey, apiSecret, { identity });
   at.addGrant({ room: 'prueba', roomJoin: true, canPublish: true, canSubscribe: true });
   res.setHeader('Content-Type', 'application/json');
-  res.end(JSON.stringify({ token: await at.toJwt(), url: URL_LK }));
-}).listen(7890, '127.0.0.1', () => console.log('tokens en http://127.0.0.1:7890/token?identity=<nombre>'));
+  // Mismo host por el que llegó el pedido: 127.0.0.1/localhost en la PC, la IP local desde el celular.
+  const host = new URL(`http://${req.headers.host}`).hostname;
+  const lk = `ws://${host === 'localhost' ? '127.0.0.1' : host}:7880`;
+  res.end(JSON.stringify({ token: await at.toJwt(), url: lk }));
+}).listen(7890, HOST, () => console.log(`tokens en http://${HOST}:7890/token?identity=<nombre>`));
