@@ -5,7 +5,7 @@
 export const FIN = 0, SONANDO = 1, PAUSADO = 2;
 
 export interface Reproductor {
-  /** Carga `videoId` parado en `desdeS` (sin arrancar: después va `play()`). */
+  /** Elige `videoId` desde `desdeS`; se carga con el `play()` (sonando) o `pause()` (parado) que sigue. */
   cargar(videoId: string, desdeS: number): void;
   play(): void;
   pause(): void;
@@ -31,6 +31,7 @@ export function crearReproductor(host: HTMLElement): Reproductor {
 // Mínimo de la IFrame API que usamos (no hay @types/youtube instalado).
 type YTPlayer = {
   cueVideoById(o: { videoId: string; startSeconds: number }): void;
+  loadVideoById(o: { videoId: string; startSeconds: number }): void;
   playVideo(): void; pauseVideo(): void; seekTo(s: number, permitir: boolean): void;
   getCurrentTime(): number; setVolume(v: number): void; destroy(): void;
 };
@@ -55,8 +56,17 @@ function reproductorYT(host: HTMLElement): Reproductor {
   caja.style.cssText = 'width:100%;height:100%';
   caja.append(div); host.append(caja);
   let p: YTPlayer | null = null, vivo = true;
-  // Hasta que el reproductor está listo se guarda lo pedido y se aplica en `onReady`.
+  // El video pedido se le pasa a YouTube recién con play/pause (o en `onReady`): `loadVideoById` si tiene que sonar,
+  // `cueVideoById` si queda parado. `cueVideoById` + `playVideo()` seguidos no anda: en un reproductor nuevo da error 2
+  // y en uno con video el tema nuevo queda parado (probado en WebView2, Task 7).
   let pendiente: { id: string; desde: number } | null = null, sonar = false, vol = 50, desde = 0;
+  const aplicar = () => {
+    if (!p || !pendiente) return false;
+    const o = { videoId: pendiente.id, startSeconds: pendiente.desde };
+    pendiente = null;
+    if (sonar) p.loadVideoById(o); else p.cueVideoById(o);
+    return true;
+  };
   let alEstado = (_: number) => {}, alError = (_: number) => {};
   cargarApi().then((YT) => {
     if (!vivo) return;
@@ -67,8 +77,7 @@ function reproductorYT(host: HTMLElement): Reproductor {
         onReady: (e: { target: YTPlayer }) => {
           if (!vivo) return e.target.destroy();
           p = e.target; p.setVolume(vol);
-          if (pendiente) p.cueVideoById({ videoId: pendiente.id, startSeconds: pendiente.desde });
-          if (sonar) p.playVideo();
+          if (!aplicar() && sonar) p.playVideo();
         },
         onStateChange: (e: { data: number }) => alEstado(e.data),
         onError: (e: { data: number }) => alError(e.data),
@@ -76,10 +85,10 @@ function reproductorYT(host: HTMLElement): Reproductor {
     });
   }, () => { if (vivo) alError(-1); });
   return {
-    cargar(id, s) { pendiente = { id, desde: s }; desde = s; sonar = false; p?.cueVideoById({ videoId: id, startSeconds: s }); },
-    play() { sonar = true; p?.playVideo(); },
-    pause() { sonar = false; p?.pauseVideo(); },
-    seek(s) { desde = s; if (pendiente) pendiente.desde = s; p?.seekTo(s, true); },
+    cargar(id, s) { pendiente = { id, desde: s }; desde = s; sonar = false; },
+    play() { sonar = true; if (!aplicar()) p?.playVideo(); },
+    pause() { sonar = false; if (!aplicar()) p?.pauseVideo(); },
+    seek(s) { desde = s; if (pendiente) pendiente.desde = s; else p?.seekTo(s, true); },
     tiempo: () => p?.getCurrentTime() ?? desde,
     volumen(v) { vol = v; p?.setVolume(v); },
     destruir() { vivo = false; try { p?.destroy(); } catch { /* ya no está */ } p = null; caja.remove(); },
