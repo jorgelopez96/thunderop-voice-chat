@@ -1,34 +1,41 @@
-import { Room, RoomEvent, Track, type LocalAudioTrack, type Participant, type RemoteTrack } from 'livekit-client';
+import type { LocalAudioTrack, Participant, RemoteTrack } from 'livekit-client';
 import { pb } from './pb';
 import { mensajeError } from './sesion.svelte';
 import { leerPrefs, guardarPrefs } from './prefs';
-import { crearSupresor } from './ruido';
 
 /** `silenciado`: no está mandando audio (muteado, sin permiso del dueño o sin micrófono publicado). */
 export type Participante = { id: string; nombre: string; hablando: boolean; silenciado: boolean; local: boolean };
 
-export const voz = $state<{ salaId: string | null; salaNombre: string; grupoId: string | null; conectando: boolean; error: string; muteado: boolean; supresion: boolean; participantes: Participante[] }>({
-  salaId: null, salaNombre: '', grupoId: null, conectando: false, error: '', muteado: false, supresion: leerPrefs().supresion, participantes: [],
+/** `sinPermiso`: el dueño nos silenció (los permisos de LiveKit no dejan publicar el micrófono). */
+export const voz = $state<{ salaId: string | null; salaNombre: string; grupoId: string | null; conectando: boolean; error: string; muteado: boolean; sinPermiso: boolean; supresion: boolean; participantes: Participante[] }>({
+  salaId: null, salaNombre: '', grupoId: null, conectando: false, error: '', muteado: false, sinPermiso: false, supresion: leerPrefs().supresion, participantes: [],
 });
 
-let room: Room | null = null;
+// LiveKit se carga recién al entrar a la voz: el arranque de la app no lo paga. Mientras haya `room`, `lk` está cargado.
+let lk: typeof import('livekit-client');
+let room: import('livekit-client').Room | null = null;
 let ctx: AudioContext | null = null;
 let intento = 0; // invalida un `entrarVoz` en curso si se sale o se entra a otra sala
-let entrada = 'default'; // micrófono en uso (el guardado si sigue conectado)
 
-const microfono = () => room?.localParticipant.getTrackPublication(Track.Source.Microphone)?.track as LocalAudioTrack | undefined;
+const microfono = () => room?.localParticipant.getTrackPublication(lk.Track.Source.Microphone)?.track as LocalAudioTrack | undefined;
 
 function actualizar() {
-  if (!room) { voz.participantes = []; return; }
+  if (!room) { voz.participantes = []; voz.sinPermiso = false; return; }
   const p = (x: Participant, local: boolean): Participante => ({ id: x.identity, nombre: x.name || x.identity, hablando: x.isSpeaking, silenciado: !x.isMicrophoneEnabled, local });
   voz.participantes = [p(room.localParticipant, true), ...[...room.remoteParticipants.values()].map((x) => p(x, false))];
+  // Misma regla que usa LiveKit para dejar publicar (sin fuentes listadas = todas permitidas).
+  const perm = room.localParticipant.permissions;
+  voz.sinPermiso = !!perm && (!perm.canPublish || (perm.canPublishSources.length > 0
+    && !perm.canPublishSources.map(lk.Track.sourceFromProto).includes(lk.Track.Source.Microphone)));
 }
 
 /** Publica el micrófono si el usuario no está muteado. Sin permiso del dueño (403 de LiveKit) falla en silencio: queda `silenciado`. */
 async function publicarMic() {
   if (!room || voz.muteado) return;
   try {
-    await room.localParticipant.setMicrophoneEnabled(true, { deviceId: entrada, noiseSuppression: false, echoCancellation: true, autoGainControl: true }, { dtx: false });
+    // Un string es "exacto, y si no está, cualquiera" en LiveKit: un micrófono guardado que ya no existe cae al predeterminado.
+    // No se consulta enumerateDevices antes: sin permiso de micrófono WebView2 oculta los ids y se perdería el guardado.
+    await room.localParticipant.setMicrophoneEnabled(true, { deviceId: leerPrefs().entrada ?? 'default', noiseSuppression: false, echoCancellation: true, autoGainControl: true }, { dtx: false });
   } catch (e) {
     const n = (e as Error)?.name;
     if (n === 'NotAllowedError') voz.error = 'No hay permiso para usar el micrófono.';
@@ -46,27 +53,20 @@ function aplicarSupresion() {
     const t = microfono();
     if (!t) return;
     try {
-      if (voz.supresion && !t.getProcessor()) await t.setProcessor(crearSupresor());
+      if (voz.supresion && !t.getProcessor()) await t.setProcessor((await import('./ruido')).crearSupresor());
       else if (!voz.supresion && t.getProcessor()) await t.stopProcessor();
     } catch { voz.error = 'No se pudo activar la supresión de ruido.'; }
   });
   return cola;
 }
 
-async function existe(kind: MediaDeviceKind, id?: string) {
-  if (!id) return false;
-  try { return (await navigator.mediaDevices.enumerateDevices()).some((d) => d.kind === kind && d.deviceId === id); }
-  catch { return false; }
-}
-
 /** Corta la sala actual y la olvida. El contexto se cierra después de desconectar (LiveKit desarma el procesador ahí). */
 function limpiar() {
-  if (!room) return;
   const r = room, c = ctx;
-  for (const el of document.querySelectorAll('audio[data-voz]')) el.remove();
   room = null; ctx = null;
-  Object.assign(voz, { salaId: null, salaNombre: '', grupoId: null, conectando: false, participantes: [] });
-  r.disconnect().catch(() => {}).finally(() => c?.close().catch(() => {}));
+  if (typeof document !== 'undefined') for (const el of document.querySelectorAll('audio[data-voz]')) el.remove();
+  Object.assign(voz, { salaId: null, salaNombre: '', grupoId: null, conectando: false, sinPermiso: false, participantes: [] });
+  (r?.disconnect() ?? Promise.resolve()).catch(() => {}).finally(() => c?.close().catch(() => {}));
 }
 
 export async function entrarVoz(roomId: string, salaNombre = '', grupoId: string | null = null) {
@@ -74,10 +74,15 @@ export async function entrarVoz(roomId: string, salaNombre = '', grupoId: string
   const mio = ++intento;
   // El contexto se crea antes de cualquier await, dentro del gesto del usuario (autoplay). 48 kHz: lo exige RNNoise.
   const c = new AudioContext({ sampleRate: 48000 });
-  const r = new Room({ adaptiveStream: true, dynacast: true, webAudioMix: { audioContext: c } });
-  ctx = c; room = r;
+  ctx = c;
   Object.assign(voz, { salaId: roomId, salaNombre, grupoId, conectando: true, error: '' });
   const vigente = () => mio === intento;
+  try { lk ??= await import('livekit-client'); }
+  catch { if (vigente()) { voz.error = 'No se pudo conectar a la voz.'; salirVoz(); } return; }
+  if (!vigente()) return;
+  const { Room, RoomEvent, Track } = lk;
+  const r = new Room({ adaptiveStream: true, dynacast: true, webAudioMix: { audioContext: c } });
+  room = r;
 
   r.on(RoomEvent.TrackSubscribed, (t: RemoteTrack, _pub, part) => {
     if (t.kind !== Track.Kind.Audio) return;
@@ -94,8 +99,19 @@ export async function entrarVoz(roomId: string, salaNombre = '', grupoId: string
   for (const ev of [RoomEvent.ParticipantConnected, RoomEvent.ParticipantDisconnected, RoomEvent.ActiveSpeakersChanged,
     RoomEvent.TrackMuted, RoomEvent.TrackUnmuted, RoomEvent.TrackPublished, RoomEvent.TrackUnpublished,
     RoomEvent.LocalTrackUnpublished, RoomEvent.ParticipantNameChanged]) r.on(ev, actualizar);
-  // Desconexión iniciada por el servidor (echado, sala borrada) o red perdida sin recuperación.
-  r.on(RoomEvent.Disconnected, () => { if (vigente()) salirVoz(); });
+  // Desconexión iniciada por el servidor (echado, sala borrada) o red perdida sin recuperación. Si salimos
+  // nosotros (`salirVoz`), el intento ya no está vigente y no hay aviso. `limpiar` no toca `voz.error`.
+  r.on(RoomEvent.Disconnected, (motivo) => {
+    if (!vigente()) return;
+    const D = lk.DisconnectReason;
+    if (motivo !== D.CLIENT_INITIATED) {
+      voz.error = motivo === D.PARTICIPANT_REMOVED ? 'Te sacaron de la llamada.'
+        : motivo === D.ROOM_DELETED ? 'La sala de voz se borró.'
+        : motivo === D.DUPLICATE_IDENTITY ? 'Entraste a la voz desde otra ventana.'
+        : 'Se perdió la conexión de voz.';
+    }
+    salirVoz();
+  });
 
   let token: string, url: string;
   try {
@@ -114,13 +130,13 @@ export async function entrarVoz(roomId: string, salaNombre = '', grupoId: string
   if (!vigente()) { r.disconnect(); return; } // por si el connect terminó pese al disconnect de limpiar()
   voz.conectando = false;
   actualizar();
-  const salida = leerPrefs().salida;
-  if (await existe('audiooutput', salida) && vigente()) r.switchActiveDevice('audiooutput', salida!).catch(() => {});
-  const guardada = leerPrefs().entrada;
-  const hay = await existe('audioinput', guardada);
-  if (!vigente()) return;
-  if (leerPrefs().entrada === guardada) entrada = hay ? guardada! : 'default'; // si eligió otro mientras tanto, gana ese
   await publicarMic();
+  // La salida va después del micrófono: recién con el permiso concedido se ven los ids de los dispositivos.
+  // Si la guardada ya no existe, se sigue con la predeterminada.
+  const salida = leerPrefs().salida;
+  if (!salida || !vigente()) return;
+  const hay = await navigator.mediaDevices.enumerateDevices().then((d) => d.some((x) => x.kind === 'audiooutput' && x.deviceId === salida), () => false);
+  if (hay && vigente()) r.switchActiveDevice('audiooutput', salida).catch(() => {});
 }
 
 export function salirVoz() {
@@ -144,7 +160,6 @@ export async function alternarSupresion() {
 
 export async function elegirEntrada(deviceId: string) {
   guardarPrefs({ entrada: deviceId });
-  entrada = deviceId;
   await room?.switchActiveDevice('audioinput', deviceId).catch(() => {}); // el procesador se reinicia solo (restart)
 }
 
@@ -175,7 +190,7 @@ if (import.meta.env.DEV) {
     async stats() {
       const remotos: Record<string, { mic: boolean; bytes: number }> = {};
       for (const p of room?.remoteParticipants.values() ?? []) {
-        const pub = p.getTrackPublication(Track.Source.Microphone);
+        const pub = p.getTrackPublication(lk.Track.Source.Microphone);
         let bytes = 0;
         (await pub?.track?.getRTCStatsReport())?.forEach((s) => { if (s.type === 'inbound-rtp') bytes += s.bytesReceived ?? 0; });
         remotos[p.name || p.identity] = { mic: !!pub && !pub.isMuted, bytes };

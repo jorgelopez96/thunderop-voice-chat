@@ -28,9 +28,14 @@ test('tres personas en una sala de voz', async ({ browser }) => {
   await crearCuenta(c, 'Caro');
   await unirse(c, link);
 
+  // Beto tiene guardados dispositivos que ya no existen: entra igual con los predeterminados.
+  await b.evaluate(() => localStorage.setItem('dm.voz', JSON.stringify({ supresion: false, entrada: 'no-existe', salida: 'no-existe' })));
+
   // Los tres entran y cada uno ve a los tres.
   for (const p of [a, b, c]) await entrar(p);
   for (const p of [a, b, c]) await expect(p.locator('section.voz li')).toHaveCount(3, { timeout: 10_000 });
+  await expect.poll(async () => (await stats(b)).mic, { timeout: 10_000 }).toBe(true);
+  await expect(b.getByRole('alert')).toHaveCount(0);
 
   // El audio llega de verdad.
   await expect.poll(async () => Object.values((await stats(a)).remotos).filter((r) => r.bytes > 0).length, { timeout: 10_000 }).toBe(2);
@@ -44,11 +49,13 @@ test('tres personas en una sala de voz', async ({ browser }) => {
   await expect(tarjeta(c, 'Beto').getByLabel('Silenciado')).toBeVisible({ timeout: 5000 });
   await expect.poll(async () => (await stats(c)).remotos.Beto?.mic, { timeout: 5000 }).toBe(false);
   await expect.poll(async () => (await stats(b)).mic, { timeout: 5000 }).toBe(false);
+  await expect(b.getByText('El dueño te silenció.')).toBeVisible();
   expect(await audioLlega(c, 'Beto')).toBe(false);
 
   // Beto sale y vuelve: sigue silenciado y no puede publicar.
   await b.getByRole('button', { name: 'Desconectar' }).click();
   await expect(c.locator('section.voz li')).toHaveCount(2, { timeout: 10_000 });
+  await expect(b.getByRole('alert')).toHaveCount(0); // salir a propósito no es un error
   await entrar(b);
   await expect(c.locator('section.voz li')).toHaveCount(3, { timeout: 10_000 });
   await expect(tarjeta(c, 'Beto').getByLabel('Silenciado')).toBeVisible();
@@ -57,16 +64,19 @@ test('tres personas en una sala de voz', async ({ browser }) => {
   expect((await stats(b)).mic).toBe(false);
   expect((await stats(c)).remotos.Beto?.mic).toBe(false);
   expect(await audioLlega(c, 'Beto')).toBe(false);
+  await expect(b.getByText('El dueño te silenció.')).toBeVisible();
 
   // Ana echa a Caro: Caro queda fuera de la llamada en menos de 15 s.
   await a.locator('aside.miembros li', { hasText: 'Caro' }).getByRole('button', { name: 'Echar' }).click();
   await a.getByRole('button', { name: 'Confirmar' }).click();
   await expect(c.getByRole('button', { name: 'Desconectar' })).toHaveCount(0, { timeout: 15_000 });
+  await expect(c.getByRole('alert')).toContainText('Te sacaron de la llamada.');
   await expect(a.locator('section.voz li')).toHaveCount(2, { timeout: 10_000 });
 
   // Ana le quita el silencio a Beto: vuelve a publicar.
   await tarjeta(a, 'Beto').getByRole('button', { name: 'Quitar silencio' }).click();
   await expect.poll(async () => (await stats(a)).remotos.Beto?.mic, { timeout: 10_000 }).toBe(true);
+  await expect(b.getByText('El dueño te silenció.')).toHaveCount(0);
   await expect.poll(() => audioLlega(a, 'Beto'), { timeout: 10_000 }).toBe(true);
 
   // Ana alterna la supresión dos veces: el audio sigue fluyendo en los dos sentidos.

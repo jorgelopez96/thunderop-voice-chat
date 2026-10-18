@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { RecordModel } from 'pocketbase';
+  import { untrack } from 'svelte';
   import { sesion, mensajeError } from '../sesion.svelte';
   import { salas, enVoz, presencia, crearInvitacion, crearSala, renombrarSala, borrarSala, borrarGrupo } from '../grupos.svelte';
   import Chat from './Chat.svelte';
@@ -14,7 +15,8 @@
   // svelte-ignore state_referenced_locally
   const s = salas(grupo.id); // el componente se recrea por grupo (clave en Principal)
   $effect(() => s.parar);
-  $effect(() => { voz.salaId; presencia(grupo.id); }); // también al conectar/desconectar (incluye caídas)
+  // También al conectar/desconectar (incluye caídas). `presencia` lee `enVoz`: no debe volver a disparar esto.
+  $effect(() => { voz.salaId; const id = grupo.id; untrack(() => presencia(id)); });
 
   const chat = $derived(s.estado.lista.filter((r) => r.kind === 'chat'));
   const salasVoz = $derived(s.estado.lista.filter((r) => r.kind === 'voz'));
@@ -109,8 +111,7 @@
     <h3>Salas de voz</h3>
     <ul>{#each salasVoz as r (r.id)}{@render sala(r)}{/each}</ul>
     {@render nuevaSala('voz')}
-    {#if voz.error}<p role="alert">{voz.error}</p>{/if}
-    {#if voz.salaId && voz.grupoId === grupo.id}<ControlesVoz alSalir={() => { centroVoz = false; presencia(grupo.id); }} />{/if}
+    {#if voz.salaId}<ControlesVoz alSalir={() => { centroVoz = false; presencia(grupo.id); }} />{/if}
   </nav>
 
   {#if centroVoz && salaVoz}<Voz {grupo} {soyDueno} sala={salaVoz.name} />
