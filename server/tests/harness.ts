@@ -27,12 +27,12 @@ function puertoLibre(): Promise<number> {
   });
 }
 
-export async function startPocketBase(opts: { rateLimits?: boolean } = {}): Promise<Harness> {
+export async function startPocketBase(opts: { rateLimits?: boolean; port?: number } = {}): Promise<Harness> {
   mkdirSync(join(raiz, '.tmp'), { recursive: true });
   const dir = mkdtempSync(join(raiz, '.tmp', 'pb-'));
   // el dir se pasa tal cual; migrationsDir/hooksDir relativos a server/
   execFileSync(exe, ['superuser', 'upsert', ADMIN, PASS, '--dir', dir], { cwd: raiz, stdio: 'pipe' });
-  const puerto = await puertoLibre();
+  const puerto = opts.port ?? await puertoLibre();
   const url = `http://127.0.0.1:${puerto}`;
   const proc: ChildProcess = spawn(
     exe,
