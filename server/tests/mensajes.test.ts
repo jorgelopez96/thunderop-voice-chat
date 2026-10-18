@@ -105,4 +105,14 @@ describe('mensajes', () => {
     expect((await b.collection('messages').getList()).items).toHaveLength(0);
     await b.collection('messages').unsubscribe();
   });
+
+  it('messages expose created and sort by -created', async () => {
+    const { b, chat } = await setup();
+    const m1 = await b.collection('messages').create({ room: chat, author: uid(b), text: 'uno' });
+    await new Promise((r) => setTimeout(r, 20));
+    const m2 = await b.collection('messages').create({ room: chat, author: uid(b), text: 'dos' });
+    const l = await b.collection('messages').getList(1, 10, { sort: '-created', filter: `room="${chat}"` });
+    expect(l.items.map((m) => m.id)).toEqual([m2.id, m1.id]);
+    expect(l.items.every((m) => typeof m.created === 'string' && m.created !== '')).toBe(true);
+  });
 });
