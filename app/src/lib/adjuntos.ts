@@ -6,8 +6,10 @@ export type Validacion = { ok: true } | { ok: false; motivo: string };
 export function validarAdjunto(f: { type: string; size: number }, duracionS?: number): Validacion {
   if (!(TIPOS as readonly string[]).includes(f.type)) return { ok: false, motivo: 'Solo se permiten imágenes y videos cortos.' };
   if (f.size > MAX_BYTES) return { ok: false, motivo: 'El archivo supera los 25 MB.' };
-  if (f.type.startsWith('video/') && duracionS !== undefined && duracionS > MAX_VIDEO_S)
-    return { ok: false, motivo: 'El video supera los 60 segundos.' };
+  if (f.type.startsWith('video/')) {
+    if (duracionS === undefined || !Number.isFinite(duracionS)) return { ok: false, motivo: 'No se pudo leer la duración del video.' };
+    if (duracionS > MAX_VIDEO_S) return { ok: false, motivo: 'El video supera los 60 segundos.' };
+  }
   return { ok: true };
 }
 
