@@ -30,7 +30,7 @@
     t.attach(el);
     return () => { t.detach(el); };
   });
-  const mirar = (id: string | null) => { pctPantalla = 100; ver(id); };
+  const mirar = (id: string | null) => { pctPantalla = 100; if (id) volumenPantalla(id, 1); ver(id); };
   const quien = $derived(voz.participantes.find((p) => p.id === voz.viendo)?.nombre ?? '');
   function cambiar(id: string, pct: number) { vols[id] = pct / 100; volumen(id, pct / 100); }
 </script>
