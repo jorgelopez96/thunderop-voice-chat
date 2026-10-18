@@ -19,8 +19,8 @@ export interface Reproductor {
   onError(cb: (codigo: number) => void): void;
 }
 
-/** Ajustes del falso: `duracion` en segundos (30 por defecto) y `error` para simular un código al cargar. */
-type Falso = { duracion?: number; error?: number };
+/** Ajustes del falso: `duracion` en segundos (30 por defecto) y `errores` (videoId → código) para simular un error al cargar ese video. */
+type Falso = { duracion?: number; errores?: Record<string, number> };
 
 /** `host`: donde va el reproductor (YouTube pide que se vea, al menos 200×113). */
 export function crearReproductor(host: HTMLElement): Reproductor {
@@ -107,9 +107,10 @@ function reproductorFalso(cfg: Falso): Reproductor {
     if (sonando && t() >= dur) { base = dur; sonando = false; alEstado(FIN); }
   }, 250);
   return {
-    cargar(_id, s) {
-      base = s; sonando = false; cargado = !cfg.error;
-      if (cfg.error) { const c = cfg.error; setTimeout(() => alError(c)); }
+    cargar(id, s) {
+      const error = cfg.errores?.[id];
+      base = s; sonando = false; cargado = !error;
+      if (error) setTimeout(() => alError(error));
     },
     play() { if (!cargado || sonando) return; desde = Date.now(); sonando = true; alEstado(SONANDO); },
     pause() { if (!sonando) return; base = t(); sonando = false; alEstado(PAUSADO); },

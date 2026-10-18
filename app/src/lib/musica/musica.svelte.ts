@@ -11,11 +11,12 @@ import { crearReproductor, FIN, SONANDO, PAUSADO, type Reproductor } from './rep
 export type Cancion = { id: string; videoId: string; titulo: string; agregadoPor: string; estado: 'cola' | 'sonando' | 'hecha' | 'error' };
 type Rep = { actual: string; inicioMs: number; pausaS: number | null };
 
-/** `cola`: la que suena y las que esperan, en orden. */
+/** `cola`: la que suena, las que esperan y las que dieron error hace poco (marcadas), en orden. */
 export const musica = $state<{ cola: Cancion[]; actual: Cancion | null; pausado: boolean; error: string }>({ cola: [], actual: null, pausado: false, error: '' });
 
 const ERRORES_EMBED = [2, 5, 100, 101, 150];
 const TOLERANCIA_S = 2;
+const ERROR_VISIBLE_MS = 10 * 60_000;
 
 let sala: string | null = null;
 let rep: Rep | null = null;
@@ -108,7 +109,9 @@ async function enviar(accion: string, extra: Record<string, string> = {}): Promi
 async function cargar() {
   const s = sala, mio = ++carga;
   if (!s) return;
-  const filtro = pb.filter("room = {:r} && (estado = 'cola' || estado = 'sonando')", { r: s });
+  // Los temas con error quedan a la vista 10 minutos, en su lugar de la cola.
+  const filtro = pb.filter("room = {:r} && (estado = 'cola' || estado = 'sonando' || (estado = 'error' && updated >= {:desde}))",
+    { r: s, desde: new Date(ahoraServidor() - ERROR_VISIBLE_MS) });
   try {
     const [cola, r] = await Promise.all([
       pb.collection('canciones').getFullList<Cancion>({ filter: filtro, sort: 'created', requestKey: null }),

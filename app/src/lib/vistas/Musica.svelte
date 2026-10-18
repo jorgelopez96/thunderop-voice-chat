@@ -37,7 +37,7 @@
     {#each musica.cola as c (c.id)}
       <li class="fila">
         <span class="titulo">{c.titulo}{c.estado === 'error' ? ' — No se puede reproducir acá' : ''}</span>
-        <button class="plano" aria-label={`Quitar ${c.titulo}`} onclick={() => quitar(c.id)}>Quitar</button>
+        {#if c.estado !== 'error'}<button class="plano" aria-label={`Quitar ${c.titulo}`} onclick={() => quitar(c.id)}>Quitar</button>{/if}
       </li>
     {/each}
   </ul>

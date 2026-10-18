@@ -59,6 +59,19 @@ test('cola de música compartida', async ({ browser }) => {
   for (const p of [a, b, c]) await expect.poll(() => reproductor(p), { timeout: 15_000 }).toBe(false);
   for (const p of [a, b, c]) await expect(actual(p)).toHaveCount(0);
 
+  // Un tema que YouTube no deja embeber (150 en el falso): queda marcado en la cola y sigue el siguiente.
+  for (const p of [a, b, c]) await p.evaluate(() => { Object.assign((globalThis as unknown as { __ytFalso: object }).__ytFalso, { duracion: 600, errores: { ccccccccccc: 150 } }); });
+  for (const id of ['ccccccccccc', 'ddddddddddd']) {
+    await link.fill(`https://www.youtube.com/watch?v=${id}`);
+    await agregar.click();
+    await expect(link).toHaveValue('');
+  }
+  for (const p of [a, b, c]) await expect.poll(() => videoId(p), { timeout: 10_000 }).toBe('ddddddddddd');
+  await expect(b.locator('section.voz li span.titulo')).toHaveText(['Tema ccccccccccc — No se puede reproducir acá', 'Tema ddddddddddd']);
+  await expect(b.getByRole('button', { name: 'Quitar Tema ccccccccccc' })).toHaveCount(0);
+  await b.getByRole('button', { name: 'Saltar' }).click();
+  for (const p of [a, b, c]) await expect.poll(() => reproductor(p), { timeout: 5000 }).toBe(false);
+
   // Un link que no es de YouTube.
   await link.fill('https://example.com/watch?v=aaaaaaaaaaa');
   await agregar.click();
