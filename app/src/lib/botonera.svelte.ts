@@ -2,11 +2,12 @@ import type { RecordModel } from 'pocketbase';
 import { pb } from './pb';
 import { leerPrefs } from './prefs';
 import { contextoVoz, publicarDatos, alRecibirDatos, voz } from './voz.svelte';
-import { validarSonido, Limite } from './botoneraLogica';
+import { validarSonido, Limite, mensajeSubida } from './botoneraLogica';
 
 const TOPIC = 'botonera';
-const buffers = new Map<string, AudioBuffer>(); // ponytail: sin tope de tamaño; 50 sonidos × ≤10 s por grupo es acotado
-const cupo = new Limite(3);
+const buffers = new Map<string, { group: string; b: AudioBuffer }>(); // ponytail: sin tope de tamaño; 50 sonidos × ≤10 s por grupo es acotado
+// Un cupo por contexto: al cerrarse el de la voz (onended no es fiable ahí) su cupo se descarta con él.
+const cupos = new WeakMap<AudioContext, Limite>();
 const codificar = (o: unknown) => new TextEncoder().encode(JSON.stringify(o));
 
 /** Sonidos de un grupo, reactivos (realtime). Llamar `parar()` al terminar. */
@@ -35,7 +36,7 @@ export async function subir(grupoId: string, nombre: string, archivo: File) {
   if (msg) throw new Error(msg);
   const dueño = pb.authStore.record?.id;
   try { await pb.collection('sonidos').create({ group: grupoId, name: nombre.trim(), file: archivo, owner: dueño }); }
-  catch (e) { throw new Error((e as { response?: { message?: string } })?.response?.message || 'No se pudo subir el sonido.'); }
+  catch (e) { throw new Error(mensajeSubida((e as { response?: Parameters<typeof mensajeSubida>[0] })?.response)); }
 }
 
 export async function borrar(id: string) {
@@ -43,30 +44,38 @@ export async function borrar(id: string) {
   buffers.delete(id);
 }
 
+/** Decodifica un sonido del grupo de voz actual; uno de otro grupo (id mandado por un par de otra sala) no se decodifica ni se cachea. */
 async function buffer(id: string, c: AudioContext) {
-  let b = buffers.get(id);
-  if (!b) {
+  let e = buffers.get(id);
+  if (!e) {
     const rec = await pb.collection('sonidos').getOne(id);
-    b = await c.decodeAudioData(await (await fetch(pb.files.getURL(rec, rec.file))).arrayBuffer());
-    buffers.set(id, b);
+    if (rec.group !== voz.grupoId) throw new Error('otro grupo');
+    e = { group: rec.group, b: await c.decodeAudioData(await (await fetch(pb.files.getURL(rec, rec.file))).arrayBuffer()) };
+    buffers.set(id, e);
   }
-  return b;
+  if (e.group !== voz.grupoId) throw new Error('otro grupo');
+  return e.b;
 }
 
 /** Reproduce localmente por el contexto de la voz; si ya hay 3 sonando, se descarta. Sin voz no hay contexto: no suena. */
 async function reproducir(id: string) {
   const c = contextoVoz();
-  if (!c || !cupo.intentar()) return;
+  if (!c) return;
+  let cupo = cupos.get(c);
+  if (!cupo) cupos.set(c, cupo = new Limite(3));
+  if (!cupo.intentar()) return;
+  let tomado = true;
+  const soltar = () => { if (tomado) { tomado = false; cupo.liberar(); } };
   try {
     const b = await buffer(id, c);
-    if (c.state === 'closed') { cupo.liberar(); return; }
+    if (c.state === 'closed') return soltar();
     const fuente = c.createBufferSource(), vol = c.createGain();
     fuente.buffer = b; vol.gain.value = leerPrefs().volBotonera;
     fuente.connect(vol).connect(c.destination);
-    fuente.onended = () => { fuente.disconnect(); vol.disconnect(); cupo.liberar(); };
+    fuente.onended = () => { fuente.disconnect(); vol.disconnect(); soltar(); };
     fuente.start();
-    if (import.meta.env.DEV) (globalThis as unknown as { __botonera: { reproducidos: number } }).__botonera.reproducidos++;
-  } catch { cupo.liberar(); }
+  } catch { return soltar(); }
+  if (import.meta.env.DEV) (globalThis as unknown as { __botonera?: { reproducidos: number } }).__botonera!.reproducidos++;
 }
 
 /** Suena para todos en la sala de voz (y para uno mismo). Fuera de la voz no hace nada. */

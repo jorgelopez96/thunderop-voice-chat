@@ -18,3 +18,12 @@ export class Limite {
   intentar() { if (this.en >= this.max) return false; this.en++; return true; }
   liberar() { this.en = Math.max(0, this.en - 1); }
 }
+
+/** Mensaje en español para un error de PocketBase al crear un sonido (`e.response`): solo se deja pasar el texto propio del hook. */
+export function mensajeSubida(response: { message?: unknown; data?: { file?: { code?: unknown } } } | undefined): string {
+  if (response?.message === 'El grupo ya tiene 50 sonidos.') return response.message;
+  const code = response?.data?.file?.code;
+  if (code === 'validation_file_size_limit') return 'El sonido pesa más de 1 MB.';
+  if (code === 'validation_invalid_mime_type') return 'Tipo de archivo no permitido.';
+  return 'No se pudo subir el sonido.';
+}

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { validarSonido, Limite } from './botoneraLogica';
+import { validarSonido, Limite, mensajeSubida } from './botoneraLogica';
 
 const ok = { duracion: 3, tamaño: 1000, tipo: 'audio/mpeg' };
 
@@ -29,5 +29,17 @@ describe('Limite', () => {
     const l = new Limite(1);
     l.liberar(); l.liberar();
     expect([l.intentar(), l.intentar()]).toEqual([true, false]);
+  });
+});
+
+describe('mensajeSubida', () => {
+  it('deja pasar el tope de 50 y traduce tamaño/tipo', () => {
+    expect(mensajeSubida({ message: 'El grupo ya tiene 50 sonidos.' })).toBe('El grupo ya tiene 50 sonidos.');
+    expect(mensajeSubida({ data: { file: { code: 'validation_file_size_limit' } } })).toBe('El sonido pesa más de 1 MB.');
+    expect(mensajeSubida({ data: { file: { code: 'validation_invalid_mime_type' } } })).toBe('Tipo de archivo no permitido.');
+  });
+  it('lo demás cae a un genérico en español', () => {
+    expect(mensajeSubida({ message: 'Failed to create record.' })).toBe('No se pudo subir el sonido.');
+    expect(mensajeSubida(undefined)).toBe('No se pudo subir el sonido.');
   });
 });
