@@ -1,13 +1,21 @@
 import type { RecordModel } from 'pocketbase';
 import { pb } from './pb';
+import { mensajeError } from './sesion.svelte';
 
 const PAGINA = 50;
 const EXPAND = 'author';
+
+/** Antepone una página más antigua sin repetir ids ya presentes (realtime o cargas solapadas). */
+export function anteponer<T extends { id: string }>(actuales: T[], pagina: T[]) {
+  const ids = new Set(actuales.map((m) => m.id));
+  return [...pagina.filter((m) => !ids.has(m.id)), ...actuales];
+}
 
 /** Chat de una sala: últimos 50 + realtime. Los mensajes quedan en orden cronológico. Llamar `cerrar()` al terminar. */
 export function abrirChat(roomId: string) {
   const estado = $state<{ mensajes: RecordModel[]; hayMas: boolean; error: string }>({ mensajes: [], hayMas: false, error: '' });
   let cerrado = false;
+  let cargando = false;
   const filtroSala = pb.filter('room = {:r}', { r: roomId });
 
   const insertar = (m: RecordModel) => {
@@ -19,7 +27,7 @@ export function abrirChat(roomId: string) {
     const filter = antes ? pb.filter(`${filtroSala} && created < {:c}`, { c: antes }) : filtroSala;
     const r = await pb.collection('messages').getList(1, PAGINA, { filter, sort: '-created', expand: EXPAND, skipTotal: true });
     if (cerrado) return;
-    estado.mensajes = [...r.items.reverse(), ...estado.mensajes];
+    estado.mensajes = anteponer(estado.mensajes, r.items.reverse());
     estado.hayMas = r.items.length === PAGINA;
   }
   cargar().catch(() => { estado.error = 'No se pudieron cargar los mensajes.'; });
@@ -39,7 +47,11 @@ export function abrirChat(roomId: string) {
     get error() { return estado.error; },
     async cargarMas() {
       const primero = estado.mensajes[0];
-      if (primero) await cargar(primero.created);
+      if (!primero || cargando) return;
+      cargando = true;
+      try { await cargar(primero.created); }
+      catch (e) { estado.error = mensajeError(e); }
+      finally { cargando = false; }
     },
     cerrar() { cerrado = true; sub.then((f) => f()).catch(() => {}); },
   };

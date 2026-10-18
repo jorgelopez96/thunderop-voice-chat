@@ -13,13 +13,24 @@ export function validarAdjunto(f: { type: string; size: number }, duracionS?: nu
   return { ok: true };
 }
 
+/** Duración en segundos; NaN si no se pudo leer (timeout 5 s). MediaRecorder/webm reporta Infinity: se fuerza el cálculo buscando al final. */
 export function duracionVideo(file: File): Promise<number> {
   return new Promise((resolve, reject) => {
     const v = document.createElement('video');
     const url = URL.createObjectURL(file);
+    const fin = (r: () => void) => { clearTimeout(t); URL.revokeObjectURL(url); r(); };
+    const t = setTimeout(() => fin(() => resolve(NaN)), 5000);
     v.preload = 'metadata';
-    v.onloadedmetadata = () => { URL.revokeObjectURL(url); resolve(v.duration); };
-    v.onerror = () => { URL.revokeObjectURL(url); reject(new Error('No se pudo leer el video.')); };
+    v.onloadedmetadata = () => {
+      if (v.duration !== Infinity) return fin(() => resolve(v.duration));
+      v.ondurationchange = () => {
+        if (v.duration === Infinity) return;
+        const d = v.duration; v.currentTime = 0;
+        fin(() => resolve(d));
+      };
+      v.currentTime = 1e101;
+    };
+    v.onerror = () => fin(() => reject(new Error('No se pudo leer el video.')));
     v.src = url;
   });
 }
