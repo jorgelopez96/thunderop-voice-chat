@@ -1,6 +1,6 @@
 /// <reference path="../pb_data/types.d.ts" />
 // Hooks de `groups`: dueño/miembros forzados al crear + salas por defecto; al editar,
-// `members` solo puede achicarse y debe seguir incluyendo al dueño.
+// `members` solo puede achicarse y debe seguir incluyendo al dueño; `silenciados` solo lo cambia el dueño.
 onRecordCreateRequest((e) => {
   // los superusers conservan los valores que mandan
   if (e.auth && e.auth.collection().name === "users") {
@@ -30,17 +30,32 @@ onRecordUpdateRequest((e) => {
     if (!despues.includes(e.record.getString("owner"))) {
       throw new BadRequestError("El dueño debe seguir siendo miembro.");
     }
+    const silenciados = (r) => JSON.stringify(r.getStringSlice("silenciados"));
+    if (e.auth.id !== e.record.original().getString("owner") && silenciados(e.record) !== silenciados(e.record.original())) {
+      throw new ForbiddenError("Solo el dueño puede silenciar.");
+    }
   }
   e.next();
 }, "groups");
 
-// Quien sale o es echado (update del dueño o /leave) pierde sus invitaciones de ese grupo.
+// Quien sale o es echado (update del dueño o /leave) pierde sus invitaciones de ese grupo,
+// sale de `silenciados` y es sacado de las salas de voz en LiveKit.
 onRecordAfterUpdateSuccess((e) => {
+  const lk = require(`${__hooks}/livekit.js`);
   const antes = e.record.original().getStringSlice("members");
   const despues = e.record.getStringSlice("members");
-  antes.filter((u) => !despues.includes(u)).forEach((u) => {
+  const fuera = antes.filter((u) => !despues.includes(u));
+  fuera.forEach((u) => {
     e.app.findRecordsByFilter("invites", "group = {:g} && created_by = {:u}", "", 0, 0, { g: e.record.id, u })
       .forEach((inv) => e.app.delete(inv));
+    lk.enSalasDeVoz(e.app, e.record.id, "RemoveParticipant", { identity: u });
   });
+  const silenciados = e.record.getStringSlice("silenciados");
+  if (silenciados.some((u) => fuera.includes(u))) {
+    // este save vuelve a disparar el hook, pero sin cambio de members no hace nada
+    const g = e.app.findRecordById("groups", e.record.id);
+    g.set("silenciados", silenciados.filter((u) => !fuera.includes(u)));
+    e.app.save(g);
+  }
   e.next();
 }, "groups");

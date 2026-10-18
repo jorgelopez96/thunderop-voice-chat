@@ -1,18 +1,8 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect } from '@playwright/test';
 import { fileURLToPath } from 'node:url';
+import { crearCuenta, unirse } from './cuentas';
 
 const img = fileURLToPath(new URL('../../server/tests/fixtures/img.png', import.meta.url));
-const sufijo = Date.now();
-
-async function crearCuenta(page: Page, nombre: string) {
-  await page.goto('/');
-  await page.getByRole('tab', { name: 'Crear cuenta' }).click();
-  await page.getByLabel('Nombre').fill(nombre);
-  await page.getByLabel('Email').fill(`${nombre}${sufijo}@test.local`);
-  await page.getByLabel('Contraseña').fill('clave-segura-123');
-  await page.getByRole('button', { name: 'Crear cuenta', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Mis grupos' })).toBeVisible();
-}
 
 test('cuentas, grupos, invitaciones y chat', async ({ browser }) => {
   const a = await (await browser.newContext()).newPage();
@@ -28,10 +18,7 @@ test('cuentas, grupos, invitaciones y chat', async ({ browser }) => {
 
   // 3
   await crearCuenta(b, 'Beto');
-  await b.getByRole('button', { name: 'Unirme con código' }).click();
-  await b.getByPlaceholder('Código o link de invitación').fill(link);
-  await b.getByRole('button', { name: 'Unirme', exact: true }).click();
-  await expect(b.getByRole('heading', { name: 'Salas de chat' })).toBeVisible();
+  await unirse(b, link);
   await b.getByRole('button', { name: '# General' }).click();
   await a.getByRole('button', { name: '# General' }).click();
 

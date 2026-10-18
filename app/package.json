@@ -15,7 +15,9 @@
   },
   "license": "MIT",
   "dependencies": {
+    "@sapphi-red/web-noise-suppressor": "^0.4.1",
     "@tauri-apps/api": "^2",
+    "livekit-client": "^2.23.0",
     "pocketbase": "^0.28.1"
   },
   "devDependencies": {

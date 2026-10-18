@@ -1,14 +1,17 @@
 import { ClientResponseError, type RecordModel } from 'pocketbase';
 import { pb } from './pb';
 import { extraerCodigo, linkInvitacion } from './invitacion';
+import { salirVoz, voz } from './voz.svelte';
 
 export const grupos = $state<{ lista: RecordModel[]; cargado: boolean }>({ lista: [], cargado: false });
 // Svelte no permite reasignar un $state exportado: se expone como propiedad.
 export const grupoActual = $state<{ id: string | null }>({ id: null });
+/** Quién está en cada sala de voz del grupo actual: `{ [roomId]: { id, name }[] }`. */
+export const enVoz = $state<{ grupo: string | null; salas: Record<string, { id: string; name: string }[]> }>({ grupo: null, salas: {} });
 
 // Al cerrar sesión (o invalidarse) no debe quedar nada del usuario anterior.
 pb.authStore.onChange(() => {
-  if (!pb.authStore.token) { grupos.lista = []; grupos.cargado = false; grupoActual.id = null; }
+  if (!pb.authStore.token) { grupos.lista = []; grupos.cargado = false; grupoActual.id = null; enVoz.grupo = null; enVoz.salas = {}; salirVoz(); voz.error = ''; voz.muteado = false; }
 });
 
 const ES = (e: unknown, ...codigos: number[]) => e instanceof ClientResponseError && codigos.includes(e.status);
@@ -21,8 +24,18 @@ export async function recargarGrupos() {
   } catch { /* red caída: se conserva la lista anterior */ }
 }
 
+/** Actualiza `enVoz` con la presencia de voz del grupo. Si falla (red, LiveKit caído) se conserva la última. */
+export async function presencia(groupId: string) {
+  if (enVoz.grupo !== groupId) { enVoz.grupo = groupId; enVoz.salas = {}; }
+  try {
+    const salas = await pb.send(`/api/groups/${groupId}/voz`, {});
+    if (enVoz.grupo === groupId) enVoz.salas = salas;
+  } catch { /* se conserva la presencia anterior */ }
+}
+
 async function verificarActual() {
-  if (!grupoActual.id) return;
+  if (!grupoActual.id) { enVoz.grupo = null; enVoz.salas = {}; return; }
+  presencia(grupoActual.id);
   try { await pb.collection('groups').getOne(grupoActual.id); }
   catch (e) { if (ES(e, 404)) { grupoActual.id = null; await recargarGrupos(); } }
 }

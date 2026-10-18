@@ -8,3 +8,4 @@ spikes/pantalla/server/data/
 server/pb_data/
 server/pocketbase.exe
 server/.tmp/
+server/.env.local
