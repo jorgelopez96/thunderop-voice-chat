@@ -12,6 +12,7 @@
   "app": {
     "windows": [
       {
+        "create": false,
         "title": "Discord mejorado",
         "width": 1200,
         "height": 760,
@@ -20,8 +21,8 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; connect-src 'self' http://127.0.0.1:8090 ws://127.0.0.1:7880; script-src 'self' 'wasm-unsafe-eval'; img-src 'self' data: blob: http://127.0.0.1:8090; media-src 'self' blob: http://127.0.0.1:8090; style-src 'self' 'unsafe-inline'",
-      "devCsp": "default-src 'self'; connect-src 'self' ws://localhost:1420 ws://127.0.0.1:1420 http://localhost:1420 http://127.0.0.1:8090 ws://127.0.0.1:7880; script-src 'self' 'wasm-unsafe-eval'; img-src 'self' data: blob: http://127.0.0.1:8090; media-src 'self' blob: http://127.0.0.1:8090; style-src 'self' 'unsafe-inline'"
+      "csp": "default-src 'self'; connect-src 'self' ipc: http://ipc.localhost http://127.0.0.1:8090 ws://127.0.0.1:7880; script-src 'self' 'wasm-unsafe-eval'; img-src 'self' data: blob: http://127.0.0.1:8090; media-src 'self' blob: http://127.0.0.1:8090; style-src 'self' 'unsafe-inline'",
+      "devCsp": "default-src 'self'; connect-src 'self' ipc: http://ipc.localhost ws://localhost:1420 ws://127.0.0.1:1420 http://localhost:1420 http://127.0.0.1:8090 ws://127.0.0.1:7880; script-src 'self' 'wasm-unsafe-eval'; img-src 'self' data: blob: http://127.0.0.1:8090; media-src 'self' blob: http://127.0.0.1:8090; style-src 'self' 'unsafe-inline'"
     },
     "withGlobalTauri": false
   },

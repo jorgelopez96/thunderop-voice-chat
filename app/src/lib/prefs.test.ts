@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { leerPrefs, guardarPrefs } from './prefs';
 import { volumen } from './voz.svelte';
 
-const DEFAULTS = { supresion: false, volumenes: {} };
+const DEFAULTS = { supresion: false, volumenes: {}, calidad: '1080p60', gpu: true, vistaPrevia: true };
 
 describe('prefs de voz', () => {
   // Vitest corre en Node (sin localStorage): uno en memoria por test.
@@ -24,7 +24,27 @@ describe('prefs de voz', () => {
   it('guardarPrefs mezcla y conserva volúmenes previos', () => {
     guardarPrefs({ entrada: 'mic1', volumenes: { a: 0.5 } });
     guardarPrefs({ supresion: true, volumenes: { b: 2 } });
-    expect(leerPrefs()).toEqual({ entrada: 'mic1', supresion: true, volumenes: { a: 0.5, b: 2 } });
+    expect(leerPrefs()).toEqual({ ...DEFAULTS, entrada: 'mic1', supresion: true, volumenes: { a: 0.5, b: 2 } });
+  });
+
+  it('calidad y gpu tienen defaults', () => {
+    expect(leerPrefs()).toMatchObject({ calidad: '1080p60', gpu: true });
+  });
+
+  it('calidad inválida cae al default', () => {
+    localStorage.setItem('dm.voz', JSON.stringify({ calidad: '4k' }));
+    expect(leerPrefs().calidad).toBe('1080p60');
+  });
+
+  it('gpu false se respeta', () => {
+    localStorage.setItem('dm.voz', JSON.stringify({ gpu: false }));
+    expect(leerPrefs().gpu).toBe(false);
+  });
+
+  it('vistaPrevia: default true y false se respeta', () => {
+    expect(leerPrefs().vistaPrevia).toBe(true);
+    localStorage.setItem('dm.voz', JSON.stringify({ vistaPrevia: false }));
+    expect(leerPrefs().vistaPrevia).toBe(false);
   });
 
   it('localStorage que tira error no rompe', () => {

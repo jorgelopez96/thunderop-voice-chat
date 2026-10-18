@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { dispositivos, elegirEntrada, elegirSalida } from '../voz.svelte';
-  import { leerPrefs } from '../prefs';
+  import { voz, vistaPrevia, dispositivos, elegirEntrada, elegirSalida } from '../voz.svelte';
+  import { leerPrefs, guardarPrefs } from '../prefs';
 
   let { cerrar }: { cerrar: () => void } = $props();
   let d: HTMLDialogElement;
@@ -25,11 +25,17 @@
       {#each lista.salidas.filter((x) => x.deviceId !== 'default') as x (x.deviceId)}<option value={x.deviceId}>{x.label || 'Altavoz'}</option>{/each}
     </select>
   </label>
+  <label class="casilla"><input type="checkbox" checked={prefs.gpu} onchange={(e) => guardarPrefs({ gpu: e.currentTarget.checked })} /> Codificar con la GPU</label>
+  <small>Desactivala solo si alguien no puede ver tu transmisión. Aplica en la próxima transmisión.</small>
+  <label class="casilla"><input type="checkbox" checked={voz.vistaPrevia} onchange={(e) => vistaPrevia(e.currentTarget.checked)} /> Mostrar vista previa de mi transmisión</label>
+  <small>Desactivala para ahorrar recursos.</small>
   <div class="fila" style="justify-content:flex-end"><button onclick={cerrar}>Cerrar</button></div>
 </dialog>
 
 <style>
   dialog { display: flex; flex-direction: column; gap: 12px; min-width: 300px; }
   dialog:not([open]) { display: none; }
+  .casilla { flex-direction: row; align-items: center; gap: 8px; }
+  small { color: var(--tenue); font-size: 12px; }
   select { font: inherit; color: var(--texto); background: var(--hondo); border: 0; border-radius: var(--radio); padding: 8px 10px; }
 </style>

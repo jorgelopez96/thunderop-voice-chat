@@ -25,15 +25,16 @@ export default defineConfig({
   timeout: 90_000,
   use: {
     channel: 'msedge',
-    baseURL: 'http://127.0.0.1:1420',
+    baseURL: 'http://127.0.0.1:1430',
     permissions: ['microphone'],
+    // Edge en inglés: `--auto-select-desktop-capture-source=Entire screen` hace que getDisplayMedia resuelva sin selector (probado solo, anda).
     launchOptions: {
-      args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', `--use-file-for-fake-audio-capture=${tono}`],
+      args: ['--use-fake-ui-for-media-stream', '--auto-select-desktop-capture-source=Entire screen', '--use-fake-device-for-media-stream', `--use-file-for-fake-audio-capture=${tono}`],
     },
   },
   webServer: {
-    command: 'npm run dev',
-    url: 'http://127.0.0.1:1420',
+    command: 'npm run dev -- --port 1430 --strictPort', // 1420 queda para `tauri dev`
+    url: 'http://127.0.0.1:1430',
     reuseExistingServer: false,
     env: { VITE_PB_URL: 'http://127.0.0.1:8091' },
   },
