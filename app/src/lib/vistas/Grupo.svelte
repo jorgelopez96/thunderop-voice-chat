@@ -2,6 +2,7 @@
   import type { RecordModel } from 'pocketbase';
   import { sesion, mensajeError } from '../sesion.svelte';
   import { salas, crearInvitacion, crearSala, renombrarSala, borrarSala, borrarGrupo } from '../grupos.svelte';
+  import Chat from './Chat.svelte';
   import Miembros from './Miembros.svelte';
   import Confirmar from './Confirmar.svelte';
 
@@ -14,6 +15,8 @@
   const chat = $derived(s.estado.lista.filter((r) => r.kind === 'chat'));
   const voz = $derived(s.estado.lista.filter((r) => r.kind === 'voz'));
 
+  let salaId = $state<string | null>(null);
+  const salaAbierta = $derived(chat.find((r) => r.id === salaId));
   let link = $state('');
   let error = $state('');
   let nueva = $state({ chat: '', voz: '' });
@@ -47,7 +50,7 @@
       <button onclick={() => hacer(guardarNombre)}>Guardar</button>
       <button onclick={() => (editando = null)}>Cancelar</button>
     {:else}
-      <button disabled={deshabilitada}>{r.kind === 'chat' ? '#' : '🔊'} {r.name}</button>
+      <button disabled={deshabilitada} onclick={() => (salaId = r.id)}>{r.kind === 'chat' ? '#' : '🔊'} {r.name}</button>
       {#if deshabilitada}<small>Disponible en la próxima versión</small>{/if}
       {#if soyDueno}
         <button onclick={() => (editando = { id: r.id, name: r.name })}>Renombrar</button>
@@ -78,6 +81,8 @@
     <input placeholder="Nueva sala de voz" bind:value={nueva.voz} maxlength="40" />
     <button onclick={() => hacer(() => agregar('voz'))}>Crear sala de voz</button>
   {/if}
+
+  {#if salaAbierta}{#key salaAbierta.id}<Chat room={salaAbierta} {soyDueno} />{/key}{/if}
 
   <Miembros {grupo} />
   {#if confirmar}
