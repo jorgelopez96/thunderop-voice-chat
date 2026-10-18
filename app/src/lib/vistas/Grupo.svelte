@@ -1,9 +1,12 @@
 <script lang="ts">
   import type { RecordModel } from 'pocketbase';
   import { sesion, mensajeError } from '../sesion.svelte';
-  import { salas, crearInvitacion, crearSala, renombrarSala, borrarSala, borrarGrupo } from '../grupos.svelte';
+  import { salas, enVoz, presencia, crearInvitacion, crearSala, renombrarSala, borrarSala, borrarGrupo } from '../grupos.svelte';
   import Chat from './Chat.svelte';
   import Miembros from './Miembros.svelte';
+  import Voz from './Voz.svelte';
+  import ControlesVoz from './ControlesVoz.svelte';
+  import { voz, entrarVoz } from '../voz.svelte';
   import Confirmar from './Confirmar.svelte';
 
   let { grupo, volver }: { grupo: RecordModel; volver: () => void } = $props();
@@ -11,11 +14,14 @@
   // svelte-ignore state_referenced_locally
   const s = salas(grupo.id); // el componente se recrea por grupo (clave en Principal)
   $effect(() => s.parar);
+  $effect(() => { presencia(grupo.id); });
 
   const chat = $derived(s.estado.lista.filter((r) => r.kind === 'chat'));
-  const voz = $derived(s.estado.lista.filter((r) => r.kind === 'voz'));
+  const salasVoz = $derived(s.estado.lista.filter((r) => r.kind === 'voz'));
+  const salaVoz = $derived(salasVoz.find((r) => r.id === voz.salaId));
 
   let salaId = $state<string | null>(null);
+  let centroVoz = $state(false); // el centro muestra la voz (si no, el chat elegido)
   const salaAbierta = $derived(chat.find((r) => r.id === salaId));
   let link = $state('');
   let error = $state('');
@@ -37,27 +43,39 @@
     await crearSala(grupo.id, name, kind, s.estado.lista.length);
     nueva[kind] = '';
   }
+  async function abrir(r: RecordModel) {
+    if (r.kind === 'chat') { salaId = r.id; centroVoz = false; return; }
+    centroVoz = true;
+    if (voz.salaId === r.id) return;
+    await entrarVoz(r.id);
+    presencia(grupo.id);
+  }
+  /** Quién está en la sala: en la tuya, los participantes en vivo; en otras, la presencia del servidor. */
+  const quienes = (r: RecordModel) =>
+    r.id === voz.salaId ? voz.participantes.map((p) => p.nombre) : (enVoz.grupo === grupo.id ? enVoz.salas[r.id] ?? [] : []).map((p) => p.name);
   async function guardarNombre() {
     if (editando?.name.trim()) await renombrarSala(editando.id, editando.name.trim());
     editando = null;
   }
 </script>
 
-{#snippet sala(r: RecordModel, deshabilitada: boolean)}
-  <li class="sala" class:activa={r.id === salaId}>
+{#snippet sala(r: RecordModel)}
+  <li class="sala" class:activa={r.kind === 'chat' ? r.id === salaId && !centroVoz : r.id === voz.salaId && centroVoz}>
     {#if editando?.id === r.id}
       <input bind:value={editando.name} maxlength="40" />
       <button onclick={() => hacer(guardarNombre)}>Guardar</button>
       <button class="plano" onclick={() => (editando = null)}>Cancelar</button>
     {:else}
-      <button class="plano nombre" disabled={deshabilitada} title={deshabilitada ? 'Disponible en la próxima versión' : undefined}
-        onclick={() => (salaId = r.id)}>{r.kind === 'chat' ? '#' : '🔊'} {r.name}</button>
+      <button class="plano nombre" onclick={() => hacer(() => abrir(r))}>{r.kind === 'chat' ? '#' : '🔊'} {r.name}</button>
       {#if soyDueno}
         <span class="acciones">
           <button class="plano" title="Renombrar" aria-label="Renombrar" onclick={() => (editando = { id: r.id, name: r.name })}>✎</button>
           <button class="plano" title="Borrar sala" aria-label="Borrar sala" onclick={() => (confirmar = { texto: `¿Borrar la sala "${r.name}"?`, hacer: () => borrarSala(r.id) })}>✕</button>
         </span>
       {/if}
+    {/if}
+    {#if r.kind === 'voz' && quienes(r).length}
+      <ul class="quienes">{#each quienes(r) as n}<li>{n}</li>{/each}</ul>
     {/if}
   </li>
 {/snippet}
@@ -85,16 +103,18 @@
     {#if error}<p role="alert">{error}</p>{/if}
 
     <h3>Salas de chat</h3>
-    <ul>{#each chat as r (r.id)}{@render sala(r, false)}{/each}</ul>
+    <ul>{#each chat as r (r.id)}{@render sala(r)}{/each}</ul>
     {@render nuevaSala('chat')}
 
     <h3>Salas de voz</h3>
-    <ul>{#each voz as r (r.id)}{@render sala(r, true)}{/each}</ul>
+    <ul>{#each salasVoz as r (r.id)}{@render sala(r)}{/each}</ul>
     {@render nuevaSala('voz')}
-    <small>La voz llega en la próxima versión.</small>
+    {#if voz.error}<p role="alert">{voz.error}</p>{/if}
+    {#if salaVoz}<ControlesVoz sala={salaVoz.name} alSalir={() => { centroVoz = false; presencia(grupo.id); }} />{/if}
   </nav>
 
-  {#if salaAbierta}{#key salaAbierta.id}<Chat room={salaAbierta} {soyDueno} />{/key}
+  {#if centroVoz && salaVoz}<Voz {grupo} {soyDueno} sala={salaVoz.name} />
+  {:else if salaAbierta}{#key salaAbierta.id}<Chat room={salaAbierta} {soyDueno} />{/key}
   {:else}<div class="vacio">Elegí una sala de chat</div>{/if}
 
   <Miembros {grupo} />
@@ -109,11 +129,12 @@
   .salas { background: var(--panel); padding: 12px 8px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
   .cabecera { display: flex; align-items: center; gap: 4px; margin-bottom: 8px; }
   .cabecera h2 { font-size: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .sala { display: flex; align-items: center; border-radius: var(--radio); }
+  .sala { display: flex; flex-wrap: wrap; align-items: center; border-radius: var(--radio); }
   .sala:hover, .sala.activa { background: var(--hover); }
   .sala .nombre { flex: 1; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .sala.activa .nombre { color: var(--texto); }
   .sala input { flex: 1; min-width: 0; padding: 4px 6px; }
+  .quienes { flex-basis: 100%; padding: 0 0 4px 28px; font-size: 13px; color: var(--tenue); }
   .acciones { opacity: 0; }
   .sala:hover .acciones, .sala:focus-within .acciones { opacity: 1; }
   .nueva { display: flex; }
