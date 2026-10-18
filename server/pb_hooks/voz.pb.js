@@ -1,5 +1,6 @@
 /// <reference path="../pb_data/types.d.ts" />
-// Rutas de voz: token de LiveKit para una sala y presencia por grupo.
+// Rutas de voz: token de LiveKit para una sala, presencia por grupo y silenciar (dueño).
+// Al borrar una sala de voz se borra también en LiveKit.
 
 routerAdd("POST", "/api/rooms/{id}/token", (e) => {
   const lk = require(`${__hooks}/livekit.js`);
@@ -34,3 +35,37 @@ routerAdd("GET", "/api/groups/{id}/voz", (e) => {
   });
   return e.json(200, res);
 }, $apis.requireAuth("users"));
+
+// Dueño silencia (o no) a un miembro: guarda `silenciados` y actualiza el permiso en vivo.
+routerAdd("POST", "/api/groups/{id}/silenciar", (e) => {
+  const lk = require(`${__hooks}/livekit.js`);
+  const group = lk.grupoDeMiembro(e.app, e.request.pathValue("id"), e.auth.id);
+  if (group.getString("owner") !== e.auth.id) throw new ForbiddenError("Solo el dueño puede silenciar.");
+  const body = e.requestInfo().body;
+  const user = body.user;
+  if (typeof user !== "string" || typeof body.silenciado !== "boolean") {
+    throw new BadRequestError("Faltan datos: user y silenciado.");
+  }
+  if (user === e.auth.id) throw new BadRequestError("No te podés silenciar a vos mismo.");
+  if (!group.getStringSlice("members").includes(user)) throw new BadRequestError("Ese usuario no es miembro del grupo.");
+
+  const otros = group.getStringSlice("silenciados").filter((u) => u !== user);
+  group.set("silenciados", body.silenciado ? otros.concat(user) : otros);
+  e.app.save(group);
+
+  // Enums de TrackSource en su nombre protobuf (Twirp JSON); vacío = todas las fuentes.
+  const canPublishSources = body.silenciado ? ["CAMERA", "SCREEN_SHARE", "SCREEN_SHARE_AUDIO"] : [];
+  lk.enSalasDeVoz(e.app, group.id, "UpdateParticipant", {
+    identity: user,
+    permission: { canSubscribe: true, canPublish: true, canPublishData: true, canPublishSources },
+  });
+  return e.json(200, { ok: true });
+}, $apis.requireAuth("users"));
+
+onRecordAfterDeleteSuccess((e) => {
+  if (e.record.getString("kind") === "voz") {
+    const lk = require(`${__hooks}/livekit.js`);
+    lk.enSalasDeVoz(e.app, e.record.getString("group"), "DeleteRoom", {}, [e.record.id]);
+  }
+  e.next();
+}, "rooms");

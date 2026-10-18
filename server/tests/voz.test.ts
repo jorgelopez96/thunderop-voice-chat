@@ -33,6 +33,19 @@ async function setup() {
   return { a, b, c, g, voz, chat };
 }
 
+// Llama a la RoomService de LiveKit con un token de admin firmado acá.
+async function roomService(method: string, body: object) {
+  const b64 = (o: object) => Buffer.from(JSON.stringify(o)).toString('base64url');
+  const ahora = Math.floor(Date.now() / 1000);
+  const cuerpo = `${b64({ alg: 'HS256', typ: 'JWT' })}.${b64({ iss: lk.key, nbf: ahora, exp: ahora + 60, video: { roomCreate: true, roomList: true } })}`;
+  const jwt = `${cuerpo}.${createHmac('sha256', lk.secret).update(cuerpo).digest('base64url')}`;
+  const res = await fetch(`${lk.apiUrl}/twirp/livekit.RoomService/${method}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${jwt}` }, body: JSON.stringify(body),
+  });
+  expect(res.status).toBe(200);
+  return res.json();
+}
+
 const token = (pb: { send: Function }, sala: string) => pb.send(`/api/rooms/${sala}/token`, { method: 'POST' });
 
 describe('voz', () => {
@@ -103,5 +116,112 @@ describe('voz', () => {
   it('presencia: no miembro → 403', async () => {
     const { c, g } = await setup();
     await expect(c.send(`/api/groups/${g.id}/voz`, {})).rejects.toMatchObject({ status: 403 });
+  });
+  describe('moderación', () => {
+    const silenciar = (pb: { send: Function }, g: string, user: string, silenciado: boolean) =>
+      pb.send(`/api/groups/${g}/silenciar`, { method: 'POST', body: { user, silenciado } });
+
+    it('dueño silencia y el siguiente token no permite micrófono', async () => {
+      const { a, b, g, voz } = await setup();
+      const bId = b.authStore.record!.id;
+      expect(await silenciar(a, g.id, bId, true)).toEqual({ ok: true });
+      expect((await a.collection('groups').getOne(g.id)).silenciados).toEqual([bId]);
+      const c = verificar((await token(b, voz.id)).token, lk.secret);
+      expect(c.video.canPublishSources).toEqual(['camera', 'screen_share', 'screen_share_audio']);
+    });
+
+    it('dueño quita el silencio y el token vuelve a permitir todo', async () => {
+      const { a, b, g, voz } = await setup();
+      const bId = b.authStore.record!.id;
+      await silenciar(a, g.id, bId, true);
+      expect(await silenciar(a, g.id, bId, false)).toEqual({ ok: true });
+      expect((await a.collection('groups').getOne(g.id)).silenciados).toEqual([]);
+      const c = verificar((await token(b, voz.id)).token, lk.secret);
+      expect(c.video.canPublishSources).toBeUndefined();
+    });
+
+    it('no dueño → 403', async () => {
+      const { a, b, g } = await setup();
+      await expect(silenciar(b, g.id, a.authStore.record!.id, true)).rejects.toMatchObject({ status: 403 });
+    });
+
+    it('silenciar al dueño → 400', async () => {
+      const { a, g } = await setup();
+      await expect(silenciar(a, g.id, a.authStore.record!.id, true)).rejects.toMatchObject({ status: 400 });
+    });
+
+    it('silenciar a un no miembro → 400', async () => {
+      const { a, c, g } = await setup();
+      await expect(silenciar(a, g.id, c.authStore.record!.id, true)).rejects.toMatchObject({ status: 400 });
+      await expect(a.send(`/api/groups/${g.id}/silenciar`, { method: 'POST', body: { user: 'x' } }))
+        .rejects.toMatchObject({ status: 400 });
+    });
+
+    it('echar con livekit vivo no falla y saca de silenciados', async () => {
+      const { a, b, g } = await setup();
+      const aId = a.authStore.record!.id;
+      await silenciar(a, g.id, b.authStore.record!.id, true);
+      await a.collection('groups').update(g.id, { members: [aId] });
+      const grupo = await a.collection('groups').getOne(g.id);
+      expect(grupo.members).toEqual([aId]);
+      expect(grupo.silenciados).toEqual([]);
+    });
+
+    it('salir del grupo también saca de silenciados', async () => {
+      const { a, b, g } = await setup();
+      await silenciar(a, g.id, b.authStore.record!.id, true);
+      await b.send(`/api/groups/${g.id}/leave`, { method: 'POST' });
+      expect((await a.collection('groups').getOne(g.id)).silenciados).toEqual([]);
+    });
+
+    it('borrar sala de voz con livekit vivo no falla', async () => {
+      const { a, chat, voz } = await setup();
+      await roomService('CreateRoom', { name: voz.id });
+      await a.collection('rooms').delete(voz.id);
+      await expect(a.collection('rooms').getOne(voz.id)).rejects.toMatchObject({ status: 404 });
+      expect((await roomService('ListRooms', { names: [voz.id] })).rooms ?? []).toEqual([]);
+      await a.collection('rooms').delete(chat.id); // no es de voz: no toca livekit
+    });
+
+    it('miembro no puede editar silenciados por la API de registros', async () => {
+      const { a, b, g } = await setup();
+      const bId = b.authStore.record!.id;
+      await silenciar(a, g.id, bId, true);
+      await expect(b.collection('groups').update(g.id, { silenciados: [] })).rejects.toMatchObject({ status: 404 });
+      expect((await a.collection('groups').getOne(g.id)).silenciados).toEqual([bId]);
+    });
+  
+    it('con livekit vivo no se registran fallos', async () => {
+      await new Promise((r) => setTimeout(r, 3500)); // los logs de PocketBase se guardan cada ~3 s
+      expect((await h.admin.logs.getList(1, 50, { filter: 'message = "LiveKit falló"' })).items).toEqual([]);
+    });
+
+    it('livekit caído: se registra con warn y no revierte', async () => {
+      const h2 = await startPocketBase({
+        env: { LIVEKIT_URL: lk.wsUrl, LIVEKIT_API_URL: 'http://127.0.0.1:1', LIVEKIT_API_KEY: lk.key, LIVEKIT_API_SECRET: lk.secret },
+      });
+      try {
+        const a = await h2.nuevoUsuario('ana');
+        const b = await h2.nuevoUsuario('beto');
+        const g = await a.collection('groups').create({ name: 'g' });
+        const inv = await a.collection('invites').create({ group: g.id });
+        await b.send('/api/invites/join', { method: 'POST', body: { code: inv.code } });
+        const voz = (await a.collection('rooms').getFullList()).find((r) => r.kind === 'voz')!;
+        const bId = b.authStore.record!.id;
+        expect(await silenciar(a, g.id, bId, true)).toEqual({ ok: true });
+        await a.collection('groups').update(g.id, { members: [a.authStore.record!.id] });
+        await a.collection('rooms').delete(voz.id);
+        expect((await a.collection('groups').getOne(g.id)).silenciados).toEqual([]);
+        let metodos: string[] = [];
+        for (let i = 0; i < 60 && metodos.length < 3; i++) {
+          await new Promise((r) => setTimeout(r, 100));
+          const logs = await h2.admin.logs.getList(1, 50, { filter: 'message = "LiveKit falló"' });
+          metodos = logs.items.map((l) => l.data.method).sort();
+        }
+        expect(metodos).toEqual(['DeleteRoom', 'RemoveParticipant', 'UpdateParticipant']);
+      } finally {
+        await h2.stop();
+      }
+    });
   });
 });

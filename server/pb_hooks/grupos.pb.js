@@ -38,13 +38,24 @@ onRecordUpdateRequest((e) => {
   e.next();
 }, "groups");
 
-// Quien sale o es echado (update del dueño o /leave) pierde sus invitaciones de ese grupo.
+// Quien sale o es echado (update del dueño o /leave) pierde sus invitaciones de ese grupo,
+// sale de `silenciados` y es sacado de las salas de voz en LiveKit.
 onRecordAfterUpdateSuccess((e) => {
+  const lk = require(`${__hooks}/livekit.js`);
   const antes = e.record.original().getStringSlice("members");
   const despues = e.record.getStringSlice("members");
-  antes.filter((u) => !despues.includes(u)).forEach((u) => {
+  const fuera = antes.filter((u) => !despues.includes(u));
+  fuera.forEach((u) => {
     e.app.findRecordsByFilter("invites", "group = {:g} && created_by = {:u}", "", 0, 0, { g: e.record.id, u })
       .forEach((inv) => e.app.delete(inv));
+    lk.enSalasDeVoz(e.app, e.record.id, "RemoveParticipant", { identity: u });
   });
+  const silenciados = e.record.getStringSlice("silenciados");
+  if (silenciados.some((u) => fuera.includes(u))) {
+    // este save vuelve a disparar el hook, pero sin cambio de members no hace nada
+    const g = e.app.findRecordById("groups", e.record.id);
+    g.set("silenciados", silenciados.filter((u) => !fuera.includes(u)));
+    e.app.save(g);
+  }
   e.next();
 }, "groups");

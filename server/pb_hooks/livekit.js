@@ -21,7 +21,8 @@ function token(c, claims, segundos) {
   return $security.createJWT(payload, c.secret, segundos);
 }
 
-// POST a la RoomService (Twirp) con un token de admin de `room`. Devuelve el JSON;
+// POST a la RoomService (Twirp) con un token de admin de `room` (+ roomCreate, que DeleteRoom exige;
+// el token no sale del servidor). Devuelve el JSON;
 // si LiveKit no responde 200, tira un Error con `status` = código de LiveKit.
 function roomService(c, method, body, room) {
   const res = $http.send({
@@ -30,7 +31,7 @@ function roomService(c, method, body, room) {
     body: JSON.stringify(body),
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${token(c, { video: { roomAdmin: true, room } }, 60)}`,
+      Authorization: `Bearer ${token(c, { video: { roomAdmin: true, roomCreate: true, room } }, 60)}`,
     },
     timeout: 10,
   });
@@ -40,6 +41,26 @@ function roomService(c, method, body, room) {
     throw err;
   }
   return res.json;
+}
+
+// Llama `method` de la RoomService en cada sala de voz del grupo (o en `salas`, si se pasan ids).
+// "not found" (404) no es error; cualquier otro fallo, o LiveKit sin configurar, se registra con warn
+// y no corta: la operación de PocketBase ya está hecha.
+function enSalasDeVoz(app, groupId, method, body, salas) {
+  let c;
+  try {
+    c = config();
+  } catch (_) {
+    return;
+  }
+  salas = salas || app.findRecordsByFilter("rooms", "group = {:g} && kind = 'voz'", "", 0, 0, { g: groupId }).map((r) => r.id);
+  salas.forEach((room) => {
+    try {
+      roomService(c, method, Object.assign({ room }, body), room);
+    } catch (err) {
+      if (err.status !== 404) app.logger().warn("LiveKit falló", "method", method, "room", room, "error", String(err));
+    }
+  });
 }
 
 // Busca el grupo y exige que `userId` sea miembro.
@@ -56,4 +77,4 @@ function grupoDeMiembro(app, groupId, userId) {
   return group;
 }
 
-module.exports = { config, token, roomService, grupoDeMiembro };
+module.exports = { config, token, roomService, enSalasDeVoz, grupoDeMiembro };
