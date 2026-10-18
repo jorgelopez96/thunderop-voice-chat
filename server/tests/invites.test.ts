@@ -76,6 +76,40 @@ describe('invitaciones', () => {
     await expect(b.collection('groups').getOne(g.id)).rejects.toMatchObject({ status: 404 });
   });
 
+  it("kicked member's own invites are revoked", async () => {
+    const { a, b, g, inv } = await setup();
+    await join(b, inv.code);
+    const x = await b.collection('invites').create({ group: g.id });
+    await a.collection('groups').update(g.id, { members: [a.authStore.record!.id] });
+    const c = await h.nuevoUsuario('carla');
+    await expect(join(c, x.code)).rejects.toMatchObject({ status: 404 });
+    await expect(h.admin.collection('invites').getOne(x.id)).rejects.toMatchObject({ status: 404 });
+  });
+
+  it('leaving revokes own invites', async () => {
+    const { b, c, g, inv } = await setup();
+    await join(b, inv.code);
+    const y = await b.collection('invites').create({ group: g.id });
+    await leave(b, g.id);
+    await expect(join(c, y.code)).rejects.toMatchObject({ status: 404 });
+  });
+
+  it("other members' invites survive a kick", async () => {
+    const { a, b, c, g, inv } = await setup();
+    await join(b, inv.code);
+    const z = await a.collection('invites').create({ group: g.id });
+    await a.collection('groups').update(g.id, { members: [a.authStore.record!.id] });
+    expect(await join(c, z.code)).toEqual({ group: g.id });
+  });
+
+  it('kicked member can rejoin with a fresh invite from a member', async () => {
+    const { a, b, g, inv } = await setup();
+    await join(b, inv.code);
+    await a.collection('groups').update(g.id, { members: [a.authStore.record!.id] });
+    const w = await a.collection('invites').create({ group: g.id });
+    expect(await join(b, w.code)).toEqual({ group: g.id });
+  });
+
   it('member leaves', async () => {
     const { a, b, c, g, inv } = await setup();
     await join(b, inv.code);

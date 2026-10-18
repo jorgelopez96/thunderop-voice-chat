@@ -33,3 +33,14 @@ onRecordUpdateRequest((e) => {
   }
   e.next();
 }, "groups");
+
+// Quien sale o es echado (update del dueño o /leave) pierde sus invitaciones de ese grupo.
+onRecordAfterUpdateSuccess((e) => {
+  const antes = e.record.original().getStringSlice("members");
+  const despues = e.record.getStringSlice("members");
+  antes.filter((u) => !despues.includes(u)).forEach((u) => {
+    e.app.findRecordsByFilter("invites", "group = {:g} && created_by = {:u}", "", 0, 0, { g: e.record.id, u })
+      .forEach((inv) => e.app.delete(inv));
+  });
+  e.next();
+}, "groups");
