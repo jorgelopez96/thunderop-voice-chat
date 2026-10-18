@@ -2,7 +2,7 @@
   import type { RecordModel } from 'pocketbase';
   import { pb } from '../pb';
   import { mensajeError } from '../sesion.svelte';
-  import { voz, volumen, silenciar } from '../voz.svelte';
+  import { voz, volumen, silenciar, ver, pistaPantalla, volumenPantalla } from '../voz.svelte';
   import { leerPrefs } from '../prefs';
 
   let { grupo, soyDueno, sala }: { grupo: RecordModel; soyDueno: boolean; sala: string } = $props();
@@ -19,6 +19,19 @@
     const nuevo = !silenciado(id);
     try { await silenciar(grupo.id, id, nuevo); pedidos[id] = nuevo; } catch (e) { error = mensajeError(e); }
   }
+  let vid = $state<HTMLVideoElement>();
+  let pctPantalla = $state(100);
+  // Se re-ejecuta cuando la pista llega (la suscripción refresca `voz.participantes`).
+  $effect(() => {
+    void voz.participantes;
+    const t = voz.viendo && vid ? pistaPantalla(voz.viendo) : undefined;
+    if (!t || !vid) return;
+    const el = vid;
+    t.attach(el);
+    return () => { t.detach(el); };
+  });
+  const mirar = (id: string | null) => { pctPantalla = 100; ver(id); };
+  const quien = $derived(voz.participantes.find((p) => p.id === voz.viendo)?.nombre ?? '');
   function cambiar(id: string, pct: number) { vols[id] = pct / 100; volumen(id, pct / 100); }
 </script>
 
@@ -26,6 +39,16 @@
   <h2>🔊 {sala}</h2>
   {#if voz.conectando}<p role="status">Conectando…</p>{/if}
   {#if error}<p role="alert">{error}</p>{/if}
+  {#if voz.viendo}
+    <div class="pantalla">
+      <video bind:this={vid} autoplay playsinline muted aria-label={`Pantalla de ${quien}`}></video>
+      <div class="fila">
+        <button onclick={() => vid?.requestFullscreen()}>Pantalla completa</button>
+        <input type="range" min="0" max="200" step="5" bind:value={pctPantalla} aria-label="Volumen de la transmisión"
+          oninput={() => voz.viendo && volumenPantalla(voz.viendo, pctPantalla / 100)} />
+      </div>
+    </div>
+  {/if}
   <ul>
     {#each voz.participantes as p (p.id)}
       {@const m = miembro(p.id)}
@@ -33,6 +56,8 @@
         {#if m?.avatar}<img class="avatar" alt="" src={pb.files.getURL(m, m.avatar, { thumb: '64x64' })} />
         {:else}<span class="avatar" style="background:{m?.color || ''}"></span>{/if}
         <strong style="color:{m?.color || 'inherit'}">{p.nombre}{p.local ? ' (vos)' : ''}</strong>
+        {#if p.transmite}<span class="vivo">📺 En vivo</span>
+          {#if !p.local}<button class="plano" onclick={() => mirar(voz.viendo === p.id ? null : p.id)}>{voz.viendo === p.id ? 'Dejar de ver' : 'Ver'}</button>{/if}{/if}
         {#if p.silenciado}<span title="Sin micrófono" aria-label="Silenciado">🔇</span>{/if}
         {#if !p.local}
           <input type="range" min="0" max="200" step="5" value={Math.round((vols[p.id] ?? 1) * 100)}
@@ -52,4 +77,8 @@
   .tarjeta.hablando { border-color: var(--ok); }
   .tarjeta strong { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   input[type='range'] { flex-basis: 100%; padding: 0; background: none; }
+  .vivo { font-size: 12px; color: var(--ok); }
+  .pantalla { margin-bottom: 12px; display: flex; flex-direction: column; gap: 8px; }
+  video { width: 100%; max-height: 60vh; object-fit: contain; background: var(--hondo); border-radius: var(--radio); }
+  .pantalla input[type='range'] { flex: 1; min-width: 120px; }
 </style>
