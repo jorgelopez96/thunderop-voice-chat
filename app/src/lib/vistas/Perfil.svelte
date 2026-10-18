@@ -45,17 +45,17 @@
   }
 </script>
 
-<form onsubmit={guardar}>
+<form class="tarjeta" onsubmit={guardar}>
   <h2>Mi perfil</h2>
   {#if sesion.usuario?.avatar}
-    <img alt="Foto de perfil" width="64" height="64"
+    <img class="avatar" alt="Foto de perfil" style="width:64px;height:64px"
       src={pb.files.getURL(sesion.usuario, sesion.usuario.avatar, { thumb: '64x64' })} />
   {/if}
   <label>Foto <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" onchange={elegirFoto} /></label>
   <label>Nombre <input bind:value={name} required maxlength="32" /></label>
   <label>Color <input type="color" bind:value={color} /></label>
   <label>Estado <input bind:value={status} maxlength="80" /></label>
-  {#if error}<p role="alert" style="color:#c00">{error}</p>{/if}
+  {#if error}<p role="alert">{error}</p>{/if}
   {#if ok}<p role="status">Perfil guardado.</p>{/if}
   <button type="submit" disabled={ocupado}>Guardar</button>
 </form>
