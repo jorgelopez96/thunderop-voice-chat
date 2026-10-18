@@ -3,6 +3,8 @@
   import { grupos, grupoActual, iniciarGrupos, crearGrupo, unirse } from '../grupos.svelte';
   import Perfil from './Perfil.svelte';
   import Grupo from './Grupo.svelte';
+  import ControlesVoz from './ControlesVoz.svelte';
+  import { voz } from '../voz.svelte';
 
   $effect(iniciarGrupos);
 
@@ -68,6 +70,7 @@
     {#if error}<p role="alert">{error}</p>{/if}
     </div></div>
   {/if}
+  {#if voz.salaId && voz.grupoId !== actual?.id}<div class="pie"><ControlesVoz /></div>{/if}
 </main>
 
 <style>
@@ -76,6 +79,7 @@
   .barra h1 { font-size: 15px; margin-right: auto; }
   .yo { font-weight: 600; }
   .perfil { position: fixed; top: 52px; right: 12px; z-index: 10; width: 320px; box-shadow: 0 8px 24px rgb(0 0 0 / .5); border-radius: 10px; }
+  .pie { position: fixed; left: 8px; bottom: 8px; width: 224px; z-index: 5; box-shadow: 0 8px 24px rgb(0 0 0 / .5); }
   .inicio { flex: 1; display: grid; place-items: center; padding: 16px; overflow: auto; }
   .tarjeta { width: min(420px, 100%); }
   .grupos { display: flex; flex-direction: column; gap: 6px; }

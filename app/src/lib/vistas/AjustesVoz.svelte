@@ -4,13 +4,15 @@
 
   let { cerrar }: { cerrar: () => void } = $props();
   let d: HTMLDialogElement;
+  let error = $state('');
   let lista = $state<Awaited<ReturnType<typeof dispositivos>>>({ entradas: [], salidas: [] });
   const prefs = leerPrefs();
-  $effect(() => { if (!d.open) d.showModal(); dispositivos().then((x) => (lista = x)); });
+  $effect(() => { if (!d.open) d.showModal(); dispositivos().then((x) => (lista = x)).catch(() => (error = 'No se pudieron listar los dispositivos de audio.')); });
 </script>
 
 <dialog bind:this={d} oncancel={cerrar} onclose={cerrar}>
   <h3>Ajustes de voz</h3>
+  {#if error}<p role="alert">{error}</p>{/if}
   <label>Entrada
     <select value={prefs.entrada ?? 'default'} onchange={(e) => elegirEntrada(e.currentTarget.value)}>
       <option value="default">Predeterminado</option>

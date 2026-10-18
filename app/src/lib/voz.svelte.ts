@@ -7,8 +7,8 @@ import { crearSupresor } from './ruido';
 /** `silenciado`: no está mandando audio (muteado, sin permiso del dueño o sin micrófono publicado). */
 export type Participante = { id: string; nombre: string; hablando: boolean; silenciado: boolean; local: boolean };
 
-export const voz = $state<{ salaId: string | null; conectando: boolean; error: string; muteado: boolean; supresion: boolean; participantes: Participante[] }>({
-  salaId: null, conectando: false, error: '', muteado: false, supresion: leerPrefs().supresion, participantes: [],
+export const voz = $state<{ salaId: string | null; salaNombre: string; grupoId: string | null; conectando: boolean; error: string; muteado: boolean; supresion: boolean; participantes: Participante[] }>({
+  salaId: null, salaNombre: '', grupoId: null, conectando: false, error: '', muteado: false, supresion: leerPrefs().supresion, participantes: [],
 });
 
 let room: Room | null = null;
@@ -65,18 +65,18 @@ function limpiar() {
   const r = room, c = ctx;
   for (const el of document.querySelectorAll('audio[data-voz]')) el.remove();
   room = null; ctx = null;
-  Object.assign(voz, { salaId: null, conectando: false, participantes: [] });
+  Object.assign(voz, { salaId: null, salaNombre: '', grupoId: null, conectando: false, participantes: [] });
   r.disconnect().catch(() => {}).finally(() => c?.close().catch(() => {}));
 }
 
-export async function entrarVoz(roomId: string) {
+export async function entrarVoz(roomId: string, salaNombre = '', grupoId: string | null = null) {
   salirVoz();
   const mio = ++intento;
   // El contexto se crea antes de cualquier await, dentro del gesto del usuario (autoplay). 48 kHz: lo exige RNNoise.
   const c = new AudioContext({ sampleRate: 48000 });
   const r = new Room({ adaptiveStream: true, dynacast: true, webAudioMix: { audioContext: c } });
   ctx = c; room = r;
-  Object.assign(voz, { salaId: roomId, conectando: true, error: '' });
+  Object.assign(voz, { salaId: roomId, salaNombre, grupoId, conectando: true, error: '' });
   const vigente = () => mio === intento;
 
   r.on(RoomEvent.TrackSubscribed, (t: RemoteTrack, _pub, part) => {

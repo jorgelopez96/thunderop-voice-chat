@@ -14,7 +14,7 @@
   // svelte-ignore state_referenced_locally
   const s = salas(grupo.id); // el componente se recrea por grupo (clave en Principal)
   $effect(() => s.parar);
-  $effect(() => { presencia(grupo.id); });
+  $effect(() => { voz.salaId; presencia(grupo.id); }); // también al conectar/desconectar (incluye caídas)
 
   const chat = $derived(s.estado.lista.filter((r) => r.kind === 'chat'));
   const salasVoz = $derived(s.estado.lista.filter((r) => r.kind === 'voz'));
@@ -47,7 +47,7 @@
     if (r.kind === 'chat') { salaId = r.id; centroVoz = false; return; }
     centroVoz = true;
     if (voz.salaId === r.id) return;
-    await entrarVoz(r.id);
+    await entrarVoz(r.id, r.name, grupo.id);
     presencia(grupo.id);
   }
   /** Quién está en la sala: en la tuya, los participantes en vivo; en otras, la presencia del servidor. */
@@ -110,7 +110,7 @@
     <ul>{#each salasVoz as r (r.id)}{@render sala(r)}{/each}</ul>
     {@render nuevaSala('voz')}
     {#if voz.error}<p role="alert">{voz.error}</p>{/if}
-    {#if salaVoz}<ControlesVoz sala={salaVoz.name} alSalir={() => { centroVoz = false; presencia(grupo.id); }} />{/if}
+    {#if voz.salaId && voz.grupoId === grupo.id}<ControlesVoz alSalir={() => { centroVoz = false; presencia(grupo.id); }} />{/if}
   </nav>
 
   {#if centroVoz && salaVoz}<Voz {grupo} {soyDueno} sala={salaVoz.name} />

@@ -2,19 +2,19 @@
   import { voz, alternarMute, alternarSupresion, salirVoz } from '../voz.svelte';
   import AjustesVoz from './AjustesVoz.svelte';
 
-  let { sala, alSalir }: { sala: string; alSalir: () => void } = $props();
+  let { alSalir }: { alSalir?: () => void } = $props();
   let ajustes = $state(false);
 </script>
 
 <div class="controles">
-  <strong>🔊 {sala}</strong>
+  <strong>🔊 {voz.salaNombre}</strong>
   <div class="fila">
     <button onclick={alternarMute}>{voz.muteado ? 'Activar micrófono' : 'Silenciarme'}</button>
     <button aria-pressed={voz.supresion} class:activo={voz.supresion} onclick={alternarSupresion}>Supresión de ruido</button>
   </div>
   <div class="fila">
     <button class="plano" onclick={() => (ajustes = true)}>Ajustes</button>
-    <button class="peligro" onclick={() => { salirVoz(); alSalir(); }}>Desconectar</button>
+    <button class="peligro" onclick={() => { salirVoz(); alSalir?.(); }}>Desconectar</button>
   </div>
   {#if ajustes}<AjustesVoz cerrar={() => (ajustes = false)} />{/if}
 </div>
