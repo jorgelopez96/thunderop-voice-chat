@@ -54,6 +54,25 @@ describe('grupos', () => {
     await expect(a.collection('groups').update(g.id, { members: [] })).rejects.toMatchObject({ status: 400 });
   });
 
+  it('owner cannot transfer ownership via body or modifiers', async () => {
+    const a = await h.nuevoUsuario('ana');
+    const c = await h.nuevoUsuario('carla');
+    const g = await a.collection('groups').create({ name: 'g' });
+    for (const body of [{ owner: c.authStore.record!.id }, { 'owner+': c.authStore.record!.id }]) {
+      await a.collection('groups').update(g.id, body).then(() => {}, (err) => expect([400, 404]).toContain(err.status));
+      expect((await h.admin.collection('groups').getOne(g.id)).owner).toBe(a.authStore.record!.id);
+    }
+  });
+
+  it('owner cannot add members via modifier', async () => {
+    const a = await h.nuevoUsuario('ana');
+    const c = await h.nuevoUsuario('carla');
+    const g = await a.collection('groups').create({ name: 'g' });
+    await expect(a.collection('groups').update(g.id, { 'members+': [c.authStore.record!.id] }))
+      .rejects.toMatchObject({ status: 400 });
+    expect((await h.admin.collection('groups').getOne(g.id)).members).toEqual([a.authStore.record!.id]);
+  });
+
   // Se activa en la Task 5, cuando existan `invites` y `messages`.
   it.todo('deleting group cascades rooms messages invites');
 });
