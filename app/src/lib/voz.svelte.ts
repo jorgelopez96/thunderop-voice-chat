@@ -69,7 +69,7 @@ function aplicarSupresion() {
 /** Corta la sala actual y la olvida. El contexto se cierra después de desconectar (LiveKit desarma el procesador ahí). */
 function limpiar() {
   const r = room, c = ctx;
-  room = null; ctx = null;
+  room = null; ctx = null; tx++;
   if (typeof document !== 'undefined') for (const el of document.querySelectorAll('audio[data-voz]')) el.remove();
   Object.assign(voz, { salaId: null, salaNombre: '', grupoId: null, conectando: false, sinPermiso: false, participantes: [], transmitiendo: false, viendo: null });
   void detenerAudioPantalla();
@@ -106,7 +106,8 @@ export async function entrarVoz(roomId: string, salaNombre = '', grupoId: string
   r.on(RoomEvent.ParticipantDisconnected, (part) => { if (part.identity === voz.viendo) voz.viendo = null; });
   // Fin de la transmisión propia, por el botón o porque Windows cortó la captura: todo pasa por acá.
   r.on(RoomEvent.LocalTrackUnpublished, (pub) => {
-    if (pub.source !== Track.Source.ScreenShare) return;
+    if (pub.source !== Track.Source.ScreenShare || room !== r) return; // una sala vieja no toca la transmisión actual
+    tx++;
     voz.transmitiendo = false;
     void detenerAudioPantalla();
     void despublicarAudio(r);
@@ -213,9 +214,21 @@ async function agrandarVentana() {
   if (t.width < 1280 || t.height < 800) await w.setSize(new LogicalSize(Math.max(t.width, 1280), Math.max(t.height, 800)));
 }
 
+// `tx` invalida un `transmitir` en curso (cortar, salir de la sala o que Windows corte la captura).
+// `arrancando` rechaza un segundo `transmitir` (doble clic con el selector abierto) hasta que termine el primero:
+// el audio nativo es uno solo y una llamada vieja no puede publicar otra pista ni frenar la captura de una nueva.
+let tx = 0;
+let arrancando = false;
+
 export async function transmitir(calidad: Calidad) {
   const r = room, c = ctx;
-  if (!r || !c || voz.transmitiendo) return;
+  if (!r || !c || voz.transmitiendo || arrancando) return;
+  arrancando = true;
+  try { await arrancar(r, c, ++tx, calidad); } finally { arrancando = false; }
+}
+
+async function arrancar(r: Room, c: AudioContext, mio: number, calidad: Calidad) {
+  const vigente = () => room === r && mio === tx;
   const { ancho, alto, fps, mbps } = CALIDADES[calidad];
   voz.error = '';
   await agrandarVentana().catch(() => {});
@@ -224,22 +237,22 @@ export async function transmitir(calidad: Calidad) {
       { audio: false, contentHint: 'motion', resolution: { width: ancho, height: alto, frameRate: fps } },
       { videoCodec: 'h264', simulcast: false, screenShareEncoding: { maxBitrate: mbps * 1e6, maxFramerate: fps } });
   } catch (e) {
-    if (room === r) voz.error = mensajeTransmision(e);
+    if (vigente()) voz.error = mensajeTransmision(e);
     return;
   }
   if (room !== r) return;
+  if (!vigente()) { await r.localParticipant.setScreenShareEnabled(false).catch(() => {}); return; }
   voz.transmitiendo = true;
   guardarPrefs({ calidad });
   const t = await iniciarAudioPantalla(c);
   // Mientras arrancaba el audio se pudo salir de la sala o cortar la transmisión: no queda captura huérfana.
-  const vigente = () => room === r && voz.transmitiendo;
   if (!vigente()) { await detenerAudioPantalla(); return; }
   if (!t) { if ('__TAURI_INTERNALS__' in globalThis) voz.error = 'No se pudo compartir el sonido de la PC.'; return; }
   try {
     await r.localParticipant.publishTrack(t, { source: lk.Track.Source.ScreenShareAudio, dtx: false, red: false, audioPreset: lk.AudioPresets.musicHighQualityStereo, forceStereo: true });
   } catch {
     await detenerAudioPantalla();
-    if (room === r) voz.error = 'No se pudo compartir el sonido de la PC.';
+    if (vigente()) voz.error = 'No se pudo compartir el sonido de la PC.';
     return;
   }
   if (!vigente()) { await despublicarAudio(r); await detenerAudioPantalla(); }
@@ -248,6 +261,7 @@ export async function transmitir(calidad: Calidad) {
 export async function dejarDeTransmitir() {
   const r = room;
   if (!r) return;
+  tx++;
   await despublicarAudio(r);
   await r.localParticipant.setScreenShareEnabled(false).catch(() => {}); // el resto lo hace LocalTrackUnpublished
 }
