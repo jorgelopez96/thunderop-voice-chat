@@ -57,40 +57,54 @@
 </script>
 
 <section class="chat" aria-label="Chat {room.name}">
-  <h3># {room.name}</h3>
+  <h2 class="titulo"># {room.name}</h2>
   <div class="lista" bind:this={lista} onscroll={alScroll} data-testid="mensajes">
-    {#if chat.hayMas}<button onclick={() => chat.cargarMas()}>Cargar anteriores</button>{/if}
+    {#if chat.hayMas}<button class="plano" onclick={() => chat.cargarMas()}>Cargar anteriores</button>{/if}
     {#if chat.error}<p role="alert">{chat.error}</p>{/if}
     {#each chat.mensajes as m (m.id)}
       {@const a = autor(m)}
       <article class="msg" data-testid="mensaje">
-        <header>
-          {#if a?.avatar}<img class="avatar" src={pb.files.getURL(a, a.avatar, { thumb: '64x64' })} alt="" />
-          {:else}<span class="avatar"></span>{/if}
-          <strong style="color:{a?.color || '#888'}">{a ? a.name : 'Ex miembro'}</strong>
-          <small>{hora(m)}</small>
-          {#if m.author === sesion.usuario?.id || soyDueno}<button onclick={() => quitar(m)}>Borrar</button>{/if}
-        </header>
-        {#if m.text}<p class="texto">{m.text}</p>{/if}
-        {#if m.file}
-          {@const url = pb.files.getURL(m, m.file)}
-          {#if esVideo(m)}<video controls src={url} style="max-width:320px"><track kind="captions" /></video>
-          {:else}<img src={url} alt="Imagen adjunta" style="max-width:320px" />{/if}
-        {/if}
+        {#if a?.avatar}<img class="avatar" src={pb.files.getURL(a, a.avatar, { thumb: '64x64' })} alt="" />
+        {:else}<span class="avatar" style="background:{a?.color || ''}"></span>{/if}
+        <div class="cuerpo">
+          <header>
+            <strong style="color:{a?.color || 'var(--tenue)'}">{a ? a.name : 'Ex miembro'}</strong>
+            <small>{hora(m)}</small>
+            {#if m.author === sesion.usuario?.id || soyDueno}<button class="plano borrar" onclick={() => quitar(m)}>Borrar</button>{/if}
+          </header>
+          {#if m.text}<p class="texto">{m.text}</p>{/if}
+          {#if m.file}
+            {@const url = pb.files.getURL(m, m.file)}
+            {#if esVideo(m)}<video class="adjunto" controls src={url}><track kind="captions" /></video>
+            {:else}<img class="adjunto" src={url} alt="Imagen adjunta" />{/if}
+          {/if}
+        </div>
       </article>
     {/each}
   </div>
-  {#if error}<p role="alert" style="color:#c00">{error}</p>{/if}
+  {#if error}<p role="alert" class="pie">{error}</p>{/if}
+  {#if archivo}<p class="pie"><small>📎 {archivo.name}</small> <button class="plano" onclick={() => (archivo = null)}>Quitar</button></p>{/if}
   <div class="composer">
-    <textarea bind:value={texto} onkeydown={tecla} maxlength="2000" rows="2" placeholder="Escribí un mensaje (Enter envía, Shift+Enter nueva línea)"></textarea>
-    <label>📎 <input type="file" hidden accept="image/png,image/jpeg,image/gif,image/webp,video/mp4,video/webm" onchange={elegir} data-testid="adjuntar" /></label>
-    {#if archivo}<small>{archivo.name} <button onclick={() => (archivo = null)}>Quitar</button></small>{/if}
-    <button onclick={enviarMensaje} disabled={enviando}>Enviar</button>
+    <label class="clip" title="Adjuntar imagen o video">📎 <input type="file" hidden accept="image/png,image/jpeg,image/gif,image/webp,video/mp4,video/webm" onchange={elegir} data-testid="adjuntar" /></label>
+    <textarea bind:value={texto} onkeydown={tecla} maxlength="2000" rows="1" placeholder="Escribí un mensaje (Enter envía, Shift+Enter nueva línea)"></textarea>
+    <button class="primario" onclick={enviarMensaje} disabled={enviando}>Enviar</button>
   </div>
 </section>
 
 <style>
-  .lista { max-height: 50vh; overflow-y: auto; }
+  .chat { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+  .titulo { font-size: 15px; padding: 12px 16px; border-bottom: 1px solid var(--hondo); }
+  .lista { flex: 1; overflow-y: auto; padding: 8px 0; }
+  .msg { display: flex; gap: 12px; padding: 4px 16px; }
+  .msg:hover { background: #2e3035; }
+  .cuerpo { min-width: 0; flex: 1; }
+  header { display: flex; align-items: baseline; gap: 8px; }
+  .borrar { opacity: 0; margin-left: auto; font-size: 12px; }
+  .msg:hover .borrar, .borrar:focus-visible { opacity: 1; }
   .texto { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; }
-  .avatar { width: 24px; height: 24px; border-radius: 50%; background: #888; display: inline-block; vertical-align: middle; }
+  .adjunto { display: block; max-width: min(400px, 100%); max-height: 300px; border-radius: var(--radio); margin-top: 4px; }
+  .pie { margin: 0 16px; }
+  .composer { display: flex; align-items: center; gap: 8px; margin: 8px 16px 16px; background: #383a40; border-radius: 8px; padding: 6px 8px; }
+  .composer textarea { flex: 1; resize: none; background: none; border: 0; padding: 6px 4px; }
+  .clip { cursor: pointer; font-size: 18px; flex-direction: row; }
 </style>

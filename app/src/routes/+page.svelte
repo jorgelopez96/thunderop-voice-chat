@@ -1,4 +1,5 @@
 <script lang="ts">
+  import '../app.css';
   import Entrar from '$lib/vistas/Entrar.svelte';
   import Principal from '$lib/vistas/Principal.svelte';
   import { onMount } from 'svelte';

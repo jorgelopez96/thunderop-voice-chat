@@ -6,6 +6,8 @@
 
 <dialog bind:this={d} oncancel={cancelar}>
   <p>{texto}</p>
-  <button onclick={confirmar}>Confirmar</button>
-  <button onclick={cancelar}>Cancelar</button>
+  <div class="fila" style="justify-content:flex-end">
+    <button onclick={cancelar}>Cancelar</button>
+    <button class="peligro" onclick={confirmar}>Confirmar</button>
+  </div>
 </dialog>
