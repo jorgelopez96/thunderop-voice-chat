@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="stylesheet" href="/src/styles.css" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Prueba de pantalla</title>
+    <script type="module" src="/src/main.ts" defer></script>
+  </head>
+  <body>
+    <form id="conectar" class="fila">
+      <input id="nombre" placeholder="nombre" required />
+      <button>Conectar</button>
+    </form>
+    <div class="fila">
+      <select id="calidad">
+        <option>720p30</option>
+        <option>720p60</option>
+        <option>1080p30</option>
+        <option selected>1080p60</option>
+      </select>
+      <select id="codec">
+        <option selected>h264</option>
+        <option>vp8</option>
+        <option>vp9</option>
+      </select>
+      <select id="bitrate">
+        <option value="4">4 Mbps</option>
+        <option value="8">8 Mbps</option>
+        <option value="12" selected>12 Mbps</option>
+        <option value="16">16 Mbps</option>
+      </select>
+      <label><input type="checkbox" id="gpu" checked /> GPU (H.264 Baseline)</label>
+      <button id="transmitir" disabled>Transmitir</button>
+      <button id="detener" disabled>Detener</button>
+      <button id="probar">Probar captura</button>
+    </div>
+    <pre id="estado">desconectado</pre>
+    <pre id="stats"></pre>
+    <pre id="error"></pre>
+    <div id="remotos"></div>
+  </body>
+</html>

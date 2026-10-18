@@ -1,0 +1,5 @@
+body { font-family: system-ui, sans-serif; margin: 12px; background: #1e1f22; color: #ddd; }
+.fila { display: flex; gap: 8px; margin-bottom: 8px; }
+pre { margin: 4px 0; }
+#error { color: #f66; }
+#remotos video { width: 100%; background: #000; }
