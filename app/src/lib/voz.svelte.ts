@@ -34,6 +34,11 @@ export async function publicarDatos(data: Uint8Array<ArrayBuffer>, topic: string
 }
 /** Escucha `DataReceived` de cualquier sala presente o futura. Devuelve la función para dejar de escuchar. */
 export function alRecibirDatos(f: OyenteDatos) { oyentesDatos.add(f); return () => { oyentesDatos.delete(f); }; }
+// Gancho para la música: sala conectada (id) o ninguna (null, en `limpiar`).
+type OyenteSala = (salaId: string | null) => void;
+const oyentesSala = new Set<OyenteSala>();
+const avisarSala = (id: string | null) => { for (const f of oyentesSala) f(id); };
+export function alCambiarSala(f: OyenteSala) { oyentesSala.add(f); return () => { oyentesSala.delete(f); }; }
 
 const microfono = () => room?.localParticipant.getTrackPublication(lk.Track.Source.Microphone)?.track as LocalAudioTrack | undefined;
 
@@ -86,6 +91,7 @@ function limpiar() {
   if (typeof document !== 'undefined') for (const el of document.querySelectorAll('audio[data-voz]')) el.remove();
   Object.assign(voz, { salaId: null, salaNombre: '', grupoId: null, conectando: false, sinPermiso: false, participantes: [], transmitiendo: false, viendo: null });
   void detenerAudioPantalla();
+  avisarSala(null);
   (r?.disconnect() ?? Promise.resolve()).catch(() => {}).finally(() => c?.close().catch(() => {}));
 }
 
@@ -166,6 +172,7 @@ export async function entrarVoz(roomId: string, salaNombre = '', grupoId: string
   }
   if (!vigente()) { r.disconnect(); return; } // por si el connect terminó pese al disconnect de limpiar()
   voz.conectando = false;
+  avisarSala(roomId);
   for (const p of r.remoteParticipants.values()) for (const pub of p.trackPublications.values()) if (pub.source === Track.Source.Microphone) pub.setSubscribed(true);
   actualizar();
   await publicarMic();
