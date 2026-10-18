@@ -21,6 +21,7 @@ let lk: typeof import('livekit-client');
 let room: Room | null = null;
 let ctx: AudioContext | null = null;
 let intento = 0; // invalida un `entrarVoz` en curso si se sale o se entra a otra sala
+const audios = new WeakMap<RemoteTrack, HTMLMediaElement>(); // <audio data-voz> creado por cada pista remota
 
 const microfono = () => room?.localParticipant.getTrackPublication(lk.Track.Source.Microphone)?.track as LocalAudioTrack | undefined;
 
@@ -94,10 +95,11 @@ export async function entrarVoz(roomId: string, salaNombre = '', grupoId: string
 
   r.on(RoomEvent.TrackSubscribed, (t: RemoteTrack, _pub, part) => {
     if (t.kind !== Track.Kind.Audio) return;
-    const el = t.attach(); el.dataset.voz = ''; document.body.append(el);
+    const el = t.attach(); el.dataset.voz = ''; document.body.append(el); audios.set(t, el);
     part.setVolume(leerPrefs().volumenes[part.identity] ?? 1);
   });
-  r.on(RoomEvent.TrackUnsubscribed, (t: RemoteTrack) => { for (const el of t.detach()) el.remove(); });
+  // LiveKit ya desenganchó la pista de todos sus elementos (también el <video> de la vista): se borra solo el <audio> propio.
+  r.on(RoomEvent.TrackUnsubscribed, (t: RemoteTrack) => { audios.get(t)?.remove(); audios.delete(t); });
   // Suscripción manual: micrófonos siempre; pantallas solo la que se mira (`ver`), aunque su audio llegue después.
   r.on(RoomEvent.TrackPublished, (pub, part) => {
     if (pub.source === Track.Source.Microphone || (part.identity === voz.viendo && esPantalla(pub.source))) pub.setSubscribed(true);
@@ -298,6 +300,7 @@ export async function dispositivos(): Promise<{ entradas: MediaDeviceInfo[]; sal
 
 // Solo para los E2E (en el build de producción no existe): micrófono local y, por nombre de cada
 // remoto, si publica micrófono y los bytes de audio recibidos de él; frames de cada pantalla y si transmitimos.
+// `terminarCaptura` hace lo que Windows al cortar la captura.
 if (import.meta.env.DEV) {
   (globalThis as unknown as { __voz: unknown }).__voz = {
     async stats() {
@@ -317,6 +320,10 @@ if (import.meta.env.DEV) {
         pantallas[p.name || p.identity] = { frames };
       }
       return { mic: room?.localParticipant.isMicrophoneEnabled ?? false, remotos, pantallas, transmitiendo: voz.transmitiendo };
+    },
+    terminarCaptura() {
+      const t = room?.localParticipant.getTrackPublication(lk.Track.Source.ScreenShare)?.track?.mediaStreamTrack;
+      t?.stop(); t?.dispatchEvent(new Event('ended'));
     },
   };
 }

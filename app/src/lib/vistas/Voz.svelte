@@ -21,10 +21,11 @@
   }
   let vid = $state<HTMLVideoElement>();
   let pctPantalla = $state(100);
-  // Se re-ejecuta cuando la pista llega (la suscripción refresca `voz.participantes`).
+  // Se recalcula con cada cambio de `voz.participantes` (así se entera de que llegó la pista), pero solo
+  // avisa si cambia la pista: hablar o silenciarse no re-engancha el video.
+  const pista = $derived((void voz.participantes, voz.viendo ? pistaPantalla(voz.viendo) : undefined));
   $effect(() => {
-    void voz.participantes;
-    const t = voz.viendo && vid ? pistaPantalla(voz.viendo) : undefined;
+    const t = pista;
     if (!t || !vid) return;
     const el = vid;
     t.attach(el);
@@ -43,7 +44,7 @@
     <div class="pantalla">
       <video bind:this={vid} autoplay playsinline muted aria-label={`Pantalla de ${quien}`}></video>
       <div class="fila">
-        <button onclick={() => vid?.requestFullscreen()}>Pantalla completa</button>
+        <button onclick={() => vid?.requestFullscreen().catch(() => {})}>Pantalla completa</button>
         <input type="range" min="0" max="200" step="5" bind:value={pctPantalla} aria-label="Volumen de la transmisión"
           oninput={() => voz.viendo && volumenPantalla(voz.viendo, pctPantalla / 100)} />
       </div>

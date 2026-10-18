@@ -20,7 +20,7 @@
   </div>
   {#if voz.sinPermiso}<p class="nota">El dueño te silenció.</p>{/if}
   {#if voz.transmitiendo}<button class="peligro" onclick={dejarDeTransmitir}>Dejar de transmitir</button>
-  {:else}<button onclick={abrir}>Transmitir</button>{/if}
+  {:else}<button onclick={abrir} disabled={voz.conectando}>Transmitir</button>{/if}
   <div class="fila">
     <button class="plano" onclick={() => (ajustes = true)}>Ajustes</button>
     <button class="peligro" onclick={() => { salirVoz(); alSalir?.(); }}>Desconectar</button>
