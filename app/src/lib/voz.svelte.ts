@@ -168,6 +168,23 @@ export async function dispositivos(): Promise<{ entradas: MediaDeviceInfo[]; sal
   } catch { return { entradas: [], salidas: [] }; }
 }
 
+// Solo para los E2E (en el build de producción no existe): micrófono local y, por nombre de cada
+// remoto, si publica micrófono y los bytes de audio recibidos de él.
+if (import.meta.env.DEV) {
+  (globalThis as unknown as { __voz: unknown }).__voz = {
+    async stats() {
+      const remotos: Record<string, { mic: boolean; bytes: number }> = {};
+      for (const p of room?.remoteParticipants.values() ?? []) {
+        const pub = p.getTrackPublication(Track.Source.Microphone);
+        let bytes = 0;
+        (await pub?.track?.getRTCStatsReport())?.forEach((s) => { if (s.type === 'inbound-rtp') bytes += s.bytesReceived ?? 0; });
+        remotos[p.name || p.identity] = { mic: !!pub && !pub.isMuted, bytes };
+      }
+      return { mic: room?.localParticipant.isMicrophoneEnabled ?? false, remotos };
+    },
+  };
+}
+
 /** Solo el dueño: silencia o des-silencia a un miembro en todas las salas de voz del grupo. */
 export async function silenciar(groupId: string, userId: string, silenciado: boolean) {
   await pb.send(`/api/groups/${groupId}/silenciar`, { method: 'POST', body: { user: userId, silenciado } });
