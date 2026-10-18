@@ -4,8 +4,9 @@
   "type": "module",
   "scripts": {
     "test": "vitest run",
-    "descargar": "node scripts/descargar-pocketbase.mjs",
-    "serve": "pocketbase.exe serve"
+    "descargar": "node scripts/descargar.mjs",
+    "serve": "pocketbase.exe serve",
+    "dev": "node scripts/dev.mjs"
   },
   "devDependencies": {
     "eventsource": "^5.1.3",
