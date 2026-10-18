@@ -7,10 +7,10 @@ export const CALIDADES: Record<Calidad, { ancho: number; alto: number; fps: numb
   '1080p30': { ancho: 1920, alto: 1080, fps: 30, mbps: 8 },
   '1080p60': { ancho: 1920, alto: 1080, fps: 60, mbps: 12 },
 };
-export type PrefsVoz = { entrada?: string; salida?: string; supresion: boolean; volumenes: Record<string, number>; calidad: Calidad; gpu: boolean };
+export type PrefsVoz = { entrada?: string; salida?: string; supresion: boolean; volumenes: Record<string, number>; calidad: Calidad; gpu: boolean; vistaPrevia: boolean };
 
 const CLAVE = 'dm.voz';
-const DEFAULTS: PrefsVoz = { supresion: false, volumenes: {}, calidad: '1080p60', gpu: true };
+const DEFAULTS: PrefsVoz = { supresion: false, volumenes: {}, calidad: '1080p60', gpu: true, vistaPrevia: true };
 
 export function leerPrefs(): PrefsVoz {
   try {
@@ -18,7 +18,7 @@ export function leerPrefs(): PrefsVoz {
     const texto = (v: unknown) => (typeof v === 'string' ? v : undefined);
     const volumenes = Object.fromEntries(Object.entries(p.volumenes ?? {}).filter(([, v]) => typeof v === 'number')) as Record<string, number>;
     const calidad = (Object.keys(CALIDADES) as Calidad[]).find((c) => c === p.calidad) ?? DEFAULTS.calidad;
-    return { entrada: texto(p.entrada), salida: texto(p.salida), supresion: p.supresion === true, volumenes, calidad, gpu: p.gpu !== false };
+    return { entrada: texto(p.entrada), salida: texto(p.salida), supresion: p.supresion === true, volumenes, calidad, gpu: p.gpu !== false, vistaPrevia: p.vistaPrevia !== false };
   } catch { return { ...DEFAULTS, volumenes: {} }; }
 }
 

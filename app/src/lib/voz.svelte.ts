@@ -1,4 +1,4 @@
-import type { LocalAudioTrack, Participant, RemoteTrack, Room, Track } from 'livekit-client';
+import type { LocalAudioTrack, LocalVideoTrack, Participant, RemoteTrack, Room, Track } from 'livekit-client';
 import { getCurrentWindow, LogicalSize } from '@tauri-apps/api/window';
 import { pb } from './pb';
 import { mensajeError } from './sesion.svelte';
@@ -12,8 +12,8 @@ import { mensajeTransmision } from './transmision';
 export type Participante = { id: string; nombre: string; hablando: boolean; silenciado: boolean; local: boolean; transmite: boolean };
 
 /** `sinPermiso`: el dueño nos silenció (los permisos de LiveKit no dejan publicar el micrófono). `viendo`: identidad cuya pantalla miramos. */
-export const voz = $state<{ salaId: string | null; salaNombre: string; grupoId: string | null; conectando: boolean; error: string; muteado: boolean; sinPermiso: boolean; supresion: boolean; participantes: Participante[]; transmitiendo: boolean; viendo: string | null }>({
-  salaId: null, salaNombre: '', grupoId: null, conectando: false, error: '', muteado: false, sinPermiso: false, supresion: leerPrefs().supresion, participantes: [], transmitiendo: false, viendo: null,
+export const voz = $state<{ salaId: string | null; salaNombre: string; grupoId: string | null; conectando: boolean; error: string; muteado: boolean; sinPermiso: boolean; supresion: boolean; participantes: Participante[]; transmitiendo: boolean; viendo: string | null; vistaPrevia: boolean }>({
+  salaId: null, salaNombre: '', grupoId: null, conectando: false, error: '', muteado: false, sinPermiso: false, supresion: leerPrefs().supresion, participantes: [], transmitiendo: false, viendo: null, vistaPrevia: leerPrefs().vistaPrevia,
 });
 
 // LiveKit se carga recién al entrar a la voz: el arranque de la app no lo paga. Mientras haya `room`, `lk` está cargado.
@@ -284,6 +284,14 @@ export function ver(identidad: string | null) {
 export function pistaPantalla(identidad: string): RemoteTrack | undefined {
   return room?.remoteParticipants.get(identidad)?.getTrackPublication(lk.Track.Source.ScreenShare)?.track as RemoteTrack | undefined;
 }
+
+/** Pista de video de nuestra propia transmisión, para la vista previa. */
+export function pistaPantallaPropia(): LocalVideoTrack | undefined {
+  return room?.localParticipant.getTrackPublication(lk.Track.Source.ScreenShare)?.track as LocalVideoTrack | undefined;
+}
+
+/** Muestra u oculta la vista previa de nuestra transmisión (se guarda). */
+export function vistaPrevia(v: boolean) { voz.vistaPrevia = v; guardarPrefs({ vistaPrevia: v }); }
 
 /** Volumen del sonido de la pantalla de `identidad` (0 a 2). No se guarda. */
 export function volumenPantalla(identidad: string, v: number) {

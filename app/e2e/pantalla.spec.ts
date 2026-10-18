@@ -39,6 +39,15 @@ test('transmitir y ver una pantalla', async ({ browser }) => {
   await expect(a.getByRole('button', { name: 'Dejar de transmitir' })).toBeVisible();
   await expect(a.getByRole('alert')).toHaveCount(0);
 
+  // Vista previa propia: se ve con imagen y se puede ocultar y volver a mostrar.
+  const previa = a.getByLabel('Vista previa de tu transmisión');
+  await expect.poll(() => previa.evaluate((v: HTMLVideoElement) => v.videoWidth), { timeout: 5000 }).toBeGreaterThan(0);
+  await a.getByRole('button', { name: 'Ocultar vista previa' }).click();
+  await expect(previa).toHaveCount(0);
+  await expect(a.getByRole('button', { name: 'Mostrar vista previa' })).toBeVisible();
+  await a.getByRole('button', { name: 'Mostrar vista previa' }).click();
+  await expect.poll(() => previa.evaluate((v: HTMLVideoElement) => v.videoWidth), { timeout: 5000 }).toBeGreaterThan(0);
+
   // Beto la ve y los frames crecen.
   await tarjeta(b, 'Ana').getByRole('button', { name: 'Ver' }).click();
   await expect(b.getByLabel('Pantalla de Ana')).toBeVisible();

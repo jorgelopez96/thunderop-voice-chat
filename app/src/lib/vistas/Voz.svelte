@@ -2,7 +2,7 @@
   import type { RecordModel } from 'pocketbase';
   import { pb } from '../pb';
   import { mensajeError } from '../sesion.svelte';
-  import { voz, volumen, silenciar, ver, pistaPantalla, volumenPantalla } from '../voz.svelte';
+  import { voz, volumen, silenciar, ver, pistaPantalla, pistaPantallaPropia, vistaPrevia, volumenPantalla } from '../voz.svelte';
   import { leerPrefs } from '../prefs';
 
   let { grupo, soyDueno, sala }: { grupo: RecordModel; soyDueno: boolean; sala: string } = $props();
@@ -28,6 +28,16 @@
     const t = pista;
     if (!t || !vid) return;
     const el = vid;
+    t.attach(el);
+    return () => { t.detach(el); };
+  });
+  // Vista previa de la propia transmisión: misma regla, solo reacciona a la referencia de la pista.
+  let prev = $state<HTMLVideoElement>();
+  const pistaPropia = $derived((void voz.participantes, voz.transmitiendo && voz.vistaPrevia ? pistaPantallaPropia() : undefined));
+  $effect(() => {
+    const t = pistaPropia;
+    if (!t || !prev) return;
+    const el = prev;
     t.attach(el);
     return () => { t.detach(el); };
   });
@@ -59,6 +69,12 @@
         <strong style="color:{m?.color || 'inherit'}">{p.nombre}{p.local ? ' (vos)' : ''}</strong>
         {#if p.transmite}<span class="vivo">📺 En vivo</span>
           {#if !p.local}<button class="plano" onclick={() => mirar(voz.viendo === p.id ? null : p.id)}>{voz.viendo === p.id ? 'Dejar de ver' : 'Ver'}</button>{/if}{/if}
+        {#if p.local && voz.transmitiendo}<div class="propia">
+          {#if voz.vistaPrevia}
+            <video class="previa" bind:this={prev} autoplay playsinline muted aria-label="Vista previa de tu transmisión"></video>
+            <button class="plano" onclick={() => vistaPrevia(false)}>Ocultar vista previa</button>
+          {:else}<button class="plano" onclick={() => vistaPrevia(true)}>Mostrar vista previa</button>{/if}
+        </div>{/if}
         {#if p.silenciado}<span title="Sin micrófono" aria-label="Silenciado">🔇</span>{/if}
         {#if !p.local}
           <input type="range" min="0" max="200" step="5" value={Math.round((vols[p.id] ?? 1) * 100)}
@@ -81,5 +97,7 @@
   .vivo { font-size: 12px; color: var(--ok); }
   .pantalla { margin-bottom: 12px; display: flex; flex-direction: column; gap: 8px; }
   video { width: 100%; max-height: 60vh; object-fit: contain; background: var(--hondo); border-radius: var(--radio); }
+  .propia { flex-basis: 100%; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+  .previa { width: 240px; max-width: 100%; max-height: none; aspect-ratio: 16 / 9; }
   .pantalla input[type='range'] { flex: 1; min-width: 120px; }
 </style>

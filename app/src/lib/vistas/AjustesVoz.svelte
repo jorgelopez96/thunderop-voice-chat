@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { dispositivos, elegirEntrada, elegirSalida } from '../voz.svelte';
+  import { voz, vistaPrevia, dispositivos, elegirEntrada, elegirSalida } from '../voz.svelte';
   import { leerPrefs, guardarPrefs } from '../prefs';
 
   let { cerrar }: { cerrar: () => void } = $props();
@@ -27,6 +27,8 @@
   </label>
   <label class="casilla"><input type="checkbox" checked={prefs.gpu} onchange={(e) => guardarPrefs({ gpu: e.currentTarget.checked })} /> Codificar con la GPU</label>
   <small>Desactivala solo si alguien no puede ver tu transmisión. Aplica en la próxima transmisión.</small>
+  <label class="casilla"><input type="checkbox" checked={voz.vistaPrevia} onchange={(e) => vistaPrevia(e.currentTarget.checked)} /> Mostrar vista previa de mi transmisión</label>
+  <small>Desactivala para ahorrar recursos.</small>
   <div class="fila" style="justify-content:flex-end"><button onclick={cerrar}>Cerrar</button></div>
 </dialog>
 
