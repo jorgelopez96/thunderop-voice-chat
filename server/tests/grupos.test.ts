@@ -1,0 +1,59 @@
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { startPocketBase, type Harness } from './harness';
+
+let h: Harness;
+beforeAll(async () => { h = await startPocketBase(); });
+afterAll(async () => { await h.stop(); });
+
+describe('grupos', () => {
+  it('create group sets owner, members and default rooms', async () => {
+    const a = await h.nuevoUsuario('ana');
+    const b = await h.nuevoUsuario('beto');
+    const g = await a.collection('groups').create({ name: 'Los pibes', owner: b.authStore.record!.id, members: [b.authStore.record!.id] });
+    const aid = a.authStore.record!.id;
+    expect(g.owner).toBe(aid);
+    expect(g.members).toEqual([aid]);
+    const salas = await a.collection('rooms').getFullList({ filter: `group = "${g.id}"`, sort: 'position' });
+    expect(salas.map((s) => [s.name, s.kind])).toEqual([['General', 'chat'], ['General', 'voz']]);
+  });
+
+  it('one group per user', async () => {
+    const a = await h.nuevoUsuario('ana');
+    await a.collection('groups').create({ name: 'uno' });
+    await expect(a.collection('groups').create({ name: 'dos' })).rejects.toMatchObject({ status: 400 });
+  });
+
+  it('non-member cannot view group', async () => {
+    const a = await h.nuevoUsuario('ana');
+    const b = await h.nuevoUsuario('beto');
+    const g = await a.collection('groups').create({ name: 'privado' });
+    await expect(b.collection('groups').getOne(g.id)).rejects.toMatchObject({ status: 404 });
+    expect((await b.collection('groups').getList()).items).toHaveLength(0);
+  });
+
+  it('owner renames, non-owner cannot', async () => {
+    const a = await h.nuevoUsuario('ana');
+    const b = await h.nuevoUsuario('beto');
+    const g = await a.collection('groups').create({ name: 'viejo' });
+    await a.collection('groups').update(g.id, { name: 'nuevo' });
+    await h.admin.collection('groups').update(g.id, { members: [a.authStore.record!.id, b.authStore.record!.id] });
+    await expect(b.collection('groups').update(g.id, { name: 'hack' })).rejects.toMatchObject({ status: 404 });
+  });
+
+  it('owner cannot add members directly', async () => {
+    const a = await h.nuevoUsuario('ana');
+    const c = await h.nuevoUsuario('carla');
+    const g = await a.collection('groups').create({ name: 'g' });
+    await expect(a.collection('groups').update(g.id, { members: [a.authStore.record!.id, c.authStore.record!.id] }))
+      .rejects.toMatchObject({ status: 400 });
+  });
+
+  it('owner cannot remove self', async () => {
+    const a = await h.nuevoUsuario('ana');
+    const g = await a.collection('groups').create({ name: 'g' });
+    await expect(a.collection('groups').update(g.id, { members: [] })).rejects.toMatchObject({ status: 400 });
+  });
+
+  // Se activa en la Task 5, cuando existan `invites` y `messages`.
+  it.todo('deleting group cascades rooms messages invites');
+});
