@@ -12,6 +12,7 @@
   "app": {
     "windows": [
       {
+        "create": false,
         "title": "Discord mejorado",
         "width": 1200,
         "height": 760,
