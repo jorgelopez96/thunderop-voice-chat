@@ -1,5 +1,6 @@
 import { Channel, invoke } from '@tauri-apps/api/core';
 import workletUrl from './pcm.worklet.ts?worker&url';
+import { aMuestras } from './colaPcm';
 
 // El worklet se registra una vez por AudioContext.
 const registrados = new WeakMap<AudioContext, Promise<void>>();
@@ -18,8 +19,11 @@ export async function iniciarAudioPantalla(ctx: AudioContext): Promise<MediaStre
     worklet.connect(destino);
     nodos = [worklet, destino];
     pista = destino.stream.getAudioTracks()[0];
-    const canal = new Channel<ArrayBuffer>();
-    canal.onmessage = (buf) => worklet.port.postMessage(new Float32Array(buf), [buf]);
+    const canal = new Channel<unknown>();
+    // Nunca tira: si `onmessage` falla, el Channel de Tauri no avanza y acumula todos los lotes siguientes.
+    canal.onmessage = (m) => {
+      try { const f = aMuestras(m); if (f) worklet.port.postMessage(f, [f.buffer]); } catch { /* se pierde el lote */ }
+    };
     await invoke('iniciar_audio', { canal });
     return pista;
   } catch (e) {

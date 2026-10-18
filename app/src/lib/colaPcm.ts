@@ -26,3 +26,9 @@ export class ColaPcm {
     this.n -= k;
   }
 }
+
+/** Lote del canal de Rust → muestras. Llega como ArrayBuffer; si la IPC cayó a postMessage, como number[] de bytes. Otra cosa: `null`. */
+export function aMuestras(x: unknown): Float32Array | null {
+  const b = x instanceof ArrayBuffer ? x : Array.isArray(x) ? new Uint8Array(x).buffer : null;
+  return b && b.byteLength % 4 === 0 ? new Float32Array(b) : null;
+}
