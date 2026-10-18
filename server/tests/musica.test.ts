@@ -113,12 +113,11 @@ describe('música', () => {
     await musica(b, voz, { accion: 'agregar', url: yt('CCCCCCCCCC1') });
     await musica(b, voz, { accion: 'agregar', url: yt('CCCCCCCCCC2') });
     await musica(b, voz, { accion: 'agregar', url: yt('CCCCCCCCCC3') });
-    const [c1, c2, c3] = await canciones(b, voz);
+    const [c1, c2] = await canciones(b, voz);
     await Promise.all([a, b, a, b].map((pb) => musica(pb, voz, { accion: 'termino', cancionId: c1.id })));
     const despues = await canciones(b, voz);
     expect(despues.map((c: any) => c.estado)).toEqual(['hecha', 'sonando', 'cola']);
     expect((await b.collection('reproducciones').getFullList())[0].actual).toBe(c2.id);
-    expect(c3.estado).toBe('cola');
   });
 
   it('saltar con id viejo no hace nada', async () => {
@@ -171,12 +170,22 @@ describe('música', () => {
 
   it('en una sala de chat da 400', async () => {
     const { b, chat } = await setup();
-    await expect(musica(b, chat, { accion: 'agregar', url: yt('IIIIIIIIIII') })).rejects.toMatchObject({ status: 400 });
+    await expect(musica(b, chat, { accion: 'agregar', url: yt('IIIIIIIIIII') })).rejects.toMatchObject({ status: 400, response: { message: 'No es una sala de voz.' } });
   });
 
   it('los clientes no escriben las colecciones directo', async () => {
     const { b, voz } = await setup();
     await expect(b.collection('canciones').create({ room: voz, videoId: 'JJJJJJJJJJJ', titulo: 'x', estado: 'sonando' }))
       .rejects.toMatchObject({ status: 403 });
+  });
+
+  it('borrar la sala de voz con música sonando no falla y limpia todo', async () => {
+    const { a, b, voz } = await setup();
+    await musica(b, voz, { accion: 'agregar', url: yt('KKKKKKKKKK1') });
+    await musica(b, voz, { accion: 'agregar', url: yt('KKKKKKKKKK2') });
+    await a.collection('rooms').delete(voz);
+    const filtro = { filter: `room = "${voz}"` };
+    await expect(h.admin.collection('canciones').getFullList(filtro)).resolves.toHaveLength(0);
+    await expect(h.admin.collection('reproducciones').getFullList(filtro)).resolves.toHaveLength(0);
   });
 });
