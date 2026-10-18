@@ -33,3 +33,6 @@ strip = true
 
 [target."cfg(windows)".dependencies]
 wasapi = "0.26"
+# Las mismas versiones que ya trae wry (Cargo.lock): no se duplica nada.
+webview2-com = "0.39.1"
+windows = "0.62.2"
