@@ -8,6 +8,7 @@
     "serve": "pocketbase.exe serve"
   },
   "devDependencies": {
+    "eventsource": "^5.1.3",
     "pocketbase": "^0.28.0",
     "vitest": "^3.0.0"
   }

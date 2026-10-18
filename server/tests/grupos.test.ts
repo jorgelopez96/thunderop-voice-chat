@@ -73,6 +73,18 @@ describe('grupos', () => {
     expect((await h.admin.collection('groups').getOne(g.id)).members).toEqual([a.authStore.record!.id]);
   });
 
-  // Se activa en la Task 5, cuando existan `invites` y `messages`.
-  it.todo('deleting group cascades rooms messages invites');
+  it('deleting group cascades rooms messages invites', async () => {
+    const a = await h.nuevoUsuario('ana');
+    const g = await a.collection('groups').create({ name: 'g' });
+    const inv = await a.collection('invites').create({ group: g.id });
+    const sala = (await a.collection('rooms').getFullList({ filter: `group = "${g.id}" && kind = "chat"` }))[0];
+    const aid = a.authStore.record!.id;
+    const m = await a.collection('messages').create({ room: sala.id, author: aid, text: 'hola' });
+    const m2 = await h.admin.collection('messages').create({ room: sala.id, author: aid, text: 'del admin' });
+    await a.collection('groups').delete(g.id);
+    await expect(h.admin.collection('rooms').getOne(sala.id)).rejects.toMatchObject({ status: 404 });
+    await expect(h.admin.collection('messages').getOne(m.id)).rejects.toMatchObject({ status: 404 });
+    await expect(h.admin.collection('messages').getOne(m2.id)).rejects.toMatchObject({ status: 404 });
+    await expect(h.admin.collection('invites').getOne(inv.id)).rejects.toMatchObject({ status: 404 });
+  });
 });
