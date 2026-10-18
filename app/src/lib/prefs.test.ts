@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { leerPrefs, guardarPrefs } from './prefs';
 import { volumen } from './voz.svelte';
 
-const DEFAULTS = { supresion: false, volumenes: {}, calidad: '1080p60', gpu: true, vistaPrevia: true };
+const DEFAULTS = { supresion: false, volumenes: {}, calidad: '1080p60', gpu: true, vistaPrevia: true, volBotonera: 0.8, volMusica: 50 };
 
 describe('prefs de voz', () => {
   // Vitest corre en Node (sin localStorage): uno en memoria por test.
@@ -45,6 +45,17 @@ describe('prefs de voz', () => {
     expect(leerPrefs().vistaPrevia).toBe(true);
     localStorage.setItem('dm.voz', JSON.stringify({ vistaPrevia: false }));
     expect(leerPrefs().vistaPrevia).toBe(false);
+  });
+
+  it('volBotonera (0-1) y volMusica (0-100): defaults, valores válidos e inválidos', () => {
+    localStorage.setItem('dm.voz', JSON.stringify({ volBotonera: 0.3, volMusica: 70 }));
+    expect(leerPrefs()).toMatchObject({ volBotonera: 0.3, volMusica: 70 });
+    for (const malo of [{ volBotonera: 2, volMusica: 101 }, { volBotonera: -1, volMusica: -5 }, { volBotonera: '1', volMusica: null }]) {
+      localStorage.setItem('dm.voz', JSON.stringify(malo));
+      expect(leerPrefs()).toMatchObject({ volBotonera: 0.8, volMusica: 50 });
+    }
+    localStorage.setItem('dm.voz', JSON.stringify({ volBotonera: 0, volMusica: 0 }));
+    expect(leerPrefs()).toMatchObject({ volBotonera: 0, volMusica: 0 });
   });
 
   it('localStorage que tira error no rompe', () => {

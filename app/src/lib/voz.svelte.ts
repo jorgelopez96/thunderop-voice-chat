@@ -23,6 +23,18 @@ let ctx: AudioContext | null = null;
 let intento = 0; // invalida un `entrarVoz` en curso si se sale o se entra a otra sala
 const audios = new WeakMap<RemoteTrack, HTMLMediaElement>(); // <audio data-voz> creado por cada pista remota
 
+// Ganchos para la botonera (sin lógica de ella acá): contexto/sala actuales y listeners de datos que sobreviven a los cambios de sala.
+type OyenteDatos = (payload: Uint8Array, topic?: string) => void;
+const oyentesDatos = new Set<OyenteDatos>();
+export const contextoVoz = () => ctx;
+/** Publica datos a la sala (false si no hay sala conectada). */
+export async function publicarDatos(data: Uint8Array<ArrayBuffer>, topic: string) {
+  if (!room || voz.conectando) return false;
+  try { await room.localParticipant.publishData(data, { reliable: true, topic }); return true; } catch { return false; }
+}
+/** Escucha `DataReceived` de cualquier sala presente o futura. Devuelve la función para dejar de escuchar. */
+export function alRecibirDatos(f: OyenteDatos) { oyentesDatos.add(f); return () => { oyentesDatos.delete(f); }; }
+
 const microfono = () => room?.localParticipant.getTrackPublication(lk.Track.Source.Microphone)?.track as LocalAudioTrack | undefined;
 
 function actualizar() {
@@ -114,6 +126,7 @@ export async function entrarVoz(roomId: string, salaNombre = '', grupoId: string
     void detenerAudioPantalla();
     void despublicarAudio(r);
   });
+  r.on(RoomEvent.DataReceived, (payload, _part, _kind, topic) => { for (const f of oyentesDatos) f(payload, topic); });
   r.on(RoomEvent.LocalTrackPublished, () => { aplicarSupresion(); actualizar(); });
   r.on(RoomEvent.ParticipantPermissionsChanged, (_prev, part) => {
     // El dueño nos des-silenció: se vuelve a publicar el micrófono (LiveKit lo despublicó al silenciar).
