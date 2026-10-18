@@ -6,6 +6,11 @@ export const grupos = $state<{ lista: RecordModel[]; cargado: boolean }>({ lista
 // Svelte no permite reasignar un $state exportado: se expone como propiedad.
 export const grupoActual = $state<{ id: string | null }>({ id: null });
 
+// Al cerrar sesión (o invalidarse) no debe quedar nada del usuario anterior.
+pb.authStore.onChange(() => {
+  if (!pb.authStore.token) { grupos.lista = []; grupos.cargado = false; grupoActual.id = null; }
+});
+
 const ES = (e: unknown, ...codigos: number[]) => e instanceof ClientResponseError && codigos.includes(e.status);
 
 export async function recargarGrupos() {
@@ -63,8 +68,7 @@ export async function crearInvitacion(groupId: string): Promise<string> {
 }
 
 export async function echar(groupId: string, userId: string) {
-  const g = await pb.collection('groups').getOne(groupId);
-  await pb.collection('groups').update(groupId, { members: (g.members as string[]).filter((m) => m !== userId) });
+  await pb.collection('groups').update(groupId, { 'members-': userId });
 }
 
 export async function salirDe(groupId: string) {

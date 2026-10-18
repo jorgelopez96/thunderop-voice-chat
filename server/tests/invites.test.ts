@@ -145,4 +145,14 @@ describe('invitaciones', () => {
     await expect(adm.collection('invites').getOne(invAEnB.id)).rejects.toMatchObject({ status: 404 });
     expect((await adm.collection('groups').getOne(gb.id)).id).toBe(gb.id);
   });
+
+  it('owner kicks with members- modifier, keeping concurrent joins', async () => {
+    const { a, b, c, g, inv } = await setup();
+    await join(b, inv.code);
+    await join(c, inv.code);
+    await a.collection('groups').update(g.id, { 'members-': b.authStore.record!.id });
+    const m = (await a.collection('groups').getOne(g.id)).members;
+    expect(m).toContain(c.authStore.record!.id);
+    expect(m).not.toContain(b.authStore.record!.id);
+  });
 });
