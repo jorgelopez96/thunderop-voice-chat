@@ -93,10 +93,10 @@
 
 <style>
   .chat { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
-  .titulo { font-size: 15px; padding: 12px 16px; border-bottom: 1px solid var(--hondo); }
+  .titulo { font-size: 15px; padding: 12px 16px; border-bottom: 1px solid var(--hover); }
   .lista { flex: 1; overflow-y: auto; padding: 8px 0; }
   .msg { display: flex; gap: 12px; padding: 4px 16px; }
-  .msg:hover { background: #2e3035; }
+  .msg:hover { background: var(--panel); }
   .cuerpo { min-width: 0; flex: 1; }
   header { display: flex; align-items: baseline; gap: 8px; }
   .borrar { opacity: 0; margin-left: auto; font-size: 12px; }
@@ -104,7 +104,7 @@
   .texto { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; }
   .adjunto { display: block; max-width: min(400px, 100%); max-height: 300px; border-radius: var(--radio); margin-top: 4px; }
   .pie { margin: 0 16px; }
-  .composer { display: flex; align-items: center; gap: 8px; margin: 8px 16px 16px; background: #383a40; border-radius: 8px; padding: 6px 8px; }
+  .composer { display: flex; align-items: center; gap: 8px; margin: 8px 16px 16px; background: var(--panel); border: 1px solid var(--borde); border-radius: 8px; padding: 6px 8px; }
   .composer textarea { flex: 1; resize: none; background: none; border: 0; padding: 6px 4px; }
   .clip { cursor: pointer; font-size: 18px; flex-direction: row; }
 </style>

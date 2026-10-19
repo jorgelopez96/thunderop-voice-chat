@@ -16,7 +16,7 @@
   <strong>🔊 {voz.salaNombre}</strong>
   <div class="fila">
     <button onclick={alternarMute} disabled={voz.sinPermiso}>{voz.muteado ? 'Activar micrófono' : 'Silenciarme'}</button>
-    <button aria-pressed={voz.supresion} class:activo={voz.supresion} onclick={alternarSupresion}>Supresión de ruido</button>
+    <button aria-pressed={voz.supresion} onclick={alternarSupresion}>Supresión de ruido</button>
   </div>
   {#if voz.sinPermiso}<p class="nota">El dueño te silenció.</p>{/if}
   {#if voz.transmitiendo}<button class="peligro" onclick={dejarDeTransmitir}>Dejar de transmitir</button>
@@ -46,6 +46,5 @@
   .controles { margin-top: auto; background: var(--hondo); border-radius: var(--radio); padding: 8px; display: flex; flex-direction: column; gap: 6px; }
   .controles strong { color: var(--ok); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .fila { flex-wrap: wrap; }
-  button.activo { background: var(--acento); }
   .nota { font-size: 13px; color: var(--tenue); }
 </style>

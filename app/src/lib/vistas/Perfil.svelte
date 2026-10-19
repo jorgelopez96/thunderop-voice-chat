@@ -6,7 +6,7 @@
   const MAX_AVATAR = 2 * 1024 * 1024;
   const u = sesion.usuario!;
   let name = $state<string>(u.name ?? '');
-  let color = $state<string>(u.color || '#5865f2');
+  let color = $state<string>(u.color || '#8055F7');
   let status = $state<string>(u.status ?? '');
   let foto = $state<File | null>(null);
   let error = $state('');
