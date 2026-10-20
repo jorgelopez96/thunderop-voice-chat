@@ -41,6 +41,7 @@ pub fn run() {
                 .build()?;
             Ok(())
         })
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(audio::Captura::default())
         .invoke_handler(tauri::generate_handler![audio::iniciar_audio, audio::detener_audio])
         .run(tauri::generate_context!())
