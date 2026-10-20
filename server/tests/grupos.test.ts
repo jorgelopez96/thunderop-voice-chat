@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { startPocketBase, type Harness } from './harness';
 
 let h: Harness;
@@ -6,6 +7,21 @@ beforeAll(async () => { h = await startPocketBase(); });
 afterAll(async () => { await h.stop(); });
 
 describe('grupos', () => {
+  it('el dueño sube foto al grupo; un miembro no', async () => {
+    const a = await h.nuevoUsuario('ana');
+    const b = await h.nuevoUsuario('beto');
+    const g = await a.collection('groups').create({ name: 'g' });
+    const inv = await a.collection('invites').create({ group: g.id });
+    await b.send('/api/invites/join', { method: 'POST', body: { code: inv.code } });
+    const foto = () => {
+      const d = new FormData();
+      d.append('foto', new File([readFileSync(new URL('./fixtures/img.png', import.meta.url))], 'img.png', { type: 'image/png' }));
+      return d;
+    };
+    expect((await a.collection('groups').update(g.id, foto())).foto).toMatch(/\.png$/);
+    await expect(b.collection('groups').update(g.id, foto())).rejects.toMatchObject({ status: 404 });
+  });
+
   it('create group sets owner, members and default rooms', async () => {
     const a = await h.nuevoUsuario('ana');
     const b = await h.nuevoUsuario('beto');

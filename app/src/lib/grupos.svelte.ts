@@ -7,7 +7,7 @@ export const grupos = $state<{ lista: RecordModel[]; cargado: boolean }>({ lista
 // Svelte no permite reasignar un $state exportado: se expone como propiedad.
 export const grupoActual = $state<{ id: string | null }>({ id: null });
 /** Quién está en cada sala de voz del grupo actual: `{ [roomId]: { id, name }[] }`. */
-export const enVoz = $state<{ grupo: string | null; salas: Record<string, { id: string; name: string }[]> }>({ grupo: null, salas: {} });
+export const enVoz = $state<{ grupo: string | null; salas: Record<string, { id: string; name: string; silenciado?: boolean }[]> }>({ grupo: null, salas: {} });
 
 // Al cerrar sesión (o invalidarse) no debe quedar nada del usuario anterior.
 pb.authStore.onChange(() => {

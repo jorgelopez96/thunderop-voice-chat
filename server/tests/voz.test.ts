@@ -56,7 +56,7 @@ describe('voz', () => {
     const c = verificar(res.token, lk.secret);
     expect(c.iss).toBe(lk.key);
     expect(c.sub).toBe(b.authStore.record!.id);
-    expect(c.name).toBe('beto');
+    expect(c.name).toBe(b.authStore.record!.name);
     expect(c.video).toEqual({ room: voz.id, roomJoin: true, canSubscribe: true, canPublish: true, canPublishData: true });
     expect(c.exp - c.nbf).toBeLessThanOrEqual(600);
     expect(c.exp - c.nbf).toBeGreaterThan(590);

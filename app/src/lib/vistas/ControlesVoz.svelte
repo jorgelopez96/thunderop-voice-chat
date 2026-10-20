@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { voz, alternarMute, alternarSupresion, salirVoz, transmitir, dejarDeTransmitir } from '../voz.svelte';
+  import { voz, alternarMute, cambiarSupresion, salirVoz, transmitir, dejarDeTransmitir } from '../voz.svelte';
   import { CALIDADES, leerPrefs, type Calidad } from '../prefs';
-  import AjustesVoz from './AjustesVoz.svelte';
+  import Configuracion from './Configuracion.svelte';
 
   let { alSalir }: { alSalir?: () => void } = $props();
   let ajustes = $state(false);
@@ -16,7 +16,7 @@
   <strong>🔊 {voz.salaNombre}</strong>
   <div class="fila">
     <button onclick={alternarMute} disabled={voz.sinPermiso}>{voz.muteado ? 'Activar micrófono' : 'Silenciarme'}</button>
-    <button aria-pressed={voz.supresion} onclick={alternarSupresion}>Supresión de ruido</button>
+    <button aria-pressed={voz.supresion} onclick={() => cambiarSupresion(!voz.supresion)}>Supresión de ruido</button>
   </div>
   {#if voz.sinPermiso}<p class="nota">El dueño te silenció.</p>{/if}
   {#if voz.transmitiendo}<button class="peligro" onclick={dejarDeTransmitir}>Dejar de transmitir</button>
@@ -25,7 +25,7 @@
     <button class="plano" onclick={() => (ajustes = true)}>Ajustes</button>
     <button class="peligro" onclick={() => { salirVoz(); alSalir?.(); }}>Desconectar</button>
   </div>
-  {#if ajustes}<AjustesVoz cerrar={() => (ajustes = false)} />{/if}
+  {#if ajustes}<Configuracion cerrar={() => (ajustes = false)} />{/if}
 </div>
 
 <dialog bind:this={d}>

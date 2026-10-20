@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Insignia from './Insignia.svelte';
   import type { RecordModel } from 'pocketbase';
   import { pb } from '../pb';
   import { mensajeError, sesion } from '../sesion.svelte';
@@ -85,7 +86,7 @@
       <li class="tarjeta" class:hablando={p.hablando}>
         {#if m?.avatar}<img class="avatar" alt="" src={pb.files.getURL(m, m.avatar, { thumb: '64x64' })} />
         {:else}<span class="avatar" style="background:{m?.color || ''}"></span>{/if}
-        <strong style="color:{m?.color || 'inherit'}">{p.nombre}{p.local ? ' (vos)' : ''}</strong>
+        <strong style="color:{m?.color || 'inherit'}">{p.nombre}{p.local ? ' (vos)' : ''}</strong><Insignia usuario={m} />
         {#if p.transmite}<span class="vivo">📺 En vivo</span>
           {#if !p.local}<button class="plano" onclick={() => mirar(voz.viendo === p.id ? null : p.id)}>{voz.viendo === p.id ? 'Dejar de ver' : 'Ver'}</button>{/if}{/if}
         {#if p.local && voz.transmitiendo}<div class="propia">

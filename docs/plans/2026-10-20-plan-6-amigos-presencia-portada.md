@@ -5,7 +5,7 @@
 **Goal:** Que Thunderop muestre quién está conectado, tenga amigos con solicitudes y chat privado, distinga al fundador, reúna perfil y configuración (con supresión de ruido por defecto y ganancia en dB), arranque en una portada con grupos en tarjetas y novedades, y no deje entrar sin actualizar.
 
 **Architecture:**
-- **Servidor (PocketBase, `server/`):** migración `10_social.js` con nombre único (índice `NOCASE`), `users.fundador`, `users.visto`, `groups.foto`, colecciones `amistades` y `privados`; hooks nuevos `social.pb.js` (fundador protegido, latido, solicitudes de amistad, permiso de privados) y `voz.pb.js` extendido con el estado de micrófono.
+- **Servidor (PocketBase, `server/`):** migración `9_social.js` con nombre único (índice `NOCASE`), `users.fundador`, `users.visto`, `groups.foto`, colecciones `amistades` y `privados`; hooks nuevos `social.pb.js` (fundador protegido, latido, solicitudes de amistad, permiso de privados) y `voz.pb.js` extendido con el estado de micrófono.
 - **Presencia:** latido `POST /api/latido` cada 45 s que guarda `users.visto`; el cliente se suscribe a `users` por realtime y considera "en línea" a quien tiene `visto` de hace menos de 90 s.
 - **Cliente (`app/src/lib`):** módulos de estado nuevos (`presencia`, `amigos`, `privados`), el chat generalizado para servir a grupo y privado, una pantalla de configuración que reemplaza a `AjustesVoz`, la portada `Inicio.svelte` que reemplaza el bloque "Mis grupos" de `Principal.svelte`, y un cartel de actualización bloqueante.
 
@@ -45,7 +45,7 @@
 ### Task 1: Servidor — nombre único y fundador protegido
 
 **Files:**
-- Create: `server/pb_migrations/10_social.js` (esta task crea la parte de `users`; las tasks 2–4 le suman campos y colecciones al mismo archivo antes del primer deploy)
+- Create: `server/pb_migrations/9_social.js` (esta task crea la parte de `users`; las tasks 2–4 le suman campos y colecciones al mismo archivo antes del primer deploy)
 - Create: `server/pb_hooks/social.pb.js`
 - Modify: `server/tests/harness.ts:121-129` (`nuevoUsuario`: nombre con sufijo aleatorio, máximo 32 caracteres, p. ej. `${nombre}-${hex4}`, para que los tests existentes no choquen con la unicidad)
 - Modify: tests existentes que comparen el nombre exacto de un usuario creado por el harness (por ejemplo `server/tests/voz.test.ts:59` `expect(c.name).toBe('beto')`): compararlo contra `pb.authStore.record.name`
@@ -66,7 +66,7 @@
   Expected: FAIL (se crean nombres repetidos; `fundador` no existe).
 
 - [ ] **Step 3: Implement**
-  - `10_social.js` (`up`): antes del índice, recorrer `users` ordenados por `created` y, si `name` ya apareció (comparando en minúsculas), renombrar a `name + n` (n = 2, 3…, recortando para no pasar 32) y `app.save`. Después: `users.indexes.push("CREATE UNIQUE INDEX idx_users_name_nocase ON users (name COLLATE NOCASE)")`, `users.fields.add(new BoolField({ name: "fundador" }))`. `down`: quitar índice y campo.
+  - `9_social.js` (`up`): antes del índice, recorrer `users` ordenados por `created` y, si `name` ya apareció (comparando en minúsculas), renombrar a `name + n` (n = 2, 3…, recortando para no pasar 32) y `app.save`. Después: `users.indexes.push("CREATE UNIQUE INDEX idx_users_name_nocase ON users (name COLLATE NOCASE)")`, `users.fields.add(new BoolField({ name: "fundador" }))`. `down`: quitar índice y campo.
   - `social.pb.js`: `onRecordCreateRequest` y `onRecordUpdateRequest` en `users`: si `e.auth` no es superuser (`!e.hasSuperuserAuth()`), `e.record.set("fundador", create ? false : e.record.original().getBool("fundador"))`; luego `e.next()`.
   - `mensajeError`: antes de la línea de `en('name')`, `if (en('name')?.code === 'validation_not_unique') return 'Ese nombre ya existe, probá con otro.';`.
   - Harness: sufijo aleatorio en `name`.
@@ -78,7 +78,7 @@
 ### Task 2: Servidor — presencia (latido) y micrófono en la presencia de voz
 
 **Files:**
-- Modify: `server/pb_migrations/10_social.js` (campo `users.visto`: `DateField`)
+- Modify: `server/pb_migrations/9_social.js` (campo `users.visto`: `DateField`)
 - Modify: `server/pb_hooks/social.pb.js` (ruta del latido)
 - Modify: `server/pb_hooks/voz.pb.js:18-30` (`GET /api/groups/{id}/voz`)
 - Test: `server/tests/social.test.ts`, `server/tests/voz.test.ts`
@@ -105,7 +105,7 @@
 ### Task 3: Servidor — amistades
 
 **Files:**
-- Modify: `server/pb_migrations/10_social.js` (colección `amistades` y nueva `viewRule` de `users`)
+- Modify: `server/pb_migrations/9_social.js` (colección `amistades` y nueva `viewRule` de `users`)
 - Modify: `server/pb_hooks/social.pb.js` (ruta de solicitud)
 - Test: `server/tests/amigos.test.ts`
 
@@ -140,7 +140,7 @@
 ### Task 4: Servidor — mensajes privados y foto de grupo
 
 **Files:**
-- Modify: `server/pb_migrations/10_social.js` (colección `privados`; campo `groups.foto`)
+- Modify: `server/pb_migrations/9_social.js` (colección `privados`; campo `groups.foto`)
 - Modify: `server/pb_hooks/social.pb.js` (permiso de escritura en privados)
 - Test: `server/tests/privados.test.ts`, `server/tests/grupos.test.ts`
 
@@ -330,7 +330,7 @@
 ### Task 13: Login — "Recordar mi cuenta"
 
 **Files:**
-- Modify: `server/pb_migrations/10_social.js` (`users.authToken.duration = 30 * 24 * 3600`; el `down` vuelve a 604800)
+- Modify: `server/pb_migrations/9_social.js` (`users.authToken.duration = 30 * 24 * 3600`; el `down` vuelve a 604800)
 - Modify: `app/src/lib/pb.ts`, `app/src/lib/sesion.svelte.ts`, `app/src/lib/vistas/Entrar.svelte`
 - Test: `app/src/lib/sesion.test.ts`
 
@@ -355,7 +355,7 @@
   Expected: PASS, 0 errores.
 - [ ] **Step 2: Actualizar el servidor** (primero el servidor: la 0.2.0 necesita las colecciones nuevas)
   Run (PowerShell): `wsl -d Ubuntu-24.04 -u root -- bash -c "rm -rf /home/jorglopez96/thunderop && mkdir -p /home/jorglopez96/thunderop && cp -r '/mnt/d/ClaudeCode/Proyectos con REA/Thunderop/server/.' /home/jorglopez96/thunderop/ && bash /home/jorglopez96/thunderop/instalar-servidor.sh thunderop.duckdns.org"` (`pb_data` vive en `/opt/thunderop`, no se toca)
-  Expected: termina con "Listo." y `curl https://thunderop.duckdns.org/api/health` responde 200. Verificar con `journalctl -u thunderop-pocketbase -n 50` que la migración `10_social.js` corrió sin error.
+  Expected: termina con "Listo." y `curl https://thunderop.duckdns.org/api/health` responde 200. Verificar con `journalctl -u thunderop-pocketbase -n 50` que la migración `9_social.js` corrió sin error.
 - [ ] **Step 3: Release**
   Run: `cd app && npm run release -- thunderop.duckdns.org`, y copiar `app/release/thunderop-setup.exe` y `app/release/latest.json` a `/opt/thunderop/descargas/` (`wsl -d Ubuntu-24.04 -u root -- cp …`).
   Expected: `https://thunderop.duckdns.org/descargas/latest.json` dice `"version": "0.2.0"`.

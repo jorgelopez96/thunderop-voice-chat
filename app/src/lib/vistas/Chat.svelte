@@ -1,15 +1,23 @@
 <script lang="ts">
+  import Insignia from './Insignia.svelte';
   import { tick } from 'svelte';
   import type { RecordModel } from 'pocketbase';
   import { pb } from '../pb';
   import { validarAdjunto, duracionVideo } from '../adjuntos';
-  import { abrirChat, enviar, borrar } from '../chat.svelte';
-  import { sesion, mensajeError } from '../sesion.svelte';
+  import type { ChatAbierto } from '../chat.svelte';
+  import { mensajeError } from '../sesion.svelte';
 
-  let { room, soyDueno }: { room: RecordModel; soyDueno: boolean } = $props();
+  // Sirve para salas de grupo y privados: quien lo usa dice qué lista abrir y cómo enviar y borrar.
+  // `soloLectura`: oculta el compositor y muestra ese texto (privado con alguien que ya no es amigo).
+  let { titulo, abrir, enviar, borrar, puedeBorrar, soloLectura = '', alVer }: {
+    titulo: string; abrir: () => ChatAbierto; enviar: (texto: string, archivo?: File) => Promise<unknown>;
+    borrar: (id: string) => Promise<unknown>; puedeBorrar: (m: RecordModel) => boolean; soloLectura?: string;
+    alVer?: (ultimo: RecordModel) => void; // se llama con el último mensaje visible (privados: marcar leído)
+  } = $props();
   // svelte-ignore state_referenced_locally
-  const chat = abrirChat(room.id); // se recrea por sala (#key en Grupo)
+  const chat = abrir(); // se recrea con #key en quien lo usa
   $effect(() => chat.cerrar);
+  $effect(() => { const m = chat.mensajes.at(-1); if (m) alVer?.(m); });
 
   let texto = $state('');
   let archivo = $state<File | null>(null);
@@ -56,7 +64,7 @@
     const t = texto.trim();
     if ((!t && !archivo) || enviando) return;
     enviando = true; error = '';
-    try { await enviar(room.id, t, archivo ?? undefined); texto = ''; archivo = null; }
+    try { await enviar(t, archivo ?? undefined); texto = ''; archivo = null; }
     catch (e) { error = mensajeError(e); }
     finally { enviando = false; }
   }
@@ -69,8 +77,8 @@
   function alScroll() { if (lista && lista.scrollTop === 0 && chat.hayMas) chat.cargarMas(); }
 </script>
 
-<section class="chat" aria-label="Chat {room.name}">
-  <h2 class="titulo"># {room.name}</h2>
+<section class="chat" aria-label="Chat {titulo}">
+  <h2 class="titulo">{titulo}</h2>
   <div class="lista" bind:this={lista} onscroll={alScroll} data-testid="mensajes">
     {#if chat.hayMas}<button class="plano" onclick={() => chat.cargarMas()}>Cargar anteriores</button>{/if}
     {#if chat.error}<p role="alert">{chat.error}</p>{/if}
@@ -81,9 +89,9 @@
         {:else}<span class="avatar" style="background:{a?.color || ''}"></span>{/if}
         <div class="cuerpo">
           <header>
-            <strong style="color:{a?.color || 'var(--tenue)'}">{a ? a.name : 'Ex miembro'}</strong>
+            <strong style="color:{a?.color || 'var(--tenue)'}">{a ? a.name : 'Ex miembro'}</strong><Insignia usuario={a} />
             <small>{hora(m)}</small>
-            {#if m.author === sesion.usuario?.id || soyDueno}<button class="plano borrar" onclick={() => quitar(m)}>Borrar</button>{/if}
+            {#if puedeBorrar(m)}<button class="plano borrar" onclick={() => quitar(m)}>Borrar</button>{/if}
           </header>
           {#if m.text}<p class="texto">{m.text}</p>{/if}
           {#if m.file}
@@ -101,11 +109,12 @@
     {:else}<img class="miniatura" src={previa} alt="Vista previa del adjunto" />{/if}
     <small>{archivo.name}</small> <button class="plano" onclick={() => (archivo = null)}>Quitar</button>
   </div>{/if}
-  <div class="composer">
+  {#if soloLectura}<p class="pie tenue">{soloLectura}</p>
+  {:else}<div class="composer">
     <label class="clip" title="Adjuntar imagen o video">📎 <input type="file" hidden accept="image/png,image/jpeg,image/gif,image/webp,video/mp4,video/webm" onchange={elegir} data-testid="adjuntar" /></label>
     <textarea bind:value={texto} onkeydown={tecla} onpaste={pegar} maxlength="2000" rows="1" placeholder="Escribí un mensaje (Enter envía, Shift+Enter nueva línea)"></textarea>
     <button class="primario" onclick={enviarMensaje} disabled={enviando}>Enviar</button>
-  </div>
+  </div>{/if}
 </section>
 
 <style>
@@ -121,6 +130,7 @@
   .texto { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; }
   .adjunto { display: block; max-width: min(400px, 100%); max-height: 300px; border-radius: var(--radio); margin-top: 4px; }
   .pie { margin: 0 16px; }
+  .tenue { color: var(--tenue); margin-bottom: 16px; }
   .adjuntado { display: flex; align-items: center; gap: 8px; }
   .miniatura { width: 64px; height: 64px; object-fit: cover; border-radius: var(--radio); }
   .ver { padding: 0; display: block; cursor: zoom-in; }

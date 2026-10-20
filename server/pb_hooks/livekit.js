@@ -90,4 +90,11 @@ function salaDeVoz(app, roomId, userId) {
   return { room, group };
 }
 
-module.exports = { config, token, roomService, enSalasDeVoz, grupoDeMiembro, salaDeVoz };
+// Sin micrófono para los demás: silenciado por el dueño o sin pista de micrófono abierta.
+// `source` llega como nombre protobuf ("MICROPHONE") o número (2), según la versión de LiveKit.
+function silenciado(p, silenciados) {
+  if (silenciados.includes(p.identity)) return true;
+  return !(p.tracks || []).some((t) => (t.source === "MICROPHONE" || t.source === 2) && !t.muted);
+}
+
+module.exports = { config, token, roomService, enSalasDeVoz, grupoDeMiembro, salaDeVoz, silenciado };

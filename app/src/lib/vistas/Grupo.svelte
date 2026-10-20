@@ -2,9 +2,11 @@
   import type { RecordModel } from 'pocketbase';
   import { untrack } from 'svelte';
   import { sesion, mensajeError } from '../sesion.svelte';
+  import { pb } from '../pb';
   import { salas, enVoz, presencia, crearInvitacion, crearSala, renombrarSala, borrarSala, borrarGrupo } from '../grupos.svelte';
   import Chat from './Chat.svelte';
-  import Miembros from './Miembros.svelte';
+  import { abrirChat, enviar, borrar } from '../chat.svelte';
+  import Participantes from './Participantes.svelte';
   import Voz from './Voz.svelte';
   import ControlesVoz from './ControlesVoz.svelte';
   import { voz, entrarVoz } from '../voz.svelte';
@@ -30,6 +32,18 @@
   let nueva = $state({ chat: '', voz: '' });
   let editando = $state<{ id: string; name: string } | null>(null);
   let confirmar = $state<null | { texto: string; hacer: () => Promise<void> }>(null);
+
+  async function cambiarFoto(ev: Event) {
+    const input = ev.currentTarget as HTMLInputElement;
+    const f = input.files?.[0];
+    input.value = '';
+    if (!f) return;
+    if (!f.type.startsWith('image/')) { error = 'La foto debe ser una imagen.'; return; }
+    if (f.size > 2 * 1024 * 1024) { error = 'La foto supera los 2 MB.'; return; }
+    const d = new FormData();
+    d.append('foto', f);
+    await hacer(async () => { await pb.collection('groups').update(grupo.id, d); });
+  }
 
   async function hacer(f: () => Promise<void>) {
     error = '';
@@ -99,6 +113,7 @@
     </div>
     <div class="fila">
       <button class="primario" onclick={() => hacer(invitar)}>Invitar</button>
+      {#if soyDueno}<label class="plano foto" title="Foto del grupo (imagen hasta 2 MB)">Foto <input type="file" hidden accept="image/png,image/jpeg,image/webp,image/gif" onchange={cambiarFoto} /></label>{/if}
       {#if soyDueno}<button class="plano" onclick={() => (confirmar = { texto: `¿Borrar el grupo "${grupo.name}"? Se pierden salas y mensajes.`, hacer: () => borrarGrupo(grupo.id) })}>Borrar grupo</button>{/if}
     </div>
     {#if link}<p role="status">Link copiado: <code data-testid="link-invitacion">{link}</code></p>{/if}
@@ -115,10 +130,11 @@
   </nav>
 
   {#if centroVoz && salaVoz}<Voz {grupo} {soyDueno} sala={salaVoz.name} />
-  {:else if salaAbierta}{#key salaAbierta.id}<Chat room={salaAbierta} {soyDueno} />{/key}
+  {:else if salaAbierta}{#key salaAbierta.id}<Chat titulo={`# ${salaAbierta.name}`} abrir={() => abrirChat(salaAbierta.id)} enviar={(t, f) => enviar(salaAbierta.id, t, f)} {borrar}
+    puedeBorrar={(m) => m.author === sesion.usuario?.id || soyDueno} />{/key}
   {:else}<div class="vacio">Elegí una sala de chat</div>{/if}
 
-  <Miembros {grupo} />
+  <Participantes {grupo} />
   {#if confirmar}
     <Confirmar texto={confirmar.texto} cancelar={() => (confirmar = null)}
       confirmar={() => { const c = confirmar!; confirmar = null; hacer(c.hacer); }} />

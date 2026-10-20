@@ -1,8 +1,9 @@
 <script lang="ts">
-  import { entrar, registrarse, mensajeError } from '../sesion.svelte';
+  import { entrar, registrarse, mensajeError, emailRecordado } from '../sesion.svelte';
 
   let modo = $state<'entrar' | 'crear'>('entrar');
-  let email = $state('');
+  let email = $state(emailRecordado());
+  let recordar = $state(true);
   let pass = $state('');
   let name = $state('');
   let error = $state('');
@@ -13,8 +14,8 @@
     error = '';
     ocupado = true;
     try {
-      if (modo === 'entrar') await entrar(email, pass);
-      else await registrarse(email, pass, name);
+      if (modo === 'entrar') await entrar(email, pass, recordar);
+      else await registrarse(email, pass, name, recordar);
     } catch (e) {
       error = mensajeError(e);
     } finally {
@@ -39,6 +40,7 @@
       <input type="password" bind:value={pass} required minlength="8"
         autocomplete={modo === 'entrar' ? 'current-password' : 'new-password'} />
     </label>
+    <label class="casilla"><input type="checkbox" bind:checked={recordar} /> Recordar mi cuenta</label>
     {#if error}<p role="alert">{error}</p>{/if}
     <button type="submit" disabled={ocupado}>{modo === 'entrar' ? 'Entrar' : 'Crear cuenta'}</button>
   </form>
@@ -46,6 +48,7 @@
 </main>
 
 <style>
+  .casilla { flex-direction: row; align-items: center; gap: 8px; }
   main { min-height: 100%; display: grid; place-items: center; padding: 16px; }
   .tarjeta { width: min(400px, 100%); }
   h1 { text-align: center; font-size: 22px; }

@@ -67,7 +67,8 @@ test('tres personas en una sala de voz', async ({ browser }) => {
   await expect(b.getByText('El dueño te silenció.')).toBeVisible();
 
   // Ana echa a Caro: Caro queda fuera de la llamada en menos de 15 s.
-  await a.locator('aside.miembros li', { hasText: 'Caro' }).getByRole('button', { name: 'Echar' }).click();
+  await a.locator('aside.participantes li', { hasText: 'Caro' }).click({ button: 'right' });
+  await a.getByRole('button', { name: 'Echar' }).click();
   await a.getByRole('button', { name: 'Confirmar' }).click();
   await expect(c.getByRole('button', { name: 'Desconectar' })).toHaveCount(0, { timeout: 15_000 });
   await expect(c.getByRole('alert')).toContainText('Te sacaron de la llamada.');

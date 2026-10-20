@@ -11,12 +11,16 @@ export function anteponer<T extends { id: string }>(actuales: T[], pagina: T[]) 
   return [...pagina.filter((m) => !ids.has(m.id)), ...actuales];
 }
 
-/** Chat de una sala: últimos 50 + realtime. Los mensajes quedan en orden cronológico. Llamar `cerrar()` al terminar. */
-export function abrirChat(roomId: string) {
+export type ChatAbierto = ReturnType<typeof abrirLista>;
+
+/** Chat de una sala de grupo. */
+export const abrirChat = (roomId: string) => abrirLista('messages', pb.filter('room = {:r}', { r: roomId }));
+
+/** Mensajes de `coleccion` que cumplen `filtroSala`: últimos 50 + realtime, en orden cronológico. Llamar `cerrar()` al terminar. */
+export function abrirLista(coleccion: 'messages' | 'privados', filtroSala: string) {
   const estado = $state<{ mensajes: RecordModel[]; hayMas: boolean; error: string }>({ mensajes: [], hayMas: false, error: '' });
   let cerrado = false;
   let cargando = false;
-  const filtroSala = pb.filter('room = {:r}', { r: roomId });
 
   const insertar = (m: RecordModel) => {
     if (estado.mensajes.some((x) => x.id === m.id)) return;
@@ -25,19 +29,19 @@ export function abrirChat(roomId: string) {
 
   async function cargar(antes?: string) {
     const filter = antes ? pb.filter(`${filtroSala} && created < {:c}`, { c: antes }) : filtroSala;
-    const r = await pb.collection('messages').getList(1, PAGINA, { filter, sort: '-created', expand: EXPAND, skipTotal: true });
+    const r = await pb.collection(coleccion).getList(1, PAGINA, { filter, sort: '-created', expand: EXPAND, skipTotal: true });
     if (cerrado) return;
     estado.mensajes = anteponer(estado.mensajes, r.items.reverse());
     estado.hayMas = r.items.length === PAGINA;
   }
   cargar().catch(() => { estado.error = 'No se pudieron cargar los mensajes.'; });
 
-  const sub = pb.collection('messages').subscribe('*', async (e) => {
+  const sub = pb.collection(coleccion).subscribe('*', async (e) => {
     if (e.action === 'delete') { estado.mensajes = estado.mensajes.filter((m) => m.id !== e.record.id); return; }
     if (e.action !== 'create') return;
     // El evento realtime llega sin `expand`: se trae el mensaje con su autor.
     let m = e.record;
-    try { m = await pb.collection('messages').getOne(m.id, { expand: EXPAND }); } catch { /* sin autor visible: "Ex miembro" */ }
+    try { m = await pb.collection(coleccion).getOne(m.id, { expand: EXPAND }); } catch { /* sin autor visible: "Ex miembro" */ }
     if (!cerrado) insertar(m);
   }, { filter: filtroSala });
 

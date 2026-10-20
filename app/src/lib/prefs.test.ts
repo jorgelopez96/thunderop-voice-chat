@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { leerPrefs, guardarPrefs } from './prefs';
 import { volumen } from './voz.svelte';
 
-const DEFAULTS = { supresion: false, volumenes: {}, calidad: '1080p60', gpu: true, vistaPrevia: true, volBotonera: 0.8, volMusica: 50 };
+const DEFAULTS = { supresion: true, volumenes: {}, calidad: '1080p60', gpu: true, vistaPrevia: true, volBotonera: 0.8, volMusica: 50, gananciaDb: 0 };
 
 describe('prefs de voz', () => {
   // Vitest corre en Node (sin localStorage): uno en memoria por test.
@@ -14,6 +14,22 @@ describe('prefs de voz', () => {
 
   it('sin nada guardado devuelve defaults', () => {
     expect(leerPrefs()).toEqual(DEFAULTS);
+  });
+
+  it('reenciende la supresión una vez', () => {
+    localStorage.setItem('dm.voz', JSON.stringify({ supresion: false }));
+    expect(leerPrefs().supresion).toBe(true);
+    guardarPrefs({ supresion: false });
+    expect(leerPrefs().supresion).toBe(false);
+  });
+
+  it('ganancia fuera de rango vuelve a 0', () => {
+    for (const g of [50, -21, 'x']) {
+      localStorage.setItem('dm.voz', JSON.stringify({ v: 2, gananciaDb: g }));
+      expect(leerPrefs().gananciaDb).toBe(0);
+    }
+    guardarPrefs({ gananciaDb: -6 });
+    expect(leerPrefs().gananciaDb).toBe(-6);
   });
 
   it('JSON roto devuelve defaults', () => {

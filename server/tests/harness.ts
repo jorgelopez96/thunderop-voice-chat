@@ -123,7 +123,7 @@ export async function startPocketBase(opts: { rateLimits?: boolean; port?: numbe
         pb.autoCancellation(false);
         const email = `${nombre}-${randomBytes(4).toString('hex')}@test.local`;
         const password = randomBytes(8).toString('hex');
-        await pb.collection('users').create({ email, password, passwordConfirm: password, name: nombre });
+        await pb.collection('users').create({ email, password, passwordConfirm: password, name: `${nombre}-${randomBytes(2).toString('hex')}` });
         await pb.collection('users').authWithPassword(email, password);
         return pb;
       },

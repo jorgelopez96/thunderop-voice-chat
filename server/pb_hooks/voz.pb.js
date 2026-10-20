@@ -20,11 +20,12 @@ routerAdd("GET", "/api/groups/{id}/voz", (e) => {
   const c = lk.config();
   const group = lk.grupoDeMiembro(e.app, e.request.pathValue("id"), e.auth.id);
   const salas = e.app.findRecordsByFilter("rooms", "group = {:g} && kind = 'voz'", "position", 0, 0, { g: group.id });
+  const silenciados = group.getStringSlice("silenciados");
   const res = {};
   salas.forEach((r) => {
     // LiveKit responde 200 { participants: [] } (o sin el campo) para una sala que no existe
     const participantes = lk.roomService(c, "ListParticipants", { room: r.id }, r.id).participants || [];
-    res[r.id] = participantes.map((p) => ({ id: p.identity, name: p.name }));
+    res[r.id] = participantes.map((p) => ({ id: p.identity, name: p.name, silenciado: lk.silenciado(p, silenciados) }));
   });
   return e.json(200, res);
 }, $apis.requireAuth("users"));

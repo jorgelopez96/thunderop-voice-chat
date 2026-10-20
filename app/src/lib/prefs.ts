@@ -1,4 +1,4 @@
-// Preferencias locales de voz (dispositivos, supresión, volúmenes por usuario, transmisión) en `localStorage['dm.voz']`.
+// Preferencias locales de voz (dispositivos, supresión, ganancia, volúmenes por usuario, transmisión) en `localStorage['dm.voz']`.
 export type Calidad = '720p30' | '720p60' | '1080p30' | '1080p60';
 // Límites de transmisión de pantalla (Global Constraints de la etapa 4).
 export const CALIDADES: Record<Calidad, { ancho: number; alto: number; fps: number; mbps: number }> = {
@@ -7,10 +7,12 @@ export const CALIDADES: Record<Calidad, { ancho: number; alto: number; fps: numb
   '1080p30': { ancho: 1920, alto: 1080, fps: 30, mbps: 8 },
   '1080p60': { ancho: 1920, alto: 1080, fps: 60, mbps: 12 },
 };
-export type PrefsVoz = { entrada?: string; salida?: string; supresion: boolean; volumenes: Record<string, number>; calidad: Calidad; gpu: boolean; vistaPrevia: boolean; volBotonera: number; volMusica: number };
+export type PrefsVoz = { entrada?: string; salida?: string; supresion: boolean; volumenes: Record<string, number>; calidad: Calidad; gpu: boolean; vistaPrevia: boolean; volBotonera: number; volMusica: number; gananciaDb: number };
 
 const CLAVE = 'dm.voz';
-const DEFAULTS: PrefsVoz = { supresion: false, volumenes: {}, calidad: '1080p60', gpu: true, vistaPrevia: true, volBotonera: 0.8, volMusica: 50 };
+// Versión del formato: lo guardado antes de la 2 tenía la supresión apagada por defecto; se reenciende una vez.
+const VERSION = 2;
+const DEFAULTS: PrefsVoz = { supresion: true, volumenes: {}, calidad: '1080p60', gpu: true, vistaPrevia: true, volBotonera: 0.8, volMusica: 50, gananciaDb: 0 };
 
 export function leerPrefs(): PrefsVoz {
   try {
@@ -19,13 +21,14 @@ export function leerPrefs(): PrefsVoz {
     const volumenes = Object.fromEntries(Object.entries(p.volumenes ?? {}).filter(([, v]) => typeof v === 'number')) as Record<string, number>;
     const calidad = (Object.keys(CALIDADES) as Calidad[]).find((c) => c === p.calidad) ?? DEFAULTS.calidad;
     const rango = (v: unknown, max: number, def: number) => (typeof v === 'number' && v >= 0 && v <= max ? v : def); // NaN falla la comparación
-    return { entrada: texto(p.entrada), salida: texto(p.salida), supresion: p.supresion === true, volumenes, calidad, gpu: p.gpu !== false, vistaPrevia: p.vistaPrevia !== false,
-      volBotonera: rango(p.volBotonera, 1, DEFAULTS.volBotonera), volMusica: rango(p.volMusica, 100, DEFAULTS.volMusica) };
+    return { entrada: texto(p.entrada), salida: texto(p.salida), supresion: p.v === VERSION ? p.supresion === true : true, volumenes, calidad, gpu: p.gpu !== false, vistaPrevia: p.vistaPrevia !== false,
+      volBotonera: rango(p.volBotonera, 1, DEFAULTS.volBotonera), volMusica: rango(p.volMusica, 100, DEFAULTS.volMusica),
+      gananciaDb: typeof p.gananciaDb === 'number' && p.gananciaDb >= -20 && p.gananciaDb <= 20 ? p.gananciaDb : DEFAULTS.gananciaDb };
   } catch { return { ...DEFAULTS, volumenes: {} }; }
 }
 
 export function guardarPrefs(p: Partial<PrefsVoz>): void {
   const actual = leerPrefs();
-  try { localStorage.setItem(CLAVE, JSON.stringify({ ...actual, ...p, volumenes: { ...actual.volumenes, ...p.volumenes } })); }
+  try { localStorage.setItem(CLAVE, JSON.stringify({ ...actual, ...p, v: VERSION, volumenes: { ...actual.volumenes, ...p.volumenes } })); }
   catch { /* almacenamiento bloqueado: la preferencia dura solo esta sesión */ }
 }

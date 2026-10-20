@@ -1,22 +1,25 @@
 <script lang="ts">
-  import { sesion, salir, mensajeError } from '../sesion.svelte';
-  import { grupos, grupoActual, iniciarGrupos, crearGrupo, unirse } from '../grupos.svelte';
-  import Perfil from './Perfil.svelte';
+    import { grupos, grupoActual, iniciarGrupos } from '../grupos.svelte';
+  import Inicio from './Inicio.svelte';
+  import MenuPerfil from './MenuPerfil.svelte';
+  import Configuracion from './Configuracion.svelte';
+  import { Settings } from '@lucide/svelte';
   import Grupo from './Grupo.svelte';
   import ControlesVoz from './ControlesVoz.svelte';
   import { voz } from '../voz.svelte';
+  import { iniciarPresencia } from '../presencia.svelte';
+  import { iniciarAmigos } from '../amigos.svelte';
+  import { iniciarPrivados } from '../privados.svelte';
+  import Campanita from './Campanita.svelte';
   import { ubicarReproductor } from '../musica/musica.svelte';
 
   $effect(iniciarGrupos);
+  $effect(iniciarPresencia);
+  $effect(iniciarAmigos);
+  $effect(iniciarPrivados);
 
-  const yaCree = $derived(grupos.lista.some((g) => g.owner === sesion.usuario?.id));
   const actual = $derived(grupos.lista.find((g) => g.id === grupoActual.id));
-  let nombre = $state('');
-  let creando = $state(false);
-  let codigo = $state('');
-  let uniendo = $state(false);
-  let verPerfil = $state(false);
-  let error = $state('');
+  let config = $state(false);
   let hostMusica = $state<HTMLElement>();
   // El reproductor vive acá y no en la vista de la sala: cambiar de chat o de grupo no corta la música.
   $effect(() => {
@@ -25,20 +28,16 @@
     return () => ubicarReproductor(null);
   });
 
-  async function hacer(f: () => Promise<void>) {
-    error = '';
-    try { await f(); } catch (e) { error = e instanceof Error && !('status' in e) ? e.message : mensajeError(e); }
-  }
 </script>
 
 <main>
   <header class="barra">
-    <h1>Thunderop</h1>
-    <span class="yo" style="color:{sesion.usuario?.color || 'inherit'}">{sesion.usuario?.name}</span>
-    <button class="plano" onclick={() => (verPerfil = !verPerfil)}>Mi perfil</button>
-    <button class="plano" onclick={salir}>Salir</button>
+    <h1>⚡ THUNDEROP</h1>
+    <Campanita />
+    <button class="plano icono" aria-label="Configuración" title="Configuración" onclick={() => (config = true)}><Settings size={20} strokeWidth={1.75} /></button>
+    <MenuPerfil />
   </header>
-  {#if verPerfil}<div class="perfil"><Perfil /></div>{/if}
+  {#if config}<Configuracion cerrar={() => (config = false)} />{/if}
   {#if voz.error}
     <p class="aviso" role="alert">{voz.error} <button class="plano" aria-label="Cerrar aviso" onclick={() => (voz.error = '')}>✕</button></p>
   {/if}
@@ -48,38 +47,7 @@
       <Grupo grupo={actual} volver={() => (grupoActual.id = null)} />
     {/key}
   {:else}
-    <div class="inicio"><div class="tarjeta">
-    <h2>Mis grupos</h2>
-    <ul class="grupos">
-      {#each grupos.lista as g (g.id)}
-        <li><button onclick={() => (grupoActual.id = g.id)}>{g.name}</button></li>
-      {/each}
-    </ul>
-    {#if grupos.cargado && !grupos.lista.length}<p>Todavía no estás en ningún grupo.</p>{/if}
-
-    {#if !yaCree}
-      {#if creando}
-        <form class="fila" onsubmit={(e) => { e.preventDefault(); hacer(async () => { await crearGrupo(nombre.trim()); nombre = ''; creando = false; }); }}>
-          <input bind:value={nombre} required maxlength="40" placeholder="Nombre del grupo" />
-          <button type="submit">Crear</button>
-          <button type="button" onclick={() => (creando = false)}>Cancelar</button>
-        </form>
-      {:else}
-        <button class="primario" onclick={() => (creando = true)}>Crear grupo</button>
-      {/if}
-    {/if}
-
-    {#if uniendo}
-      <form class="fila" onsubmit={(e) => { e.preventDefault(); hacer(async () => { await unirse(codigo); codigo = ''; uniendo = false; }); }}>
-        <input bind:value={codigo} required placeholder="Código o link de invitación" />
-        <button type="submit">Unirme</button>
-        <button type="button" onclick={() => (uniendo = false)}>Cancelar</button>
-      </form>
-    {:else}
-      <button onclick={() => (uniendo = true)}>Unirme con código</button>
-    {/if}
-    {#if error}<p role="alert">{error}</p>{/if}
-    </div></div>
+    <Inicio />
   {/if}
   <!-- Dentro de un grupo, los controles van al pie de su barra de salas (Grupo); afuera, flotan. -->
   {#if voz.salaId && !actual}<div class="pie"><ControlesVoz /></div>{/if}
@@ -90,16 +58,10 @@
   main { height: 100%; display: flex; flex-direction: column; }
   .barra { display: flex; align-items: center; gap: 8px; padding: 0 12px; height: 44px; background: var(--hondo); flex: none; }
   .barra h1 { font-size: 15px; margin-right: auto; }
-  .yo { font-weight: 600; }
-  .perfil { position: fixed; top: 52px; right: 12px; z-index: 10; width: 320px; box-shadow: 0 8px 24px rgb(0 0 0 / .5); border-radius: 10px; }
+  .icono { display: grid; place-items: center; padding: 6px; }
   .aviso { display: flex; align-items: center; gap: 8px; padding: 6px 12px; background: var(--hondo); border-top: 1px solid var(--hover); flex: none; }
   .aviso button { margin-left: auto; }
   .pie { position: fixed; left: 8px; bottom: 8px; width: 224px; z-index: 5; box-shadow: 0 8px 24px rgb(0 0 0 / .5); }
-  .inicio { flex: 1; display: grid; place-items: center; padding: 16px; overflow: auto; }
-  .tarjeta { width: min(420px, 100%); }
-  .grupos { display: flex; flex-direction: column; gap: 6px; }
-  .grupos button { width: 100%; text-align: left; background: var(--hover); padding: 10px 12px; }
-  form.fila input { flex: 1; }
   /* Fuera de pantalla y no display:none: oculto, el iframe de YouTube puede dejar de sonar. */
   .reproductor { position: fixed; left: -10000px; top: 0; width: 240px; height: 135px; }
   .reproductor :global(iframe) { width: 100%; height: 100%; border: 0; }

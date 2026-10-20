@@ -1,3 +1,4 @@
+import type { ProcesadorMic } from './ruido';
 import type { LocalAudioTrack, LocalVideoTrack, Participant, RemoteTrack, Room, Track } from 'livekit-client';
 import { getCurrentWindow, LogicalSize } from '@tauri-apps/api/window';
 import { pb } from './pb';
@@ -69,17 +70,20 @@ async function publicarMic() {
   actualizar();
 }
 
-// En serie: LiveKit recién registra el procesador cuando termina su init (import + wasm), así que un
-// on→off rápido sin cola vería "sin procesador" y dejaría RNNoise puesto. Cada paso decide al llegar su turno.
+// En serie: LiveKit recién registra el procesador cuando termina su init (import + wasm), así que dos
+// cambios rápidos sin cola pondrían dos procesadores. Cada paso decide al llegar su turno.
 let cola = Promise.resolve();
-function aplicarSupresion() {
+function aplicarProcesador() {
   cola = cola.then(async () => {
     const t = microfono();
     if (!t) return;
+    const op = { supresion: voz.supresion, gananciaDb: leerPrefs().gananciaDb };
     try {
-      if (voz.supresion && !t.getProcessor()) await t.setProcessor((await import('./ruido')).crearSupresor());
-      else if (!voz.supresion && t.getProcessor()) await t.stopProcessor();
-    } catch { voz.error = 'No se pudo activar la supresión de ruido.'; }
+      let p = t.getProcessor() as ProcesadorMic | undefined;
+      if (p) await p.ajustar(op);
+      else { p = (await import('./ruido')).crearProcesador(op); await t.setProcessor(p); }
+      if (p.fallo) voz.error = `No se pudo activar la supresión de ruido (${p.fallo}). El micrófono anda igual.`;
+    } catch (e) { console.error(e); voz.error = `No se pudo activar el procesador del micrófono (${e instanceof Error ? e.message : e}).`; }
   });
   return cola;
 }
@@ -133,7 +137,7 @@ export async function entrarVoz(roomId: string, salaNombre = '', grupoId: string
     void despublicarAudio(r);
   });
   r.on(RoomEvent.DataReceived, (payload, _part, _kind, topic) => { for (const f of oyentesDatos) f(payload, topic); });
-  r.on(RoomEvent.LocalTrackPublished, () => { aplicarSupresion(); actualizar(); });
+  r.on(RoomEvent.LocalTrackPublished, () => { aplicarProcesador(); actualizar(); });
   r.on(RoomEvent.ParticipantPermissionsChanged, (_prev, part) => {
     // El dueño nos des-silenció: se vuelve a publicar el micrófono (LiveKit lo despublicó al silenciar).
     if (part === r.localParticipant && !r.localParticipant.isMicrophoneEnabled) publicarMic();
@@ -197,10 +201,16 @@ export async function alternarMute() {
   actualizar();
 }
 
-export async function alternarSupresion() {
-  voz.supresion = !voz.supresion;
-  guardarPrefs({ supresion: voz.supresion });
-  await aplicarSupresion();
+export async function cambiarSupresion(si: boolean) {
+  voz.supresion = si;
+  guardarPrefs({ supresion: si });
+  await aplicarProcesador();
+}
+
+/** Ganancia del micrófono en dB (−20 a +20), después de la supresión. Se guarda y se aplica en vivo. */
+export async function cambiarGanancia(db: number) {
+  guardarPrefs({ gananciaDb: db });
+  await aplicarProcesador();
 }
 
 export async function elegirEntrada(deviceId: string) {

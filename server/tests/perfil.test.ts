@@ -27,9 +27,17 @@ describe('perfil de usuario', () => {
       .rejects.toMatchObject({ status: 400 });
   });
 
-  it('users list is not public', async () => {
+  it('users list only shows visible users (self, group mates, friends)', async () => {
     const a = await h.nuevoUsuario('ana');
-    await expect(a.collection('users').getList()).rejects.toMatchObject({ status: 403 });
+    await h.nuevoUsuario('beto');
+    expect((await a.collection('users').getFullList()).map((u) => u.id)).toEqual([a.authStore.record!.id]);
+  });
+
+  it('visto only changes through the heartbeat', async () => {
+    const a = await h.nuevoUsuario('ana');
+    const id = a.authStore.record!.id;
+    await a.collection('users').update(id, { visto: '2099-01-01 00:00:00.000Z' });
+    expect((await a.collection('users').getOne(id)).visto).toBe('');
   });
 
   const join = (pb: any, code: string) => pb.send('/api/invites/join', { method: 'POST', body: { code } });
@@ -55,7 +63,7 @@ describe('perfil de usuario', () => {
     const a = await h.nuevoUsuario('ana');
     const b = await h.nuevoUsuario('beto');
     await grupoCon(a, b);
-    expect((await b.collection('users').getOne(a.authStore.record!.id)).name).toBe('ana');
+    expect((await b.collection('users').getOne(a.authStore.record!.id)).name).toBe(a.authStore.record!.name);
   });
 
   it('members in different groups cannot view each other', async () => {
@@ -72,6 +80,6 @@ describe('perfil de usuario', () => {
     const b = await h.nuevoUsuario('beto');
     const g = await grupoCon(a, b);
     const r = await b.collection('groups').getOne(g.id, { expand: 'members' });
-    expect(r.expand!.members.map((m: any) => m.name)).toContain('ana');
+    expect(r.expand!.members.map((m: any) => m.name)).toContain(a.authStore.record!.name);
   });
 });
