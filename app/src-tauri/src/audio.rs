@@ -1,5 +1,6 @@
 // Captura del sonido de la PC sin las voces de la llamada: loopback de WASAPI
-// excluyendo nuestro árbol de procesos (el WebView2 cuelga de app.exe).
+// excluyendo el árbol del navegador de WebView2. Excluir app.exe no alcanza: aunque
+// msedgewebview2.exe figure como hijo, Windows no lo cuenta dentro de su árbol (medido).
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc, Mutex};
 use std::thread::JoinHandle;
@@ -10,6 +11,7 @@ pub struct Captura(Mutex<Option<(Arc<AtomicBool>, JoinHandle<()>)>>);
 
 #[cfg(windows)]
 fn capturar_con(
+    excluir: u32,
     activa: Arc<AtomicBool>,
     mut enviar: impl FnMut(Vec<u8>) -> bool,
     listo: impl FnOnce(Result<(), String>),
@@ -20,7 +22,7 @@ fn capturar_con(
     let abrir = || -> Result<_, String> {
         wasapi::initialize_mta().ok().map_err(|e| e.to_string())?;
         // include_tree=false => EXCLUDE_TARGET_PROCESS_TREE (el comentario del crate dice lo contrario)
-        let mut ac = AudioClient::new_application_loopback_client(std::process::id(), false)
+        let mut ac = AudioClient::new_application_loopback_client(excluir, false)
             .map_err(|e| e.to_string())?;
         // este cliente no soporta get_mixformat: el formato lo ponemos nosotros
         let fmt = WaveFormat::new(32, 32, &SampleType::Float, 48000, 2, None);
@@ -75,6 +77,7 @@ fn capturar_con(
 
 #[cfg(not(windows))]
 fn capturar_con(
+    _: u32,
     _: Arc<AtomicBool>,
     _: impl FnMut(Vec<u8>) -> bool,
     listo: impl FnOnce(Result<(), String>),
@@ -86,7 +89,24 @@ fn capturar_con(
 /// Captura mientras `activa` sea true y `enviar` devuelva true.
 #[cfg_attr(not(test), allow(dead_code))] // la usan los tests; la app va por capturar_con
 pub fn capturar(activa: Arc<AtomicBool>, enviar: impl FnMut(Vec<u8>) -> bool) -> Result<(), String> {
-    capturar_con(activa, enviar, |_| {})
+    capturar_con(std::process::id(), activa, enviar, |_| {})
+}
+
+/// PID del proceso navegador de WebView2 (el que reproduce el audio de la app); si no se puede, el propio.
+// Corre fuera del hilo principal (comando async): `with_webview` se ejecuta en él y no se traba.
+fn pid_navegador(w: &tauri::Webview) -> u32 {
+    #[cfg(windows)]
+    {
+        let (tx, rx) = mpsc::channel();
+        let _ = w.with_webview(move |pw| {
+            let mut pid = 0u32;
+            let _ = unsafe { pw.controller().CoreWebView2().and_then(|c| c.BrowserProcessId(&mut pid)) };
+            let _ = tx.send(pid);
+        });
+        if let Ok(pid) = rx.recv_timeout(std::time::Duration::from_secs(2)) { if pid != 0 { return pid; } }
+    }
+    let _ = w;
+    std::process::id()
 }
 
 impl Captura {
@@ -99,13 +119,14 @@ impl Captura {
 }
 
 #[tauri::command]
-pub fn iniciar_audio(canal: Channel<InvokeResponseBody>, estado: tauri::State<Captura>) -> Result<(), String> {
+pub async fn iniciar_audio(webview: tauri::Webview, canal: Channel<InvokeResponseBody>, estado: tauri::State<'_, Captura>) -> Result<(), String> {
     estado.detener();
+    let excluir = pid_navegador(&webview);
     let activa = Arc::new(AtomicBool::new(true));
     let (tx, rx) = mpsc::channel();
     let p = activa.clone();
     let h = std::thread::spawn(move || {
-        let _ = capturar_con(p, |b| canal.send(InvokeResponseBody::Raw(b)).is_ok(), |r| {
+        let _ = capturar_con(excluir, p,|b| canal.send(InvokeResponseBody::Raw(b)).is_ok(), |r| {
             let _ = tx.send(r);
         });
     });

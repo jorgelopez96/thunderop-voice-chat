@@ -28,10 +28,23 @@
   const hora = (m: RecordModel) => new Date(m.created.replace(' ', 'T')).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' });
   const esVideo = (m: RecordModel) => /\.(mp4|webm)$/i.test(m.file);
 
+  // Vista previa del adjunto antes de mandarlo.
+  const previa = $derived(archivo ? URL.createObjectURL(archivo) : '');
+  $effect(() => { const u = previa; return () => { if (u) URL.revokeObjectURL(u); }; });
+
   async function elegir(e: Event) {
     const input = e.currentTarget as HTMLInputElement;
     const f = input.files?.[0];
     input.value = '';
+    await adjuntar(f);
+  }
+  function pegar(e: ClipboardEvent) {
+    const f = e.clipboardData?.files[0];
+    if (!f) return; // texto: pega normal
+    e.preventDefault();
+    adjuntar(f);
+  }
+  async function adjuntar(f: File | undefined) {
     error = ''; archivo = null;
     if (!f) return;
     let dur: number | undefined;
@@ -76,17 +89,21 @@
           {#if m.file}
             {@const url = pb.files.getURL(m, m.file)}
             {#if esVideo(m)}<video class="adjunto" controls src={url}><track kind="captions" /></video>
-            {:else}<img class="adjunto" src={url} alt="Imagen adjunta" />{/if}
+            {:else}<button class="plano ver" title="Ver en grande" onclick={(e) => e.currentTarget.querySelector('img')?.requestFullscreen().catch(() => {})}><img class="adjunto" src={url} alt="Imagen adjunta" /></button>{/if}
           {/if}
         </div>
       </article>
     {/each}
   </div>
   {#if error}<p role="alert" class="pie">{error}</p>{/if}
-  {#if archivo}<p class="pie"><small>📎 {archivo.name}</small> <button class="plano" onclick={() => (archivo = null)}>Quitar</button></p>{/if}
+  {#if archivo}<div class="pie adjuntado">
+    {#if archivo.type.startsWith('video/')}<video class="miniatura" src={previa} muted></video>
+    {:else}<img class="miniatura" src={previa} alt="Vista previa del adjunto" />{/if}
+    <small>{archivo.name}</small> <button class="plano" onclick={() => (archivo = null)}>Quitar</button>
+  </div>{/if}
   <div class="composer">
     <label class="clip" title="Adjuntar imagen o video">📎 <input type="file" hidden accept="image/png,image/jpeg,image/gif,image/webp,video/mp4,video/webm" onchange={elegir} data-testid="adjuntar" /></label>
-    <textarea bind:value={texto} onkeydown={tecla} maxlength="2000" rows="1" placeholder="Escribí un mensaje (Enter envía, Shift+Enter nueva línea)"></textarea>
+    <textarea bind:value={texto} onkeydown={tecla} onpaste={pegar} maxlength="2000" rows="1" placeholder="Escribí un mensaje (Enter envía, Shift+Enter nueva línea)"></textarea>
     <button class="primario" onclick={enviarMensaje} disabled={enviando}>Enviar</button>
   </div>
 </section>
@@ -104,6 +121,10 @@
   .texto { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; }
   .adjunto { display: block; max-width: min(400px, 100%); max-height: 300px; border-radius: var(--radio); margin-top: 4px; }
   .pie { margin: 0 16px; }
+  .adjuntado { display: flex; align-items: center; gap: 8px; }
+  .miniatura { width: 64px; height: 64px; object-fit: cover; border-radius: var(--radio); }
+  .ver { padding: 0; display: block; cursor: zoom-in; }
+  .adjunto:fullscreen { max-width: none; max-height: none; object-fit: contain; background: #000; }
   .composer { display: flex; align-items: center; gap: 8px; margin: 8px 16px 16px; background: var(--panel); border: 1px solid var(--borde); border-radius: 8px; padding: 6px 8px; }
   .composer textarea { flex: 1; resize: none; background: none; border: 0; padding: 6px 4px; }
   .clip { cursor: pointer; font-size: 18px; flex-direction: row; }

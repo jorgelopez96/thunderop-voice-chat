@@ -23,6 +23,13 @@
   }
   let vid = $state<HTMLVideoElement>();
   let pctPantalla = $state(100);
+  let ultimoPct = 100;
+  let marco = $state<HTMLDivElement>();
+  function sonarPantalla(pct: number) {
+    if (pct) ultimoPct = pct;
+    pctPantalla = pct;
+    if (voz.viendo) volumenPantalla(voz.viendo, pct / 100);
+  }
   // Se recalcula con cada cambio de `voz.participantes` (así se entera de que llegó la pista), pero solo
   // avisa si cambia la pista: hablar o silenciarse no re-engancha el video.
   const pista = $derived((void voz.participantes, voz.viendo ? pistaPantalla(voz.viendo) : undefined));
@@ -61,12 +68,14 @@
   {#if voz.conectando}<p role="status">Conectando…</p>{/if}
   {#if error}<p role="alert">{error}</p>{/if}
   {#if voz.viendo}
-    <div class="pantalla">
+    <!-- Pantalla completa sobre el contenedor (no el <video>): el mute nativo del video no toca el audio, que va por otra pista. -->
+    <div class="pantalla" bind:this={marco}>
       <video bind:this={vid} autoplay playsinline muted aria-label={`Pantalla de ${quien}`}></video>
       <div class="fila">
-        <button onclick={() => vid?.requestFullscreen().catch(() => {})}>Pantalla completa</button>
+        <button onclick={() => (document.fullscreenElement ? document.exitFullscreen() : marco?.requestFullscreen())?.catch(() => {})}>Pantalla completa</button>
+        <button onclick={() => sonarPantalla(pctPantalla ? 0 : ultimoPct)} aria-label={pctPantalla ? 'Silenciar transmisión' : 'Activar sonido'}>{pctPantalla ? '🔊' : '🔇'}</button>
         <input type="range" min="0" max="200" step="5" bind:value={pctPantalla} aria-label="Volumen de la transmisión"
-          oninput={() => voz.viendo && volumenPantalla(voz.viendo, pctPantalla / 100)} />
+          oninput={() => sonarPantalla(pctPantalla)} />
       </div>
     </div>
   {/if}
@@ -113,4 +122,6 @@
   .propia { flex-basis: 100%; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
   .previa { width: 240px; max-width: 100%; max-height: none; aspect-ratio: 16 / 9; }
   .pantalla input[type='range'] { flex: 1; min-width: 120px; }
+  .pantalla:fullscreen { margin: 0; padding: 8px; background: #000; }
+  .pantalla:fullscreen video { flex: 1; max-height: none; min-height: 0; }
 </style>
