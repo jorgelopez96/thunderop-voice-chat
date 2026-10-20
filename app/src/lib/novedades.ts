@@ -3,6 +3,24 @@ export type Novedad = { version: string; fecha: string; cambios: { tipo: 'nuevo'
 
 export const NOVEDADES: Novedad[] = [
   {
+    version: '0.3.0', fecha: '2026-10-20', cambios: [
+      { tipo: 'nuevo', texto: 'Diseño nuevo en toda la app: colores, tipografía, íconos y portada con tus grupos y quién está en voz.' },
+      { tipo: 'nuevo', texto: 'Sala de voz con tarjetas grandes para cada uno, y la pantalla que mirás arriba de todo.' },
+      { tipo: 'nuevo', texto: 'Barra de abajo con micrófono, auriculares para ensordecerte (también calla la música), pantalla, sonidos y música.' },
+      { tipo: 'nuevo', texto: 'Sonidos y música en panelcitos que se abren desde la barra, con buscador de sonidos.' },
+      { tipo: 'nuevo', texto: 'Reproductor de música abajo de la sala: pausar, pasar y silenciar solo para vos.' },
+      { tipo: 'nuevo', texto: 'Cada sala de voz tiene su propio chat.' },
+      { tipo: 'nuevo', texto: 'Responder mensajes, reaccionar con emojis y mandar emojis desde un menú.' },
+      { tipo: 'nuevo', texto: 'Los mensajes seguidos de la misma persona se agrupan.' },
+      { tipo: 'nuevo', texto: 'Contador de mensajes sin leer en los chats y en los grupos.' },
+      { tipo: 'nuevo', texto: 'Fotos en grande con zoom con la ruedita y botón para descargarlas.' },
+      { tipo: 'nuevo', texto: 'Clic derecho en alguien: ver perfil y volumen de esa persona.' },
+      { tipo: 'nuevo', texto: 'Configuraciones del grupo: foto, participantes y borrar (pide escribir el nombre para confirmar).' },
+      { tipo: 'nuevo', texto: 'Sonido corto cuando alguien entra o sale de la sala.' },
+      { tipo: 'nuevo', texto: 'Foto de perfil por defecto para quien no subió una, e ícono nuevo de la app.' },
+    ],
+  },
+  {
     version: '0.2.0', fecha: '2026-10-21', cambios: [
       { tipo: 'nuevo', texto: 'Pantalla de inicio con tus grupos, las novedades y tus amigos.' },
       { tipo: 'nuevo', texto: 'Amigos: mandá solicitudes por nombre o con clic derecho en Participantes, y aceptalas en la campanita.' },

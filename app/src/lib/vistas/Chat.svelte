@@ -1,16 +1,18 @@
 <script lang="ts">
   import Insignia from './Insignia.svelte';
+  import { Paperclip, Smile, SmilePlus, Reply, Trash2, X } from '@lucide/svelte';
   import { tick } from 'svelte';
   import type { RecordModel } from 'pocketbase';
   import { pb } from '../pb';
+  import { foto } from '../foto';
   import { validarAdjunto, duracionVideo } from '../adjuntos';
   import type { ChatAbierto } from '../chat.svelte';
-  import { mensajeError } from '../sesion.svelte';
+  import { mensajeError, sesion } from '../sesion.svelte';
 
   // Sirve para salas de grupo y privados: quien lo usa dice qué lista abrir y cómo enviar y borrar.
   // `soloLectura`: oculta el compositor y muestra ese texto (privado con alguien que ya no es amigo).
   let { titulo, abrir, enviar, borrar, puedeBorrar, soloLectura = '', alVer }: {
-    titulo: string; abrir: () => ChatAbierto; enviar: (texto: string, archivo?: File) => Promise<unknown>;
+    titulo: string; abrir: () => ChatAbierto; enviar: (texto: string, archivo?: File, respondeA?: string) => Promise<unknown>;
     borrar: (id: string) => Promise<unknown>; puedeBorrar: (m: RecordModel) => boolean; soloLectura?: string;
     alVer?: (ultimo: RecordModel) => void; // se llama con el último mensaje visible (privados: marcar leído)
   } = $props();
@@ -24,6 +26,7 @@
   let error = $state('');
   let enviando = $state(false);
   let lista: HTMLElement | undefined = $state();
+  let caja: HTMLTextAreaElement | undefined = $state();
   let ultimoId = '';
 
   // Baja al final cuando llega un mensaje nuevo (no al cargar anteriores).
@@ -35,6 +38,23 @@
   const autor = (m: RecordModel) => m.expand?.author as RecordModel | undefined;
   const hora = (m: RecordModel) => new Date(m.created.replace(' ', 'T')).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' });
   const esVideo = (m: RecordModel) => /\.(mp4|webm)$/i.test(m.file);
+  const fecha = (m: RecordModel) => new Date(m.created.replace(' ', 'T')).getTime();
+  /** Seguido: mismo autor que el anterior y menos de 5 min después (sin repetir nombre y foto). Una respuesta siempre muestra el nombre. */
+  const seguido = (i: number) => {
+    const m = chat.mensajes[i], p = chat.mensajes[i - 1];
+    return !!p && !m.respondeA && p.author === m.author && fecha(m) - fecha(p) < 5 * 60_000;
+  };
+
+  // Responder: el mensaje elegido queda marcado y el compositor muestra a quién le contestás.
+  let respondiendo = $state<RecordModel | null>(null);
+  function responder(m: RecordModel) { respondiendo = m; caja?.focus(); }
+  const resumen = (m: RecordModel) => m.text ? m.text.slice(0, 80) : m.file ? (esVideo(m) ? 'Video' : 'Imagen') : '';
+  let resaltado = $state('');
+  function irA(id: string) {
+    document.getElementById(`msg-${id}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    resaltado = id;
+    setTimeout(() => { if (resaltado === id) resaltado = ''; }, 1500);
+  }
 
   // Vista previa del adjunto antes de mandarlo.
   const previa = $derived(archivo ? URL.createObjectURL(archivo) : '');
@@ -64,17 +84,59 @@
     const t = texto.trim();
     if ((!t && !archivo) || enviando) return;
     enviando = true; error = '';
-    try { await enviar(t, archivo ?? undefined); texto = ''; archivo = null; }
+    try { await enviar(t, archivo ?? undefined, respondiendo?.id); texto = ''; archivo = null; respondiendo = null; }
     catch (e) { error = mensajeError(e); }
     finally { enviando = false; }
   }
   function tecla(e: KeyboardEvent) {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviarMensaje(); }
+    if (e.key === 'Escape' && respondiendo) { e.preventDefault(); respondiendo = null; }
   }
   async function quitar(m: RecordModel) {
     try { await borrar(m.id); } catch (e) { error = mensajeError(e); }
   }
   function alScroll() { if (lista && lista.scrollTop === 0 && chat.hayMas) chat.cargarMas(); }
+
+  // Menú de emojis: para escribir (destino '') o para reaccionar a un mensaje (destino = su id).
+  // ponytail: lista fija de los más usados; si piden todos, emoji-picker-element.
+  const EMOJIS = '😀 😂 🤣 😊 😍 🥰 😘 😎 🤔 😏 😅 😭 😢 😡 🤯 😱 🥳 😴 🤤 🙄 😬 🤡 💀 👻 👍 👎 👌 👏 🙌 🙏 💪 🤝 👀 🫡 🤙 ✌️ ❤️ 🧡 💛 💚 💙 💜 🖤 💔 🔥 ✨ ⭐ ⚡ 💯 ✅ ❌ ❓ ❗ 🎉 🎮 🏆 🍕 🍺 ☕ 🐐 🚀 💩'.split(' ');
+  let menuEmojis: HTMLElement | undefined = $state();
+  let destino = $state('');
+  let posMenu = $state('');
+  function abrirEmojis(e: MouseEvent, para: string) {
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    destino = para;
+    // Arriba del botón si entra (~310 px de menú); si no (mensaje pegado arriba), abajo.
+    const x = Math.max(8, Math.min(r.left, innerWidth - 304));
+    posMenu = r.top > 320 ? `left:${x}px;bottom:${innerHeight - r.top + 4}px` : `left:${x}px;top:${r.bottom + 4}px`;
+    menuEmojis?.showPopover();
+  }
+  async function elegirEmoji(emoji: string) {
+    menuEmojis?.hidePopover();
+    if (destino) return reaccionar(destino, emoji);
+    const i = caja?.selectionStart ?? texto.length, f = caja?.selectionEnd ?? texto.length;
+    texto = texto.slice(0, i) + emoji + texto.slice(f);
+    await tick();
+    caja?.focus();
+    caja?.setSelectionRange(i + emoji.length, i + emoji.length);
+  }
+  async function reaccionar(id: string, emoji: string) {
+    try { await chat.reaccionar(id, emoji); } catch (e) { error = mensajeError(e); }
+  }
+  const reacciones = (m: RecordModel) => Object.entries((m.reacciones ?? {}) as Record<string, string[]>);
+
+  // Imagen en grande: ruedita acerca/aleja hacia donde está el mouse.
+  let visor: HTMLDialogElement | undefined = $state();
+  let grande = $state<RecordModel | null>(null);
+  let zoom = $state(1);
+  let origen = $state('50% 50%');
+  function verGrande(m: RecordModel) { grande = m; zoom = 1; visor?.showModal(); }
+  function rueda(e: WheelEvent) {
+    e.preventDefault();
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    origen = `${((e.clientX - r.left) / r.width) * 100}% ${((e.clientY - r.top) / r.height) * 100}%`;
+    zoom = Math.min(8, Math.max(0.5, zoom * (e.deltaY < 0 ? 1.15 : 1 / 1.15)));
+  }
 </script>
 
 <section class="chat" aria-label="Chat {titulo}">
@@ -82,23 +144,41 @@
   <div class="lista" bind:this={lista} onscroll={alScroll} data-testid="mensajes">
     {#if chat.hayMas}<button class="plano" onclick={() => chat.cargarMas()}>Cargar anteriores</button>{/if}
     {#if chat.error}<p role="alert">{chat.error}</p>{/if}
-    {#each chat.mensajes as m (m.id)}
+    {#each chat.mensajes as m, i (m.id)}
       {@const a = autor(m)}
-      <article class="msg" data-testid="mensaje">
-        {#if a?.avatar}<img class="avatar" src={pb.files.getURL(a, a.avatar, { thumb: '64x64' })} alt="" />
-        {:else}<span class="avatar" style="background:{a?.color || ''}"></span>{/if}
+      {@const sigue = seguido(i)}
+      {@const cita = m.expand?.respondeA as RecordModel | undefined}
+      <article class="msg" class:sigue class:elegido={respondiendo?.id === m.id} class:resaltado={resaltado === m.id} id="msg-{m.id}" data-testid="mensaje">
+        {#if sigue}<small class="hora-lado">{hora(m)}</small>
+        {:else}<img class="avatar" src={foto(a)} alt="" />{/if}
         <div class="cuerpo">
-          <header>
+          {#if !sigue}<header>
             <strong style="color:{a?.color || 'var(--tenue)'}">{a ? a.name : 'Ex miembro'}</strong><Insignia usuario={a} />
             <small>{hora(m)}</small>
-            {#if puedeBorrar(m)}<button class="plano borrar" onclick={() => quitar(m)}>Borrar</button>{/if}
-          </header>
+          </header>{/if}
+          {#if m.respondeA}
+            <button class="plano cita" onclick={() => cita && irA(cita.id)} disabled={!cita}>
+              <Reply size={12} strokeWidth={1.75} />
+              {#if cita}<strong>{(cita.expand?.author as RecordModel | undefined)?.name ?? 'Ex miembro'}</strong> <span>{resumen(cita)}</span>
+              {:else}<span>Mensaje borrado</span>{/if}
+            </button>
+          {/if}
           {#if m.text}<p class="texto">{m.text}</p>{/if}
           {#if m.file}
             {@const url = pb.files.getURL(m, m.file)}
             {#if esVideo(m)}<video class="adjunto" controls src={url}><track kind="captions" /></video>
-            {:else}<button class="plano ver" title="Ver en grande" onclick={(e) => e.currentTarget.querySelector('img')?.requestFullscreen().catch(() => {})}><img class="adjunto" src={url} alt="Imagen adjunta" /></button>{/if}
+            {:else}<button class="plano ver" title="Ver en grande" onclick={() => verGrande(m)}><img class="adjunto" src={url} alt="Imagen adjunta" /></button>{/if}
           {/if}
+          {#if reacciones(m).length}<div class="reacciones">
+            {#each reacciones(m) as [emoji, quienes] (emoji)}
+              <button class="plano chip" aria-pressed={quienes.includes(sesion.usuario?.id ?? '')} onclick={() => reaccionar(m.id, emoji)}>{emoji} {quienes.length}</button>
+            {/each}
+          </div>{/if}
+        </div>
+        <div class="herramientas">
+          <button class="icono" title="Responder" aria-label="Responder" onclick={() => responder(m)}><Reply size={16} strokeWidth={1.75} /></button>
+          <button class="icono" title="Reaccionar" aria-label="Reaccionar" onclick={(e) => abrirEmojis(e, m.id)}><SmilePlus size={16} strokeWidth={1.75} /></button>
+          {#if puedeBorrar(m)}<button class="icono borrar" title="Borrar" aria-label="Borrar" onclick={() => quitar(m)}><Trash2 size={16} strokeWidth={1.75} /></button>{/if}
         </div>
       </article>
     {/each}
@@ -109,33 +189,85 @@
     {:else}<img class="miniatura" src={previa} alt="Vista previa del adjunto" />{/if}
     <small>{archivo.name}</small> <button class="plano" onclick={() => (archivo = null)}>Quitar</button>
   </div>{/if}
+  {#if respondiendo && !soloLectura}
+    <div class="pie respondiendo">
+      <Reply size={14} strokeWidth={1.75} />
+      <span>Respondiendo a <strong>{autor(respondiendo)?.name ?? 'Ex miembro'}</strong>: {resumen(respondiendo)}</span>
+      <button class="icono" aria-label="Cancelar respuesta" title="Cancelar (Esc)" onclick={() => (respondiendo = null)}><X size={14} strokeWidth={1.75} /></button>
+    </div>
+  {/if}
   {#if soloLectura}<p class="pie tenue">{soloLectura}</p>
   {:else}<div class="composer">
-    <label class="clip" title="Adjuntar imagen o video">📎 <input type="file" hidden accept="image/png,image/jpeg,image/gif,image/webp,video/mp4,video/webm" onchange={elegir} data-testid="adjuntar" /></label>
-    <textarea bind:value={texto} onkeydown={tecla} onpaste={pegar} maxlength="2000" rows="1" placeholder="Escribí un mensaje (Enter envía, Shift+Enter nueva línea)"></textarea>
+    <label class="clip" title="Adjuntar imagen o video"><Paperclip size={18} strokeWidth={1.75} /><input type="file" hidden accept="image/png,image/jpeg,image/gif,image/webp,video/mp4,video/webm" onchange={elegir} data-testid="adjuntar" /></label>
+    <button class="plano emoji" title="Emojis" aria-label="Emojis" onclick={(e) => abrirEmojis(e, '')}><Smile size={18} strokeWidth={1.75} /></button>
+    <textarea bind:this={caja} bind:value={texto} onkeydown={tecla} onpaste={pegar} maxlength="2000" rows="1" placeholder="Escribí un mensaje" title="Enter envía, Shift+Enter hace una línea nueva"></textarea>
     <button class="primario" onclick={enviarMensaje} disabled={enviando}>Enviar</button>
   </div>{/if}
+  <div popover class="emojis" bind:this={menuEmojis} style={posMenu}>
+    {#each EMOJIS as emoji (emoji)}<button class="plano" onclick={() => elegirEmoji(emoji)}>{emoji}</button>{/each}
+  </div>
+  <dialog class="visor" bind:this={visor} onclose={() => (grande = null)} onclick={(e) => e.target === visor && visor.close()}>
+    {#if grande}
+      <div class="acciones">
+        <a class="boton plano" href={pb.files.getURL(grande, grande.file, { download: true })} download title="Descargar" aria-label="Descargar">⬇</a>
+        <button class="plano" onclick={() => visor?.close()} title="Cerrar" aria-label="Cerrar">✕</button>
+      </div>
+      <div class="marco" onwheel={rueda}>
+        <img src={pb.files.getURL(grande, grande.file)} alt="Imagen adjunta" style="transform: scale({zoom}); transform-origin: {origen}" />
+      </div>
+    {/if}
+  </dialog>
 </section>
 
 <style>
   .chat { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
   .titulo { font-size: 15px; padding: 12px 16px; border-bottom: 1px solid var(--hover); }
   .lista { flex: 1; overflow-y: auto; padding: 8px 0; }
-  .msg { display: flex; gap: 12px; padding: 4px 16px; }
-  .msg:hover { background: var(--panel); }
+  /* Separados entre sí; los seguidos del mismo autor van sin nombre ni foto. */
+  .msg { position: relative; display: flex; gap: 12px; margin: 12px 12px 0; padding: 8px 12px; border-radius: var(--radio-menu); transition: background-color .12s; }
+  .msg.sigue { margin-top: 4px; }
+  .msg:hover { background: var(--hover); }
+  .msg.elegido, .msg.resaltado { background: var(--acento-suave); box-shadow: inset 2px 0 var(--acento); }
+  .hora-lado { width: 32px; flex: none; font-size: 11px; text-align: center; padding-top: 3px; opacity: 0; }
+  .msg:hover .hora-lado { opacity: 1; }
   .cuerpo { min-width: 0; flex: 1; }
-  header { display: flex; align-items: baseline; gap: 8px; }
-  .borrar { opacity: 0; margin-left: auto; font-size: 12px; }
-  .msg:hover .borrar, .borrar:focus-visible { opacity: 1; }
+  header { display: flex; align-items: baseline; gap: 8px; margin-bottom: 2px; }
+  header small { font-size: 11px; }
   .texto { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; }
+  .cita { display: flex; gap: 6px; align-items: center; max-width: 100%; margin-bottom: 4px; padding: 2px 8px; font-size: 12px; color: var(--tenue);
+    border-left: 2px solid var(--acento); border-radius: 0 var(--radio) var(--radio) 0; background: var(--hover); justify-content: flex-start; }
+  .cita span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cita strong { font-weight: 600; color: var(--texto); flex: none; }
+  .herramientas { position: absolute; top: -12px; right: 8px; display: none; gap: 2px; padding: 2px; background: var(--elevado); border: 1px solid var(--borde); border-radius: var(--radio); }
+  .msg:hover .herramientas, .herramientas:focus-within { display: flex; }
+  .herramientas .icono { padding: 4px; }
+  .herramientas .borrar:hover { color: var(--peligro); }
+  .respondiendo { display: flex; align-items: center; gap: 8px; margin: 8px 16px 0; padding: 6px 8px; font-size: 13px; color: var(--tenue);
+    border-left: 2px solid var(--acento); background: var(--acento-suave); border-radius: 0 var(--radio) var(--radio) 0; }
+  .respondiendo span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .respondiendo + .composer { margin-top: 4px; }
   .adjunto { display: block; max-width: min(400px, 100%); max-height: 300px; border-radius: var(--radio); margin-top: 4px; }
   .pie { margin: 0 16px; }
   .tenue { color: var(--tenue); margin-bottom: 16px; }
   .adjuntado { display: flex; align-items: center; gap: 8px; }
   .miniatura { width: 64px; height: 64px; object-fit: cover; border-radius: var(--radio); }
   .ver { padding: 0; display: block; cursor: zoom-in; }
-  .adjunto:fullscreen { max-width: none; max-height: none; object-fit: contain; background: #000; }
+  .reacciones { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+  .chip { min-height: 26px; padding: 2px 8px; font-size: 13px; border-color: var(--borde); }
+  .emoji { padding: 4px; color: var(--icono); }
+  .emojis { position: fixed; inset: auto; margin: 0; padding: 6px; width: 296px; flex-wrap: wrap; gap: 2px;
+    background: var(--panel); border: 1px solid var(--borde); border-radius: 10px; }
+  .emojis:popover-open { display: flex; }
+  .emojis button { font-size: 20px; padding: 2px; min-height: 0; width: 34px; height: 34px; }
+  .visor { max-width: none; width: 70vw; height: 70vh; padding: 0; overflow: hidden; background: var(--hondo); }
+  .visor[open] { display: flex; flex-direction: column; }
+  .acciones { display: flex; justify-content: flex-end; gap: 4px; padding: 6px; }
+  .acciones .boton { display: inline-flex; align-items: center; padding: 6px 14px; color: var(--tenue); text-decoration: none; border-radius: var(--radio); }
+  .acciones .boton:hover { color: var(--texto); background: var(--hover); }
+  .marco { flex: 1; min-height: 0; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+  .marco img { max-width: 100%; max-height: 100%; object-fit: contain; transition: transform .08s; }
   .composer { display: flex; align-items: center; gap: 8px; margin: 8px 16px 16px; background: var(--panel); border: 1px solid var(--borde); border-radius: 8px; padding: 6px 8px; }
-  .composer textarea { flex: 1; resize: none; background: none; border: 0; padding: 6px 4px; }
-  .clip { cursor: pointer; font-size: 18px; flex-direction: row; }
+  .composer textarea { flex: 1; min-width: 0; resize: none; field-sizing: content; max-height: 120px; background: none; border: 0; padding: 6px 4px; }
+  .clip { cursor: pointer; flex-direction: row; color: var(--icono); padding: 4px; }
+  .clip:hover { color: var(--texto); }
 </style>

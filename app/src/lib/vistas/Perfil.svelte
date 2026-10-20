@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { foto as fotoDe } from '../foto';
   import { pb } from '../pb';
   import { validarAdjunto } from '../adjuntos';
   import { sesion, mensajeError } from '../sesion.svelte';
@@ -47,10 +48,7 @@
 
 <form class="tarjeta" onsubmit={guardar}>
   <h2>Mi perfil</h2>
-  {#if sesion.usuario?.avatar}
-    <img class="avatar" alt="Foto de perfil" style="width:64px;height:64px"
-      src={pb.files.getURL(sesion.usuario, sesion.usuario.avatar, { thumb: '64x64' })} />
-  {/if}
+  <img class="avatar" alt="Foto de perfil" style="width:64px;height:64px" src={fotoDe(sesion.usuario)} />
   <label>Foto <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" onchange={elegirFoto} /></label>
   <label>Nombre <input bind:value={name} required maxlength="32" /></label>
   <label>Color <input type="color" bind:value={color} /></label>

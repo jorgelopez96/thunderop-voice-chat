@@ -46,9 +46,9 @@ describe('mensajes', () => {
     await expect(b.collection('messages').create({ room: chat, author: uid(b) })).rejects.toMatchObject({ status: 400 });
   });
 
-  it('rejects posting to voice room', async () => {
+  it('voice rooms have their own chat', async () => {
     const { b, voz } = await setup();
-    await expect(b.collection('messages').create({ room: voz, author: uid(b), text: 'x' })).rejects.toMatchObject({ status: 400 });
+    expect((await b.collection('messages').create({ room: voz, author: uid(b), text: 'x' })).room).toBe(voz);
   });
 
   it('rejects spoofed author', async () => {

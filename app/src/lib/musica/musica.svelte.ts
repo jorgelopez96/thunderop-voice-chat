@@ -1,7 +1,7 @@
 import { pb } from '../pb';
 import { mensajeError } from '../sesion.svelte';
 import { leerPrefs, guardarPrefs } from '../prefs';
-import { alCambiarSala } from '../voz.svelte';
+import { alCambiarSala, voz } from '../voz.svelte';
 import { posicion, muestra, mejor, type Muestra } from './posicion';
 import { crearReproductor, FIN, SONANDO, PAUSADO, type Reproductor } from './reproductor';
 
@@ -81,11 +81,16 @@ export const saltar = () => (musica.actual ? enviar('saltar', { cancionId: music
 export const quitar = (id: string) => enviar('quitar', { cancionId: id });
 
 /** Volumen de la música (0 a 100), aparte del de las voces. Se guarda en prefs. */
+/** Ensordecido no escucha nada, tampoco la música (el volumen elegido se conserva para cuando vuelva). */
+const oido = (v: number) => (voz.ensordecido ? 0 : v);
+// `v` se calcula antes del `?.`: si no, sin reproductor no se lee `voz.ensordecido` y el efecto nunca se vuelve a correr.
+$effect.root(() => { $effect(() => { const v = oido(leerPrefs().volMusica); rp?.volumen(v); }); });
+
 export function volumenMusica(v: number) {
   if (!Number.isFinite(v)) return;
   v = Math.min(100, Math.max(0, v));
   guardarPrefs({ volMusica: v });
-  rp?.volumen(v);
+  rp?.volumen(oido(v));
 }
 
 /** POST a la ruta de música. Mide el desfase con su `ahora` y relee el estado. false si falló (queda en `musica.error`). */
@@ -135,7 +140,7 @@ function sincronizar() {
     const nuevo = rp = crearReproductor(host);
     nuevo.onEstado((e) => { if (rp === nuevo) alEstado(e); });
     nuevo.onError((codigo) => { if (rp === nuevo) alError(codigo); });
-    nuevo.volumen(leerPrefs().volMusica);
+    nuevo.volumen(oido(leerPrefs().volMusica));
     vigia = setInterval(corregir, 5000);
   }
   if (cargada?.id !== c.id) { cargada = c; estado = -1; rp.cargar(c.videoId, posicion(rep, ahoraServidor())); }
@@ -172,6 +177,9 @@ function destruir() {
   rp?.destruir();
   rp = null; cargada = null; estado = -1;
 }
+
+/** Dónde va la canción que suena, para la barra "Ahora suena". */
+export const progreso = () => ({ t: rp?.tiempo() ?? 0, dur: rp?.duracion() ?? 0 });
 
 alCambiarSala((id) => (id ? conectar(id) : desconectar()));
 

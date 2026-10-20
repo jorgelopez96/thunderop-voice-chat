@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { fileURLToPath } from 'node:url';
-import { crearCuenta, unirse } from './cuentas';
+import { crearCuenta, crearGrupo, unirse } from './cuentas';
 
 const img = fileURLToPath(new URL('../../server/tests/fixtures/img.png', import.meta.url));
 
@@ -10,17 +10,13 @@ test('cuentas, grupos, invitaciones y chat', async ({ browser }) => {
 
   // 1-2
   await crearCuenta(a, 'Ana');
-  await a.getByRole('button', { name: 'Crear grupo' }).click();
-  await a.getByPlaceholder('Nombre del grupo').fill('Los pibes');
-  await a.getByRole('button', { name: 'Crear', exact: true }).click();
-  await a.getByRole('button', { name: 'Invitar' }).click();
-  const link = (await a.getByTestId('link-invitacion').textContent())!.trim();
+  const link = await crearGrupo(a, 'Los pibes');
 
   // 3
   await crearCuenta(b, 'Beto');
   await unirse(b, link);
-  await b.getByRole('button', { name: '# General' }).click();
-  await a.getByRole('button', { name: '# General' }).click();
+  await b.getByRole('button', { name: 'Sala de chat General' }).click();
+  await a.getByRole('button', { name: 'Sala de chat General' }).click();
 
   // 4
   await b.getByPlaceholder(/Escribí un mensaje/).fill('hola');
@@ -33,11 +29,14 @@ test('cuentas, grupos, invitaciones y chat', async ({ browser }) => {
   await expect(b.getByTestId('mensajes').locator('img[alt="Imagen adjunta"]')).toBeVisible({ timeout: 5000 });
 
   // 6
-  await a.getByTestId('mensaje').filter({ hasText: 'hola' }).getByRole('button', { name: 'Borrar' }).click();
+  const hola = a.getByTestId('mensaje').filter({ hasText: 'hola' });
+  await hola.hover(); // las herramientas del mensaje aparecen al pasar el mouse
+  await hola.getByRole('button', { name: 'Borrar' }).click();
   await expect(b.getByTestId('mensaje').filter({ hasText: 'hola' })).toHaveCount(0);
 
   // 7
-  await a.getByRole('listitem').filter({ hasText: 'Beto' }).getByRole('button', { name: 'Echar' }).click();
+  await a.getByRole('listitem').filter({ hasText: 'Beto' }).click({ button: 'right' });
+  await a.getByRole('button', { name: 'Expulsar del grupo' }).click();
   await a.getByRole('button', { name: 'Confirmar' }).click();
   await expect(b.getByRole('heading', { name: 'Mis grupos' })).toBeVisible({ timeout: 15_000 });
   await expect(b.getByRole('button', { name: 'Los pibes' })).toHaveCount(0);

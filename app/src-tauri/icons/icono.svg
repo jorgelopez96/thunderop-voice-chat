@@ -1,15 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <defs>
-    <linearGradient id="fondo" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#1b1f4b"/>
-      <stop offset="1" stop-color="#0b0d24"/>
-    </linearGradient>
-    <linearGradient id="rayo" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#b9a6ff"/>
-      <stop offset="0.5" stop-color="#7c5cff"/>
-      <stop offset="1" stop-color="#4f46e5"/>
-    </linearGradient>
-  </defs>
-  <rect width="512" height="512" rx="112" fill="url(#fondo)"/>
-  <path d="M300 56 L132 292 H236 L196 456 L380 200 H272 Z" fill="url(#rayo)"/>
+  <!-- Ícono de la app (paleta de Fable): superficie #161821 y el rayo de lucide en violeta #8B7CF6. Se genera con `npx tauri icon src-tauri/icons/icono.svg`. -->
+  <rect width="512" height="512" rx="112" fill="#161821"/>
+  <g transform="translate(64 64) scale(16)" fill="#8B7CF6" stroke="#8B7CF6" stroke-width="1.75" stroke-linejoin="round">
+    <path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/>
+  </g>
 </svg>

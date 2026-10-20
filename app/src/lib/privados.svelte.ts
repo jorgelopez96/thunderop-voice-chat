@@ -35,12 +35,13 @@ const filtroPar = (amigoId: string) =>
 
 export const abrirPrivado = (amigoId: string) => abrirLista('privados', filtroPar(amigoId));
 
-export async function enviarPrivado(amigoId: string, texto: string, archivo?: File) {
+export async function enviarPrivado(amigoId: string, texto: string, archivo?: File, respondeA?: string) {
   const d = new FormData();
   d.append('author', yo());
   d.append('para', amigoId);
   if (texto) d.append('text', texto);
   if (archivo) d.append('file', archivo);
+  if (respondeA) d.append('respondeA', respondeA);
   await pb.collection('privados').create(d);
 }
 

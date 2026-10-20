@@ -37,6 +37,6 @@ export default defineConfig({
     command: 'npm run dev -- --port 1430 --strictPort', // 1420 queda para `tauri dev`
     url: 'http://127.0.0.1:1430',
     reuseExistingServer: false,
-    env: { VITE_PB_URL: 'http://127.0.0.1:8091' },
+    env: { VITE_PB_URL: `http://127.0.0.1:${process.env.E2E_PB_PORT ?? 8091}` },
   },
 });

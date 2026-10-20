@@ -3,13 +3,14 @@
   import Inicio from './Inicio.svelte';
   import MenuPerfil from './MenuPerfil.svelte';
   import Configuracion from './Configuracion.svelte';
-  import { Settings } from '@lucide/svelte';
+  import { Settings, Zap } from '@lucide/svelte';
   import Grupo from './Grupo.svelte';
-  import ControlesVoz from './ControlesVoz.svelte';
+  import Dock from './Dock.svelte';
   import { voz } from '../voz.svelte';
   import { iniciarPresencia } from '../presencia.svelte';
   import { iniciarAmigos } from '../amigos.svelte';
   import { iniciarPrivados } from '../privados.svelte';
+  import { iniciarNoLeidos } from '../noLeidos.svelte';
   import Campanita from './Campanita.svelte';
   import { ubicarReproductor } from '../musica/musica.svelte';
 
@@ -17,6 +18,7 @@
   $effect(iniciarPresencia);
   $effect(iniciarAmigos);
   $effect(iniciarPrivados);
+  $effect(iniciarNoLeidos);
 
   const actual = $derived(grupos.lista.find((g) => g.id === grupoActual.id));
   let config = $state(false);
@@ -32,7 +34,7 @@
 
 <main>
   <header class="barra">
-    <h1>⚡ THUNDEROP</h1>
+    <h1><button class="plano logo" onclick={() => (grupoActual.id = null)} aria-label="Inicio"><Zap size={18} strokeWidth={1.75} /> THUNDEROP</button></h1>
     <Campanita />
     <button class="plano icono" aria-label="Configuración" title="Configuración" onclick={() => (config = true)}><Settings size={20} strokeWidth={1.75} /></button>
     <MenuPerfil />
@@ -49,19 +51,19 @@
   {:else}
     <Inicio />
   {/if}
-  <!-- Dentro de un grupo, los controles van al pie de su barra de salas (Grupo); afuera, flotan. -->
-  {#if voz.salaId && !actual}<div class="pie"><ControlesVoz /></div>{/if}
+  {#if voz.salaId}<Dock />{/if}
   <div class="reproductor" bind:this={hostMusica}></div>
 </main>
 
 <style>
   main { height: 100%; display: flex; flex-direction: column; }
-  .barra { display: flex; align-items: center; gap: 8px; padding: 0 12px; height: 44px; background: var(--hondo); flex: none; }
-  .barra h1 { font-size: 15px; margin-right: auto; }
+  .barra { display: flex; align-items: center; gap: 8px; padding: 0 12px; height: 48px; background: var(--fondo); border-bottom: 1px solid var(--borde); flex: none; }
+  .barra h1 { margin-right: auto; }
+  .logo { color: var(--acento); font-size: 14px; font-weight: 700; letter-spacing: .06em; gap: 8px; padding: 4px 0; }
+  .logo:hover:not(:disabled) { color: var(--acento); background: none; }
   .icono { display: grid; place-items: center; padding: 6px; }
   .aviso { display: flex; align-items: center; gap: 8px; padding: 6px 12px; background: var(--hondo); border-top: 1px solid var(--hover); flex: none; }
   .aviso button { margin-left: auto; }
-  .pie { position: fixed; left: 8px; bottom: 8px; width: 224px; z-index: 5; box-shadow: 0 8px 24px rgb(0 0 0 / .5); }
   /* Fuera de pantalla y no display:none: oculto, el iframe de YouTube puede dejar de sonar. */
   .reproductor { position: fixed; left: -10000px; top: 0; width: 240px; height: 135px; }
   .reproductor :global(iframe) { width: 100%; height: 100%; border: 0; }

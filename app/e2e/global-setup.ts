@@ -19,7 +19,7 @@ export default async function () {
   const lk = await startLiveKit().catch(async (e) => { await oembed.stop(); throw e; });
   try {
     const pb = await startPocketBase({
-      port: 8091,
+      port: Number(process.env.E2E_PB_PORT ?? 8091), // otro puerto si 8091 está ocupado (p. ej. una vista previa abierta)
       env: { LIVEKIT_URL: lk.wsUrl, LIVEKIT_API_URL: lk.apiUrl, LIVEKIT_API_KEY: lk.key, LIVEKIT_API_SECRET: lk.secret, YOUTUBE_OEMBED: oembed.url },
     });
     return async () => { await pb.stop(); await lk.stop(); await oembed.stop(); };

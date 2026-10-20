@@ -12,10 +12,10 @@ function wav(segundos: number) {
   return b;
 }
 const reproducidos = (p: Page) => p.evaluate(() => (globalThis as unknown as { __botonera: { reproducidos: number } }).__botonera.reproducidos);
-const entrar = (p: Page) => p.getByRole('button', { name: '🔊 General' }).click();
+const entrar = (p: Page) => p.getByRole('button', { name: 'Sala de voz General' }).click();
 
 async function subir(p: Page, nombre: string, segundos: number) {
-  await p.getByRole('button', { name: '+ Sonido' }).click();
+  await p.getByRole('button', { name: 'Agregar sonido' }).click();
   await p.getByLabel('Nombre del sonido').fill(nombre);
   await p.getByLabel('Archivo de audio').setInputFiles({ name: `${nombre}.wav`, mimeType: 'audio/wav', buffer: wav(segundos) });
   await p.getByRole('button', { name: 'Subir' }).click();
@@ -26,9 +26,10 @@ test('un sonido de la botonera lo escuchan los de la sala', async ({ browser }) 
 
   // Ana y Beto entran a la voz; Caro se queda afuera.
   for (const p of [a, b]) await entrar(p);
-  for (const p of [a, b]) await expect(p.locator('section.voz li.tarjeta')).toHaveCount(2, { timeout: 10_000 });
+  for (const p of [a, b]) await expect(p.locator('section.voz .franja li')).toHaveCount(2, { timeout: 10_000 });
 
-  // Ana sube un sonido de 1 s y les aparece a los dos.
+  // Ana sube un sonido de 1 s y les aparece a los dos (en el panelcito de Sonidos del dock).
+  for (const p of [a, b]) await p.getByRole('button', { name: 'Sonidos', exact: true }).click();
   await subir(a, 'Bocina', 1);
   const boton = (p: Page) => p.getByRole('button', { name: 'Bocina', exact: true });
   await expect(boton(a)).toBeVisible({ timeout: 5000 });

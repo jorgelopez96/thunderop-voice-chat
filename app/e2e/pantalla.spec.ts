@@ -1,11 +1,11 @@
 import { test, expect, type Page } from '@playwright/test';
-import { crearCuenta, unirse } from './cuentas';
+import { crearCuenta, crearGrupo, de, unirse } from './cuentas';
 
 type Stats = { pantallas: Record<string, { frames: number }>; transmitiendo: boolean };
 const stats = (p: Page) => p.evaluate(() => (window as unknown as { __voz: { stats(): Promise<Stats> } }).__voz.stats());
-const framesDe = async (p: Page, nombre: string) => (await stats(p)).pantallas[nombre]?.frames ?? 0;
+const framesDe = async (p: Page, nombre: string) => de((await stats(p)).pantallas, nombre)?.frames ?? 0;
 const tarjeta = (p: Page, nombre: string) => p.locator('section.voz li', { hasText: nombre });
-const entrar = (p: Page) => p.getByRole('button', { name: '🔊 General' }).click();
+const entrar = (p: Page) => p.getByRole('button', { name: 'Sala de voz General' }).click();
 // Lo que hace Windows al cortar la captura (cerrar la ventana compartida, Win+L...): la pista termina sola.
 const terminarCaptura = (p: Page) => p.evaluate(() => (window as unknown as { __voz: { terminarCaptura(): void } }).__voz.terminarCaptura());
 const mismoVideo = (p: Page) => p.getByLabel('Pantalla de Ana').evaluate((v: HTMLVideoElement) => {
@@ -17,11 +17,7 @@ test('transmitir y ver una pantalla', async ({ browser }) => {
   const [a, b, c] = await Promise.all([0, 1, 2].map(async () => (await browser.newContext()).newPage()));
 
   await crearCuenta(a, 'Ana');
-  await a.getByRole('button', { name: 'Crear grupo' }).click();
-  await a.getByPlaceholder('Nombre del grupo').fill('Pantallas');
-  await a.getByRole('button', { name: 'Crear', exact: true }).click();
-  await a.getByRole('button', { name: 'Invitar' }).click();
-  const link = (await a.getByTestId('link-invitacion').textContent())!.trim();
+  const link = await crearGrupo(a, 'Pantallas');
   await crearCuenta(b, 'Beto');
   await unirse(b, link);
   await crearCuenta(c, 'Caro');
@@ -35,7 +31,7 @@ test('transmitir y ver una pantalla', async ({ browser }) => {
   await a.getByRole('button', { name: 'Transmitir' }).click();
   await a.getByLabel('Calidad').selectOption({ label: '720p · 30 fps' });
   await a.getByRole('button', { name: 'Empezar' }).click();
-  await expect(tarjeta(a, 'Ana').getByText('📺 En vivo')).toBeVisible({ timeout: 10_000 });
+  await expect(tarjeta(a, 'Ana').getByText('EN VIVO')).toBeVisible({ timeout: 10_000 });
   await expect(a.getByRole('button', { name: 'Dejar de transmitir' })).toBeVisible();
   await expect(a.getByRole('alert')).toHaveCount(0);
 
@@ -98,15 +94,15 @@ test('transmitir y ver una pantalla', async ({ browser }) => {
   await expect.poll(async () => (await stats(a)).transmitiendo, { timeout: 10_000 }).toBe(false);
   await expect(a.getByRole('button', { name: 'Transmitir' })).toBeVisible();
   await expect(a.getByRole('alert')).toHaveCount(0);
-  await expect(b.getByText('📺 En vivo')).toHaveCount(0, { timeout: 10_000 });
+  await expect(b.getByText('EN VIVO')).toHaveCount(0, { timeout: 10_000 });
   await expect(b.getByLabel('Pantalla de Ana')).toHaveCount(0);
 
   // Ana transmite otra vez y se desconecta: el "En vivo" desaparece en Beto en menos de 10 s.
   await a.getByRole('button', { name: 'Transmitir' }).click();
   await a.getByRole('button', { name: 'Empezar' }).click();
-  await expect(tarjeta(b, 'Ana').getByText('📺 En vivo')).toBeVisible({ timeout: 10_000 });
-  await a.getByRole('button', { name: 'Desconectar' }).click();
-  await expect(b.getByText('📺 En vivo')).toHaveCount(0, { timeout: 10_000 });
+  await expect(tarjeta(b, 'Ana').getByText('EN VIVO')).toBeVisible({ timeout: 10_000 });
+  await a.getByRole('button', { name: 'Salir', exact: true }).click();
+  await expect(b.getByText('EN VIVO')).toHaveCount(0, { timeout: 10_000 });
   // El <audio> del micrófono de Ana se va con ella; queda solo el de Caro.
   await expect(b.locator('audio[data-voz]')).toHaveCount(1, { timeout: 10_000 });
 });

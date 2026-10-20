@@ -1,4 +1,5 @@
 <script lang="ts">
+  import '@fontsource-variable/inter';
   import '../app.css';
   import Entrar from '$lib/vistas/Entrar.svelte';
   import Principal from '$lib/vistas/Principal.svelte';

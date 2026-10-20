@@ -1,11 +1,12 @@
 <script lang="ts">
+  import { Search, Volume2, Plus, X } from '@lucide/svelte';
   import { sonidos, subir, borrar, tocar } from '../botonera.svelte';
   import { mensajeError } from '../sesion.svelte';
   import { voz } from '../voz.svelte';
   import { leerPrefs, guardarPrefs } from '../prefs';
 
-  let { grupoId, userId, soyDueno, abierto, alAlternar }: { grupoId: string; userId: string | undefined; soyDueno: boolean; abierto: boolean; alAlternar: (a: boolean) => void } = $props();
-  // Grupo.svelte está con {#key}: un grupo por instancia.
+  // Contenido del panelcito de Sonidos del dock. Quien lo usa lo recrea por grupo ({#key}).
+  let { grupoId, userId, soyDueno }: { grupoId: string; userId: string | undefined; soyDueno: boolean } = $props();
   // svelte-ignore state_referenced_locally
   const s = sonidos(grupoId);
   $effect(() => s.parar);
@@ -16,6 +17,8 @@
   let subiendo = $state(false);
   let modal = $state(false); // `dlg.open` no es reactivo
   let vol = $state(Math.round(leerPrefs().volBotonera * 100));
+  let busqueda = $state('');
+  const visibles = $derived(s.estado.lista.filter((x) => x.name.toLowerCase().includes(busqueda.trim().toLowerCase())));
 
   async function enviar(e: SubmitEvent) {
     e.preventDefault();
@@ -32,27 +35,29 @@
   }
 </script>
 
-<details class="seccion" open={abierto} ontoggle={(e) => alAlternar(e.currentTarget.open)}>
-  <summary>Botonera</summary>
+<div class="botonera">
+  <div class="arriba">
+    <label class="buscar"><Search size={16} strokeWidth={1.75} /><input bind:value={busqueda} placeholder="Buscá un sonido" aria-label="Buscar sonido" /></label>
+    <span class="vol" title="Volumen de la botonera"><Volume2 size={16} strokeWidth={1.75} />
+      <input type="range" min="0" max="100" step="5" bind:value={vol} aria-label="Volumen de la botonera" oninput={() => guardarPrefs({ volBotonera: vol / 100 })} /></span>
+  </div>
   {#if error && !modal}<p role="alert">{error}</p>{/if}
   <ul class="grilla">
-    {#each s.estado.lista as x (x.id)}
+    {#each visibles as x (x.id)}
       <li>
-        <button disabled={!voz.salaId} onclick={() => tocar(x.id)}>{x.name}</button>
-        {#if soyDueno || x.owner === userId}<button class="plano" aria-label={`Borrar ${x.name}`} onclick={() => quitar(x.id)}>Borrar</button>{/if}
+        <button class="sonido" disabled={!voz.salaId} onclick={() => tocar(x.id)}>{x.name}</button>
+        {#if soyDueno || x.owner === userId}<button class="icono borrar" aria-label={`Borrar ${x.name}`} title="Borrar" onclick={() => quitar(x.id)}><X size={12} strokeWidth={1.75} /></button>{/if}
       </li>
     {/each}
   </ul>
-  {#if !s.estado.lista.length}<p>Todavía no hay sonidos.</p>{/if}
-  <div class="fila">
-    <button onclick={() => { error = ''; modal = true; dlg?.showModal(); }}>+ Sonido</button>
-    <input type="range" min="0" max="100" step="5" bind:value={vol} aria-label="Volumen de la botonera"
-      oninput={() => guardarPrefs({ volBotonera: vol / 100 })} />
-  </div>
-</details>
+  {#if !s.estado.lista.length}<p class="tenue">Todavía no hay sonidos en este grupo.</p>
+  {:else if !visibles.length}<p class="tenue">Ningún sonido se llama así.</p>{/if}
+  <button class="agregar" aria-label="Agregar sonido" onclick={() => { error = ''; modal = true; dlg?.showModal(); }}><Plus size={16} strokeWidth={1.75} /> Sonido</button>
+</div>
 
 <dialog bind:this={dlg} onclose={() => { modal = false; error = ''; }}>
   <form onsubmit={enviar}>
+    <h3>Subir un sonido</h3>
     <input bind:value={nombre} required maxlength="30" placeholder="Nombre del sonido" aria-label="Nombre del sonido" />
     <input type="file" accept="audio/*" required aria-label="Archivo de audio" onchange={(e) => (archivo = e.currentTarget.files?.[0])} />
     {#if error}<p role="alert">{error}</p>{/if}
@@ -64,9 +69,21 @@
 </dialog>
 
 <style>
-  .grilla { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; margin: 8px 0; }
-  .grilla li { display: flex; flex-direction: column; gap: 2px; }
-  .fila { display: flex; gap: 8px; align-items: center; }
-  .fila input[type='range'] { flex: 1; padding: 0; background: none; }
+  .botonera { display: flex; flex-direction: column; gap: 12px; }
+  .arriba { display: flex; align-items: center; gap: 12px; }
+  .buscar { flex: 1; flex-direction: row; align-items: center; gap: 8px; padding: 0 12px; background: var(--hondo); border: 1px solid var(--borde); border-radius: var(--radio); color: var(--tenue); }
+  .buscar input { flex: 1; border: 0; background: none; padding: 8px 0; }
+  .vol { display: flex; align-items: center; gap: 4px; color: var(--icono); }
+  .vol input { width: 72px; padding: 0; border: 0; background: none; }
+  .grilla { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; max-height: 50vh; overflow-y: auto; }
+  .grilla li { position: relative; }
+  .sonido { width: 100%; height: 48px; padding: 4px 8px; background: var(--panel); border-color: transparent; font-size: 13px; line-height: 1.2; text-align: center; overflow: hidden; }
+  .sonido:hover:not(:disabled) { background: var(--hover); }
+  .borrar { position: absolute; top: 2px; right: 2px; padding: 2px; opacity: 0; }
+  li:hover .borrar, .borrar:focus-visible { opacity: 1; }
+  .agregar { align-self: flex-start; }
+  .tenue { margin: 0; color: var(--tenue); font-size: 13px; }
   form { display: flex; flex-direction: column; gap: 8px; }
+  form h3 { margin: 0 0 4px; }
+  .fila { display: flex; gap: 8px; align-items: center; }
 </style>

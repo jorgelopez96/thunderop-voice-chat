@@ -11,6 +11,8 @@ export interface Reproductor {
   pause(): void;
   seek(s: number): void;
   tiempo(): number;
+  /** Segundos; 0 mientras no se sabe. */
+  duracion(): number;
   /** 0 a 100. */
   volumen(v: number): void;
   destruir(): void;
@@ -33,7 +35,7 @@ type YTPlayer = {
   cueVideoById(o: { videoId: string; startSeconds: number }): void;
   loadVideoById(o: { videoId: string; startSeconds: number }): void;
   playVideo(): void; pauseVideo(): void; seekTo(s: number, permitir: boolean): void;
-  getCurrentTime(): number; setVolume(v: number): void; destroy(): void;
+  getCurrentTime(): number; getDuration(): number; setVolume(v: number): void; destroy(): void;
 };
 type YTApi = { Player: new (el: HTMLElement, o: object) => YTPlayer };
 
@@ -90,6 +92,7 @@ function reproductorYT(host: HTMLElement): Reproductor {
     pause() { sonar = false; if (!aplicar()) p?.pauseVideo(); },
     seek(s) { desde = s; if (pendiente) pendiente.desde = s; else p?.seekTo(s, true); },
     tiempo: () => p?.getCurrentTime() ?? desde,
+    duracion: () => p?.getDuration() ?? 0,
     volumen(v) { vol = v; p?.setVolume(v); },
     destruir() { vivo = false; try { p?.destroy(); } catch { /* ya no está */ } p = null; caja.remove(); },
     onEstado(cb) { alEstado = cb; },
@@ -116,6 +119,7 @@ function reproductorFalso(cfg: Falso): Reproductor {
     pause() { if (!sonando) return; base = t(); sonando = false; alEstado(PAUSADO); },
     seek(s) { base = s; desde = Date.now(); },
     tiempo: t,
+    duracion: () => cfg.duracion ?? 30,
     volumen() {},
     destruir() { clearInterval(reloj); sonando = false; },
     onEstado(cb) { alEstado = cb; },

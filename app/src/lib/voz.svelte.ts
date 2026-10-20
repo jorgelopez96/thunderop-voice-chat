@@ -13,8 +13,8 @@ import { mensajeTransmision } from './transmision';
 export type Participante = { id: string; nombre: string; hablando: boolean; silenciado: boolean; local: boolean; transmite: boolean };
 
 /** `sinPermiso`: el dueño nos silenció (los permisos de LiveKit no dejan publicar el micrófono). `viendo`: identidad cuya pantalla miramos. */
-export const voz = $state<{ salaId: string | null; salaNombre: string; grupoId: string | null; conectando: boolean; error: string; muteado: boolean; sinPermiso: boolean; supresion: boolean; participantes: Participante[]; transmitiendo: boolean; viendo: string | null; vistaPrevia: boolean }>({
-  salaId: null, salaNombre: '', grupoId: null, conectando: false, error: '', muteado: false, sinPermiso: false, supresion: leerPrefs().supresion, participantes: [], transmitiendo: false, viendo: null, vistaPrevia: leerPrefs().vistaPrevia,
+export const voz = $state<{ salaId: string | null; salaNombre: string; grupoId: string | null; conectando: boolean; error: string; muteado: boolean; ensordecido: boolean; sinPermiso: boolean; supresion: boolean; participantes: Participante[]; transmitiendo: boolean; viendo: string | null; vistaPrevia: boolean }>({
+  salaId: null, salaNombre: '', grupoId: null, conectando: false, error: '', muteado: false, ensordecido: false, sinPermiso: false, supresion: leerPrefs().supresion, participantes: [], transmitiendo: false, viendo: null, vistaPrevia: leerPrefs().vistaPrevia,
 });
 
 // LiveKit se carga recién al entrar a la voz: el arranque de la app no lo paga. Mientras haya `room`, `lk` está cargado.
@@ -93,7 +93,8 @@ function limpiar() {
   const r = room, c = ctx;
   room = null; ctx = null; tx++;
   if (typeof document !== 'undefined') for (const el of document.querySelectorAll('audio[data-voz]')) el.remove();
-  Object.assign(voz, { salaId: null, salaNombre: '', grupoId: null, conectando: false, sinPermiso: false, participantes: [], transmitiendo: false, viendo: null });
+  if (voz.ensordecido && !muteadoAntes) voz.muteado = false; // la sordera no deja el mic apagado para la próxima sala
+  Object.assign(voz, { salaId: null, salaNombre: '', grupoId: null, conectando: false, ensordecido: false, sinPermiso: false, participantes: [], transmitiendo: false, viendo: null });
   void detenerAudioPantalla();
   avisarSala(null);
   (r?.disconnect() ?? Promise.resolve()).catch(() => {}).finally(() => c?.close().catch(() => {}));
@@ -115,10 +116,26 @@ export async function entrarVoz(roomId: string, salaNombre = '', grupoId: string
   const r = new Room({ adaptiveStream: true, dynacast: true, webAudioMix: { audioContext: c } });
   room = r;
 
+  // Pitido corto al entrar alguien (o yo) y al irse: sube o baja. Ensordecido no suena.
+  const pitido = (sube: boolean) => {
+    if (voz.ensordecido) return;
+    const o = c.createOscillator(), g = c.createGain(), t = c.currentTime;
+    o.frequency.setValueAtTime(sube ? 520 : 700, t);
+    o.frequency.linearRampToValueAtTime(sube ? 780 : 460, t + 0.12);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.12, t + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.18);
+    o.connect(g).connect(c.destination);
+    o.start(t);
+    o.stop(t + 0.2);
+  };
+  r.on(RoomEvent.Connected, () => pitido(true));
+  r.on(RoomEvent.ParticipantConnected, () => pitido(true));
+  r.on(RoomEvent.ParticipantDisconnected, () => pitido(false));
   r.on(RoomEvent.TrackSubscribed, (t: RemoteTrack, _pub, part) => {
     if (t.kind !== Track.Kind.Audio) return;
     const el = t.attach(); el.dataset.voz = ''; document.body.append(el); audios.set(t, el);
-    part.setVolume(leerPrefs().volumenes[part.identity] ?? 1);
+    part.setVolume(voz.ensordecido ? 0 : leerPrefs().volumenes[part.identity] ?? 1);
   });
   // LiveKit ya desenganchó la pista de todos sus elementos (también el <video> de la vista): se borra solo el <audio> propio.
   r.on(RoomEvent.TrackUnsubscribed, (t: RemoteTrack) => { audios.get(t)?.remove(); audios.delete(t); });
@@ -195,6 +212,7 @@ export function salirVoz() {
 
 export async function alternarMute() {
   voz.muteado = !voz.muteado;
+  if (!voz.muteado && voz.ensordecido) { voz.ensordecido = false; aplicarSordera(); } // prender el mic también devuelve el sonido
   if (!room) return;
   if (voz.muteado) await room.localParticipant.setMicrophoneEnabled(false).catch(() => {});
   else await publicarMic();
@@ -228,7 +246,20 @@ export function volumen(userId: string, v: number) {
   if (!Number.isFinite(v)) return;
   v = Math.min(2, Math.max(0, v));
   guardarPrefs({ volumenes: { [userId]: v } });
-  room?.remoteParticipants.get(userId)?.setVolume(v);
+  if (!voz.ensordecido) room?.remoteParticipants.get(userId)?.setVolume(v);
+}
+
+/** Ensordecerse (auriculares): no escucho a nadie y apago el micrófono; al volver, el micrófono vuelve como estaba. */
+let muteadoAntes = false;
+function aplicarSordera() {
+  const vols = leerPrefs().volumenes;
+  for (const p of room?.remoteParticipants.values() ?? []) p.setVolume(voz.ensordecido ? 0 : vols[p.identity] ?? 1);
+}
+export async function ensordecer(si: boolean) {
+  voz.ensordecido = si;
+  aplicarSordera();
+  if (si) { muteadoAntes = voz.muteado; if (!voz.muteado) await alternarMute(); }
+  else if (voz.muteado && !muteadoAntes) await alternarMute();
 }
 
 const esPantalla = (s: Track.Source) => s === lk.Track.Source.ScreenShare || s === lk.Track.Source.ScreenShareAudio;

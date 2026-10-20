@@ -3,7 +3,7 @@ import { pb } from './pb';
 import { mensajeError } from './sesion.svelte';
 
 const PAGINA = 50;
-const EXPAND = 'author';
+const EXPAND = 'author,respondeA.author'; // el mensaje citado y su autor, para mostrar la respuesta
 
 /** Antepone una página más antigua sin repetir ids ya presentes (realtime o cargas solapadas). */
 export function anteponer<T extends { id: string }>(actuales: T[], pagina: T[]) {
@@ -38,6 +38,10 @@ export function abrirLista(coleccion: 'messages' | 'privados', filtroSala: strin
 
   const sub = pb.collection(coleccion).subscribe('*', async (e) => {
     if (e.action === 'delete') { estado.mensajes = estado.mensajes.filter((m) => m.id !== e.record.id); return; }
+    if (e.action === 'update') { // reacciones: se conserva el autor ya expandido
+      estado.mensajes = estado.mensajes.map((m) => (m.id === e.record.id ? { ...e.record, expand: m.expand } : m));
+      return;
+    }
     if (e.action !== 'create') return;
     // El evento realtime llega sin `expand`: se trae el mensaje con su autor.
     let m = e.record;
@@ -57,16 +61,19 @@ export function abrirLista(coleccion: 'messages' | 'privados', filtroSala: strin
       catch (e) { estado.error = mensajeError(e); }
       finally { cargando = false; }
     },
+    /** Pone o saca mi reacción; llega a todos por el realtime. */
+    reaccionar: (id: string, emoji: string) => pb.send('/api/reaccionar', { method: 'POST', body: { coleccion, id, emoji } }),
     cerrar() { cerrado = true; sub.then((f) => f()).catch(() => {}); },
   };
 }
 
-export async function enviar(roomId: string, texto: string, archivo?: File) {
+export async function enviar(roomId: string, texto: string, archivo?: File, respondeA?: string) {
   const d = new FormData();
   d.append('room', roomId);
   d.append('author', pb.authStore.record!.id);
   if (texto) d.append('text', texto);
   if (archivo) d.append('file', archivo);
+  if (respondeA) d.append('respondeA', respondeA);
   await pb.collection('messages').create(d);
 }
 

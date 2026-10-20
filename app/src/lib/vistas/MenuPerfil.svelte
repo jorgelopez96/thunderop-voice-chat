@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { foto } from '../foto';
   import { pb } from '../pb';
   import { sesion, salir } from '../sesion.svelte';
   import Perfil from './Perfil.svelte';
@@ -13,7 +14,7 @@
 
 <!-- Menú nativo (popover): se cierra solo al tocar afuera o con Esc. -->
 <button class="plano yo" popovertarget="menu-perfil">
-  {#if u?.avatar}<img class="avatar" alt="" src={pb.files.getURL(u, u.avatar, { thumb: '64x64' })} />{/if}
+  {#if u}<img class="avatar" alt="" src={foto(u)} />{/if}
   <span style="color:{u?.color || 'inherit'}">{u?.name}</span><Insignia usuario={u ?? undefined} />
 </button>
 <div id="menu-perfil" popover bind:this={menu}>
