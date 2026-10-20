@@ -68,6 +68,37 @@ UNIT
 servicio livekit "$DEST/livekit-server --config $DEST/livekit.yaml"
 servicio pocketbase "$DEST/pocketbase serve --http=127.0.0.1:8090 --dir $DEST/pb_data --migrationsDir $DEST/pb_migrations --hooksDir $DEST/pb_hooks"
 
+# Si LiveKit arranca antes que la red (o cambia la IP pública), no anuncia la IP pública y la voz
+# no conecta nunca. Cada 5 minutos se compara con la IP actual y, si no está, se reinicia.
+cat > "$DEST/chequear-voz.sh" <<'CHEQUEO'
+#!/usr/bin/env bash
+IP=$(curl -fs --max-time 10 https://api.ipify.org) || exit 0 # sin internet no hay nada que arreglar
+ID=$(systemctl show -p InvocationID --value thunderop-livekit)
+journalctl -q _SYSTEMD_INVOCATION_ID="$ID" --no-pager | grep 'using external IPs' | grep -qF "\"$IP/" && exit 0
+echo "LiveKit no anuncia $IP, reiniciando"
+systemctl restart thunderop-livekit
+CHEQUEO
+chmod 755 "$DEST/chequear-voz.sh"
+cat > /etc/systemd/system/thunderop-chequeo-voz.service <<UNIT
+[Unit]
+Description=Thunderop chequeo de la IP de la voz
+
+[Service]
+Type=oneshot
+ExecStart=$DEST/chequear-voz.sh
+UNIT
+cat > /etc/systemd/system/thunderop-chequeo-voz.timer <<UNIT
+[Unit]
+Description=Thunderop chequeo de la IP de la voz cada 5 minutos
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+
+[Install]
+WantedBy=timers.target
+UNIT
+
 # Un solo dominio: la señalización de LiveKit vive en /rtc, todo lo demás es PocketBase.
 cat > /etc/caddy/Caddyfile <<CADDY
 $DOMINIO {
@@ -93,6 +124,7 @@ netfilter-persistent save
 systemctl daemon-reload
 systemctl enable thunderop-livekit thunderop-pocketbase caddy
 systemctl restart thunderop-livekit thunderop-pocketbase caddy
+systemctl enable --now thunderop-chequeo-voz.timer
 
 echo
 echo "Listo. Probá en el navegador: https://$DOMINIO/api/health"
