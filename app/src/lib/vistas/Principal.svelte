@@ -5,6 +5,7 @@
   import Grupo from './Grupo.svelte';
   import ControlesVoz from './ControlesVoz.svelte';
   import { voz } from '../voz.svelte';
+  import { ubicarReproductor } from '../musica/musica.svelte';
 
   $effect(iniciarGrupos);
 
@@ -16,6 +17,13 @@
   let uniendo = $state(false);
   let verPerfil = $state(false);
   let error = $state('');
+  let hostMusica = $state<HTMLElement>();
+  // El reproductor vive acá y no en la vista de la sala: cambiar de chat o de grupo no corta la música.
+  $effect(() => {
+    if (!hostMusica) return;
+    ubicarReproductor(hostMusica);
+    return () => ubicarReproductor(null);
+  });
 
   async function hacer(f: () => Promise<void>) {
     error = '';
@@ -75,6 +83,7 @@
   {/if}
   <!-- Dentro de un grupo, los controles van al pie de su barra de salas (Grupo); afuera, flotan. -->
   {#if voz.salaId && !actual}<div class="pie"><ControlesVoz /></div>{/if}
+  <div class="reproductor" bind:this={hostMusica}></div>
 </main>
 
 <style>
@@ -91,4 +100,7 @@
   .grupos { display: flex; flex-direction: column; gap: 6px; }
   .grupos button { width: 100%; text-align: left; background: var(--hover); padding: 10px 12px; }
   form.fila input { flex: 1; }
+  /* Fuera de pantalla y no display:none: oculto, el iframe de YouTube puede dejar de sonar. */
+  .reproductor { position: fixed; left: -10000px; top: 0; width: 240px; height: 135px; }
+  .reproductor :global(iframe) { width: 100%; height: 100%; border: 0; }
 </style>
