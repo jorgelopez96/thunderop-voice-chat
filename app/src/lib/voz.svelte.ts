@@ -9,8 +9,8 @@ import { iniciarAudioPantalla, detenerAudioPantalla } from './audioPantalla';
 import { mensajeTransmision } from './transmision';
 
 /** `silenciado`: no está mandando audio (muteado, sin permiso del dueño o sin micrófono publicado). */
-/** `transmite`: está compartiendo pantalla. */
-export type Participante = { id: string; nombre: string; hablando: boolean; silenciado: boolean; local: boolean; transmite: boolean };
+/** `transmite`: está compartiendo pantalla. `espectadores`: cuántos la están mirando. */
+export type Participante = { id: string; nombre: string; hablando: boolean; silenciado: boolean; local: boolean; transmite: boolean; espectadores: number };
 
 /** `sinPermiso`: el dueño nos silenció (los permisos de LiveKit no dejan publicar el micrófono). `viendo`: identidad cuya pantalla miramos. */
 export const voz = $state<{ salaId: string | null; salaNombre: string; grupoId: string | null; conectando: boolean; error: string; muteado: boolean; ensordecido: boolean; sinPermiso: boolean; supresion: boolean; participantes: Participante[]; transmitiendo: boolean; viendo: string | null; vistaPrevia: boolean }>({
@@ -45,8 +45,9 @@ const microfono = () => room?.localParticipant.getTrackPublication(lk.Track.Sour
 
 function actualizar() {
   if (!room) { voz.participantes = []; voz.sinPermiso = false; return; }
+  const mirando = [...room.remoteParticipants.values()].map((x) => x.attributes.mirando);
   const p = (x: Participant, local: boolean): Participante => ({ id: x.identity, nombre: x.name || x.identity, hablando: x.isSpeaking, silenciado: !x.isMicrophoneEnabled, local,
-    transmite: !!x.getTrackPublication(lk.Track.Source.ScreenShare) });
+    transmite: !!x.getTrackPublication(lk.Track.Source.ScreenShare), espectadores: mirando.filter((m) => m === x.identity).length });
   voz.participantes = [p(room.localParticipant, true), ...[...room.remoteParticipants.values()].map((x) => p(x, false))];
   // Misma regla que usa LiveKit para dejar publicar (sin fuentes listadas = todas permitidas).
   const perm = room.localParticipant.permissions;
@@ -143,8 +144,8 @@ export async function entrarVoz(roomId: string, salaNombre = '', grupoId: string
   r.on(RoomEvent.TrackPublished, (pub, part) => {
     if (pub.source === Track.Source.Microphone || (part.identity === voz.viendo && esPantalla(pub.source))) pub.setSubscribed(true);
   });
-  r.on(RoomEvent.TrackUnpublished, (pub, part) => { if (pub.source === Track.Source.ScreenShare && part.identity === voz.viendo) voz.viendo = null; });
-  r.on(RoomEvent.ParticipantDisconnected, (part) => { if (part.identity === voz.viendo) voz.viendo = null; });
+  r.on(RoomEvent.TrackUnpublished, (pub, part) => { if (pub.source === Track.Source.ScreenShare && part.identity === voz.viendo) mirar(null); });
+  r.on(RoomEvent.ParticipantDisconnected, (part) => { if (part.identity === voz.viendo) mirar(null); });
   // Fin de la transmisión propia, por el botón o porque Windows cortó la captura: todo pasa por acá.
   r.on(RoomEvent.LocalTrackUnpublished, (pub) => {
     if (pub.source !== Track.Source.ScreenShare || room !== r) return; // una sala vieja no toca la transmisión actual
@@ -162,7 +163,7 @@ export async function entrarVoz(roomId: string, salaNombre = '', grupoId: string
   });
   for (const ev of [RoomEvent.ParticipantConnected, RoomEvent.ParticipantDisconnected, RoomEvent.ActiveSpeakersChanged,
     RoomEvent.TrackMuted, RoomEvent.TrackUnmuted, RoomEvent.TrackPublished, RoomEvent.TrackUnpublished,
-    RoomEvent.LocalTrackUnpublished, RoomEvent.ParticipantNameChanged, RoomEvent.TrackSubscribed, RoomEvent.TrackUnsubscribed]) r.on(ev, actualizar);
+    RoomEvent.LocalTrackUnpublished, RoomEvent.ParticipantNameChanged, RoomEvent.ParticipantAttributesChanged, RoomEvent.TrackSubscribed, RoomEvent.TrackUnsubscribed]) r.on(ev, actualizar);
   // Desconexión iniciada por el servidor (echado, sala borrada) o red perdida sin recuperación. Si salimos
   // nosotros (`salirVoz`), el intento ya no está vigente y no hay aviso. `limpiar` no toca `voz.error`.
   r.on(RoomEvent.Disconnected, (motivo) => {
@@ -348,7 +349,13 @@ export function ver(identidad: string | null) {
   };
   if (voz.viendo !== identidad) suscribir(voz.viendo, false);
   suscribir(identidad, true);
+  mirar(identidad);
+}
+
+// El resto cuenta los espectadores de cada transmisión con este atributo (necesita canUpdateOwnMetadata en el token).
+function mirar(identidad: string | null) {
   voz.viendo = identidad;
+  room?.localParticipant.setAttributes({ mirando: identidad ?? '' }).catch(() => {});
 }
 
 /** Pista de video de la pantalla de `identidad`, si ya está suscrita (para hacerle `attach`). */

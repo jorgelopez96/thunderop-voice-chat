@@ -1,7 +1,7 @@
 <script lang="ts">
   import Insignia from './Insignia.svelte';
   import type { RecordModel } from 'pocketbase';
-  import { MicOff, Users, Link, Volume2, VolumeX, Maximize, ChevronRight, MessageSquare } from '@lucide/svelte';
+  import { MicOff, Users, Link, Volume2, VolumeX, Maximize, ChevronRight, MessageSquare, User } from '@lucide/svelte';
   import { foto } from '../foto';
   import { mensajeError, sesion } from '../sesion.svelte';
   import { crearInvitacion } from '../grupos.svelte';
@@ -89,6 +89,10 @@
   function plegarChat(a: boolean) { chatAbierto = a; try { localStorage.setItem('dm.chatSala', a ? '1' : '0'); } catch { /* sin almacenamiento */ } }
 </script>
 
+{#snippet espectadores(n: number)}
+  <span class="espectadores" title={`${n} ${n === 1 ? 'persona mirando' : 'personas mirando'}`}><User size={12} strokeWidth={2.5} />{n}</span>
+{/snippet}
+
 <section class="voz" class:conChat={chatAbierto}>
   <div class="centro">
     <header>
@@ -106,7 +110,7 @@
       <!-- Pantalla completa sobre el contenedor (no el <video>): el mute nativo del video no toca el audio, que va por otra pista. -->
       <div class="escenario" bind:this={marco}>
         <video bind:this={vid} autoplay playsinline muted aria-label={`Pantalla de ${quien}`}></video>
-        <span class="etiqueta"><span class="punto"></span>{quien}</span>
+        <span class="etiqueta"><span class="punto"></span>{quien}{@render espectadores(voz.participantes.find((p) => p.id === voz.viendo)?.espectadores ?? 0)}</span>
         <div class="controles">
           <button class="icono" onclick={() => sonarPantalla(pctPantalla ? 0 : ultimoPct)} aria-label={pctPantalla ? 'Silenciar transmisión' : 'Activar sonido'}>
             {#if pctPantalla}<Volume2 size={16} strokeWidth={1.75} />{:else}<VolumeX size={16} strokeWidth={1.75} />{/if}</button>
@@ -120,7 +124,7 @@
         {@const m = miembro(p.id)}
         <li class:hablando={p.hablando} class:transmite={p.transmite} style="background:{fondo(m?.color, p.nombre)}" oncontextmenu={(e) => abrirMenu(e, p)}>
           <img class="avatar" alt="" src={foto(m, '256x256')} />
-          {#if p.transmite}<span class="vivo">EN VIVO</span>
+          {#if p.transmite}<span class="vivo">EN VIVO{@render espectadores(p.espectadores)}</span>
             {#if !p.local}<button class="primario ver" onclick={() => mirar(voz.viendo === p.id ? null : p.id)}>{voz.viendo === p.id ? 'Dejar de ver' : 'Ver'}</button>{/if}{/if}
           <span class="etiqueta-nombre">
             {#if p.silenciado}<span class="mic" title="Sin micrófono" aria-label="Silenciado"><MicOff size={16} strokeWidth={1.75} /></span>{/if}
@@ -178,6 +182,8 @@
   .mic { color: var(--peligro); display: grid; }
   .vivo { position: absolute; top: 8px; left: 8px; padding: 2px 8px; border-radius: var(--radio); font-size: 11px; font-weight: 600; color: #fff; background: color-mix(in srgb, var(--ok) 70%, #000); }
   .ver { position: absolute; bottom: 8px; right: 8px; }
+  .espectadores { display: inline-flex; align-items: center; gap: 2px; margin-left: 6px; color: var(--peligro); font-weight: 600; }
+  .vivo .espectadores { color: #fff; }
   .escenario { position: relative; background: var(--hondo); border: 1px solid var(--borde); border-radius: var(--radio-tarjeta); overflow: hidden; }
   .escenario video { display: block; width: 100%; max-height: 60vh; object-fit: contain; }
   .etiqueta { position: absolute; top: 12px; left: 12px; display: flex; align-items: center; gap: 8px; padding: 4px 8px; font-size: 13px; font-weight: 500; background: rgb(0 0 0 / .6); border-radius: var(--radio); }

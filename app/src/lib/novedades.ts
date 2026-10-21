@@ -4,6 +4,12 @@ export type Novedad = { version: string; fecha: string; cambios: { tipo: 'nuevo'
 
 export const NOVEDADES: Novedad[] = [
   {
+    version: '0.3.4', fecha: '2026-10-20', cambios: [
+      { tipo: 'nuevo', texto: 'Contador de espectadores en la transmisión: al lado del nombre ves cuántos la están mirando.' },
+      { tipo: 'arreglo', texto: 'La transmisión ya no se cuadricula al mover la cámara rápido en los juegos, y se ve nítida desde que empezás a mirarla.' },
+    ],
+  },
+  {
     version: '0.3.3', fecha: '2026-10-20', cambios: [
       { tipo: 'nuevo', texto: 'Diseño nuevo en toda la app: colores, tipografía, íconos y portada con tus grupos y quién está en voz.' },
       { tipo: 'nuevo', texto: 'Pantalla de inicio con tus grupos, las novedades y tus amigos.' },

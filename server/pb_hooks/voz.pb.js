@@ -7,7 +7,7 @@ routerAdd("POST", "/api/rooms/{id}/token", (e) => {
   const c = lk.config();
   const { room, group } = lk.salaDeVoz(e.app, e.request.pathValue("id"), e.auth.id);
 
-  const video = { room: room.id, roomJoin: true, canSubscribe: true, canPublish: true, canPublishData: true };
+  const video = { room: room.id, roomJoin: true, canSubscribe: true, canPublish: true, canPublishData: true, canUpdateOwnMetadata: true };
   if (group.getStringSlice("silenciados").includes(e.auth.id)) {
     video.canPublishSources = ["camera", "screen_share", "screen_share_audio"];
   }
@@ -51,7 +51,7 @@ routerAdd("POST", "/api/groups/{id}/silenciar", (e) => {
   const canPublishSources = body.silenciado ? ["CAMERA", "SCREEN_SHARE", "SCREEN_SHARE_AUDIO"] : [];
   lk.enSalasDeVoz(e.app, group.id, "UpdateParticipant", {
     identity: user,
-    permission: { canSubscribe: true, canPublish: true, canPublishData: true, canPublishSources },
+    permission: { canSubscribe: true, canPublish: true, canPublishData: true, canUpdateOwnMetadata: true, canPublishSources },
   });
   return e.json(200, { ok: true });
 }, $apis.requireAuth("users"));
