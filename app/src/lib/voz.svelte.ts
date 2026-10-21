@@ -303,14 +303,12 @@ async function arrancar(r: Room, c: AudioContext, mio: number, calidad: Calidad)
   voz.error = '';
   await agrandarVentana().catch(() => {});
   // 'motion' y no 'detail': con 'detail' WebRTC usa el modo pantalla del codificador (pensado para texto)
-  // y en juegos, al girar la cámara rápido, se pixelea. La capa liviana es para el espectador con mala
-  // conexión; el resto sigue recibiendo la calidad elegida.
-  const liviana = alto > 720 ? new lk.VideoPreset(1280, 720, 2_500_000, 30) : new lk.VideoPreset(640, 360, 1_000_000, 30);
+  // y en juegos, al girar la cámara rápido, se pixelea. Sin simulcast: con dos capas el emisor bajaba a
+  // ~2 Mbps y se cuadriculaba todo; al espectador con mala conexión lo cubre el servidor (livekit.yaml).
   try {
     await r.localParticipant.setScreenShareEnabled(true,
       { audio: false, contentHint: 'motion', resolution: { width: ancho, height: alto, frameRate: fps } },
-      { videoCodec: 'h264', simulcast: true, screenShareSimulcastLayers: [liviana], degradationPreference: 'balanced',
-        screenShareEncoding: { maxBitrate: mbps * 1e6, maxFramerate: fps } });
+      { videoCodec: 'h264', simulcast: false, screenShareEncoding: { maxBitrate: mbps * 1e6, maxFramerate: fps } });
   } catch (e) {
     if (vigente()) voz.error = mensajeTransmision(e);
     return;

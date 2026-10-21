@@ -4,7 +4,7 @@ export type Novedad = { version: string; fecha: string; cambios: { tipo: 'nuevo'
 
 export const NOVEDADES: Novedad[] = [
   {
-    version: '0.3.2', fecha: '2026-10-20', cambios: [
+    version: '0.3.3', fecha: '2026-10-20', cambios: [
       { tipo: 'nuevo', texto: 'Diseño nuevo en toda la app: colores, tipografía, íconos y portada con tus grupos y quién está en voz.' },
       { tipo: 'nuevo', texto: 'Pantalla de inicio con tus grupos, las novedades y tus amigos.' },
       { tipo: 'nuevo', texto: 'Amigos: mandá solicitudes por nombre o con clic derecho en Participantes, y aceptalas en la campanita.' },
@@ -25,7 +25,7 @@ export const NOVEDADES: Novedad[] = [
       { tipo: 'nuevo', texto: 'Sonido corto cuando alguien entra o sale de la sala.' },
       { tipo: 'nuevo', texto: 'La X ya no cierra la app: queda en la bandeja, al lado de la hora (la voz sigue). Para cerrarla del todo, clic derecho en el ícono → Salir. Ahí usa menos memoria si no estás en una llamada.' },
       { tipo: 'nuevo', texto: 'Los nombres de usuario son únicos, foto de perfil por defecto, foto de grupo e ícono nuevo de la app.' },
-      { tipo: 'arreglo', texto: 'La transmisión ya no se pixela al mover la cámara rápido en los juegos, y si a alguien le anda lenta la conexión recibe una versión más liviana sin arruinarle la imagen al resto.' },
+      { tipo: 'arreglo', texto: 'La transmisión ya no se cuadricula al mover la cámara rápido en los juegos, y se ve nítida desde que empezás a mirarla.' },
       { tipo: 'arreglo', texto: 'Ya no se escucha doble al transmitir con sonido, y silenciar la transmisión funciona en pantalla completa.' },
       { tipo: 'arreglo', texto: 'La música de la sala ya no se corta al cambiar de chat o de grupo.' },
       { tipo: 'arreglo', texto: 'Los menús del clic derecho ya no se salen de la pantalla.' },

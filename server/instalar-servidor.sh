@@ -30,6 +30,12 @@ rtc:
   port_range_start: 50000
   port_range_end: 50100
   use_external_ip: true
+  # Con REMB la estimación arrancaba en ~5 kbps al empezar a mirar y dejaba la capa más baja por minutos.
+  congestion_control:
+    enabled: true
+    allow_pause: false
+    use_send_side_bwe_interceptor: true
+    use_send_side_bwe: true
 YAML
 
 # Las claves se generan una sola vez; el dominio se reescribe en cada corrida.
