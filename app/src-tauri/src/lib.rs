@@ -78,7 +78,7 @@ pub fn run() {
         })
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(audio::Captura::default())
-        .invoke_handler(tauri::generate_handler![audio::iniciar_audio, audio::detener_audio, memoria_baja])
+        .invoke_handler(tauri::generate_handler![audio::iniciar_audio, audio::detener_audio, memoria_baja, salir])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
@@ -109,6 +109,10 @@ mod tests {
     }
 }
 /// La página la pide al irse a la bandeja si no hay llamada; `mostrar` vuelve a lo normal.
+/// "Salir de Thunderop" del menú del perfil: cerrar la ventana solo la manda a la bandeja.
+#[tauri::command]
+fn salir(app: AppHandle) { app.exit(0) }
+
 #[tauri::command]
 fn memoria_baja(w: WebviewWindow) { nivel_memoria(&w, true) }
 

@@ -101,7 +101,7 @@ test('transmitir y ver una pantalla', async ({ browser }) => {
   await a.getByRole('button', { name: 'Transmitir' }).click();
   await a.getByRole('button', { name: 'Empezar' }).click();
   await expect(tarjeta(b, 'Ana').getByText('EN VIVO')).toBeVisible({ timeout: 10_000 });
-  await a.getByRole('button', { name: 'Salir', exact: true }).click();
+  await a.getByRole('button', { name: 'Desconectarse', exact: true }).click();
   await expect(b.getByText('EN VIVO')).toHaveCount(0, { timeout: 10_000 });
   // El <audio> del micrófono de Ana se va con ella; queda solo el de Caro.
   await expect(b.locator('audio[data-voz]')).toHaveCount(1, { timeout: 10_000 });

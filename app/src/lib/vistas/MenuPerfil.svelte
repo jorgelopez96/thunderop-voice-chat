@@ -1,25 +1,41 @@
 <script lang="ts">
-  import { foto } from '../foto';
+  import Avatar from './Avatar.svelte';
   import { pb } from '../pb';
   import { sesion, salir } from '../sesion.svelte';
   import Perfil from './Perfil.svelte';
   import Insignia from './Insignia.svelte';
+  import { latir } from '../presencia.svelte';
 
   let menu = $state<HTMLElement>();
   let d = $state<HTMLDialogElement>();
   let editando = $state(false); // Perfil se monta al abrir: arranca con los datos actuales
   const u = $derived(sesion.usuario);
   const editar = () => { menu?.hidePopover(); editando = true; queueMicrotask(() => d?.showModal()); };
+
+  const ESTADOS = [['disponible', 'Disponible'], ['ausente', 'Ausente'], ['ocupado', 'Ocupado'], ['invisible', 'Invisible']] as const;
+  const actual = $derived(u?.disponibilidad || 'disponible');
+  async function cambiarEstado(valor: string) {
+    menu?.hidePopover();
+    if (!u || valor === actual) return;
+    await pb.collection('users').update(u.id, { disponibilidad: valor }).catch(() => {});
+    void latir(); // al volver de invisible se ve en línea sin esperar el próximo latido
+  }
+  const salirDeLaApp = () => import('@tauri-apps/api/core').then(({ invoke }) => invoke('salir')).catch(() => {});
 </script>
 
 <!-- Menú nativo (popover): se cierra solo al tocar afuera o con Esc. -->
 <button class="plano yo" popovertarget="menu-perfil">
-  {#if u}<img class="avatar" alt="" src={foto(u)} />{/if}
+  {#if u}<Avatar usuario={u} tam={24} />{/if}
   <span style="color:{u?.color || 'inherit'}">{u?.name}</span><Insignia usuario={u ?? undefined} />
 </button>
 <div id="menu-perfil" popover bind:this={menu}>
+  {#each ESTADOS as [valor, texto] (valor)}
+    <button class="plano estado" aria-pressed={actual === valor} onclick={() => cambiarEstado(valor)}><span class="punto {valor}"></span>{texto}</button>
+  {/each}
+  <hr />
   <button class="plano" onclick={editar}>Editar perfil</button>
   <button class="plano" onclick={salir}>Cerrar sesión</button>
+  {#if '__TAURI_INTERNALS__' in globalThis}<button class="plano peligroso" onclick={salirDeLaApp}>Salir de Thunderop</button>{/if}
 </div>
 
 <dialog bind:this={d} onclose={() => (editando = false)}>
@@ -29,9 +45,16 @@
 
 <style>
   .yo { display: flex; align-items: center; gap: 8px; font-weight: 600; }
-  .yo img { width: 24px; height: 24px; }
   [popover] { position: fixed; inset: 48px 12px auto auto; margin: 0; padding: 6px; display: none; flex-direction: column; gap: 2px;
     background: var(--panel); color: var(--texto); border: 1px solid var(--borde); border-radius: 10px; }
   [popover]:popover-open { display: flex; }
   [popover] button { text-align: left; }
+  [popover] hr { border: 0; border-top: 1px solid var(--borde); margin: 4px 0; }
+  .estado { display: flex; align-items: center; gap: 8px; }
+  .punto { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+  .disponible { background: var(--ok); }
+  .ausente { background: var(--ausente); }
+  .ocupado { background: var(--peligro); }
+  .invisible { background: var(--apagado); }
+  .peligroso { color: var(--peligro); }
 </style>

@@ -13,6 +13,7 @@ export function enLineaSegun(visto: string | undefined, ahora: number): boolean 
 }
 
 const vistos = $state<Record<string, string>>({});
+const disponibilidades = $state<Record<string, string>>({});
 const reloj = $state({ ahora: Date.now() });
 
 /** Reactiva: usa el `visto` del realtime si llegó, si no el del registro. */
@@ -21,13 +22,22 @@ export function enLinea(u: RecordModel | string): boolean {
   return enLineaSegun(vistos[id] ?? (typeof u === 'string' ? undefined : u.visto), reloj.ahora);
 }
 
+export type Estado = 'disponible' | 'ausente' | 'ocupado' | 'desconectado';
+/** Lo que muestra la lucecita: desconectado (o invisible, que no late) o el estado que eligió. */
+export function estado(u: RecordModel): Estado {
+  if (!enLinea(u)) return 'desconectado';
+  const d = disponibilidades[u.id] ?? u.disponibilidad;
+  return d === 'ausente' || d === 'ocupado' ? d : 'disponible';
+}
+
+export const latir = () => pb.send('/api/latido', { method: 'POST', requestKey: null }).catch(() => {});
+
 /** Arranca el latido, el realtime y el reloj. Devuelve la limpieza. */
 export function iniciarPresencia(): () => void {
-  const latir = () => pb.send('/api/latido', { method: 'POST', requestKey: null }).catch(() => {});
   void latir();
   const latido = setInterval(latir, LATIDO_MS);
   const tic = setInterval(() => (reloj.ahora = Date.now()), 15_000);
-  const sub = pb.collection('users').subscribe('*', (e) => { vistos[e.record.id] = e.record.visto; });
+  const sub = pb.collection('users').subscribe('*', (e) => { vistos[e.record.id] = e.record.visto; disponibilidades[e.record.id] = e.record.disponibilidad; });
   return () => {
     clearInterval(latido);
     clearInterval(tic);

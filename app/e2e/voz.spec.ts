@@ -50,7 +50,7 @@ test('tres personas en una sala de voz', async ({ browser }) => {
   expect(await audioLlega(c, 'Beto')).toBe(false);
 
   // Beto sale y vuelve: sigue silenciado y no puede publicar.
-  await b.getByRole('button', { name: 'Salir', exact: true }).click();
+  await b.getByRole('button', { name: 'Desconectarse', exact: true }).click();
   await expect(c.locator('section.voz li')).toHaveCount(2, { timeout: 10_000 });
   await expect(b.getByRole('alert')).toHaveCount(0); // salir a propósito no es un error
   await entrar(b);
@@ -68,7 +68,7 @@ test('tres personas en una sala de voz', async ({ browser }) => {
   await a.locator('aside.participantes li', { hasText: 'Caro' }).click({ button: 'right' });
   await a.getByRole('button', { name: 'Expulsar del grupo' }).click();
   await a.getByRole('button', { name: 'Confirmar' }).click();
-  await expect(c.getByRole('button', { name: 'Salir', exact: true })).toHaveCount(0, { timeout: 15_000 });
+  await expect(c.getByRole('button', { name: 'Desconectarse', exact: true })).toHaveCount(0, { timeout: 15_000 });
   await expect(c.getByRole('alert')).toContainText('Te sacaron de la llamada.');
   await expect(a.locator('section.voz li')).toHaveCount(2, { timeout: 10_000 });
 

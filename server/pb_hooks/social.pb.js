@@ -10,12 +10,14 @@ onRecordUpdateRequest((e) => {
   if (!e.hasSuperuserAuth()) {
     e.record.set("fundador", e.record.original().getBool("fundador"));
     e.record.set("visto", e.record.original().get("visto")); // solo lo cambia el latido
+    if (e.record.getString("disponibilidad") === "invisible") e.record.set("visto", ""); // se ve desconectado al instante
   }
   e.next();
 }, "users");
 
 routerAdd("POST", "/api/latido", (e) => {
   const u = e.app.findRecordById("users", e.auth.id);
+  if (u.getString("disponibilidad") === "invisible") return e.json(200, { visto: "" });
   u.set("visto", new DateTime());
   e.app.saveNoValidate(u);
   return e.json(200, { visto: u.getString("visto") });
