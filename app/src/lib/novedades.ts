@@ -4,6 +4,11 @@ export type Novedad = { version: string; fecha: string; cambios: { tipo: 'nuevo'
 
 export const NOVEDADES: Novedad[] = [
   {
+    version: '0.3.5', fecha: '2026-10-20', cambios: [
+      { tipo: 'arreglo', texto: 'La transmisión ya no tiene tope de calidad: usa todo lo que dé la conexión del que transmite.' },
+    ],
+  },
+  {
     version: '0.3.4', fecha: '2026-10-20', cambios: [
       { tipo: 'nuevo', texto: 'Contador de espectadores en la transmisión: al lado del nombre ves cuántos la están mirando.' },
       { tipo: 'arreglo', texto: 'La transmisión ya no se cuadricula al mover la cámara rápido en los juegos, y se ve nítida desde que empezás a mirarla.' },
