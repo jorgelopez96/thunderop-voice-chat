@@ -5,6 +5,7 @@
   import { echar, salirDe, enVoz } from '../grupos.svelte';
   import { voz, volumen } from '../voz.svelte';
   import { leerPrefs } from '../prefs';
+  import { abrirEnPunto } from '../menu';
   import { enLinea } from '../presencia.svelte';
   import { amigos, solicitarA } from '../amigos.svelte';
   import Avatar from './Avatar.svelte';
@@ -25,7 +26,6 @@
   let error = $state('');
   let menu = $state<HTMLElement>();
   let elegido = $state<RecordModel | null>(null);
-  let pos = $state({ x: 0, y: 0 });
 
   /** Micrófono apagado de quien está en voz en este grupo: mi sala por LiveKit, las otras por la presencia del servidor. */
   function micApagado(id: string): boolean {
@@ -43,8 +43,7 @@
     e.preventDefault();
     elegido = m;
     vol = Math.round((leerPrefs().volumenes[m.id] ?? 1) * 100);
-    pos = { x: e.clientX, y: e.clientY };
-    menu?.showPopover();
+    void abrirEnPunto(menu, e.clientX, e.clientY);
   }
   async function hacer(f: () => Promise<unknown>) {
     menu?.hidePopover();
@@ -79,7 +78,7 @@
 </aside>
 
 <!-- Menú del clic derecho (popover nativo: se cierra con Esc o tocando afuera). -->
-<div popover bind:this={menu} style="left:{pos.x}px;top:{pos.y}px">
+<div popover bind:this={menu}>
   {#if elegido}
     {@const m = elegido}
     <button class="plano" onclick={() => { menu?.hidePopover(); viendo = m; perfil?.showModal(); }}>Ver perfil</button>

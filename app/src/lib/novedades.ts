@@ -3,6 +3,14 @@ export type Novedad = { version: string; fecha: string; cambios: { tipo: 'nuevo'
 
 export const NOVEDADES: Novedad[] = [
   {
+    version: '0.3.1', fecha: '2026-10-20', cambios: [
+      { tipo: 'arreglo', texto: 'La transmisión de pantalla se mantiene nítida: si a alguien le anda lenta la conexión, recibe una versión más liviana sin arruinarle la imagen al resto.' },
+      { tipo: 'nuevo', texto: 'La X ya no cierra la app: queda en la bandeja, al lado de la hora (la voz sigue). Para cerrarla del todo, clic derecho en el ícono → Salir.' },
+      { tipo: 'nuevo', texto: 'Mientras está en la bandeja y no estás en una llamada, usa menos memoria.' },
+      { tipo: 'arreglo', texto: 'El menú del clic derecho en Participantes y en la sala de voz ya no se sale de la pantalla.' },
+    ],
+  },
+  {
     version: '0.3.0', fecha: '2026-10-20', cambios: [
       { tipo: 'nuevo', texto: 'Diseño nuevo en toda la app: colores, tipografía, íconos y portada con tus grupos y quién está en voz.' },
       { tipo: 'nuevo', texto: 'Sala de voz con tarjetas grandes para cada uno, y la pantalla que mirás arriba de todo.' },

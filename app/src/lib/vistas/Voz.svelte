@@ -10,6 +10,7 @@
   import Chat from './Chat.svelte';
   import { voz, volumen, silenciar, ver, pistaPantalla, pistaPantallaPropia, vistaPrevia, volumenPantalla } from '../voz.svelte';
   import { leerPrefs } from '../prefs';
+  import { abrirEnPunto } from '../menu';
   import { mirar as mirarSala } from '../noLeidos.svelte';
 
   let { grupo, soyDueno, sala, verParticipantes }: { grupo: RecordModel; soyDueno: boolean; sala: string; verParticipantes: () => void } = $props();
@@ -75,13 +76,11 @@
   // Clic derecho en una píldora: volumen y, para el dueño, silenciar.
   let menu = $state<HTMLElement>();
   let elegido = $state<{ id: string; nombre: string } | null>(null);
-  let pos = $state({ x: 0, y: 0 });
   function abrirMenu(e: MouseEvent, p: { id: string; nombre: string; local: boolean }) {
     e.preventDefault();
     if (p.local) return;
     elegido = p;
-    pos = { x: Math.min(e.clientX, innerWidth - 260), y: e.clientY };
-    menu?.showPopover();
+    void abrirEnPunto(menu, e.clientX, e.clientY);
   }
 
   // Chat de la sala, plegable y recordado.
@@ -150,7 +149,7 @@
   {/if}
 </section>
 
-<div popover bind:this={menu} class="menu" style="left:{pos.x}px;top:{pos.y}px">
+<div popover bind:this={menu} class="menu">
   {#if elegido}
     {@const p = elegido}
     <label>Volumen · {Math.round((vols[p.id] ?? 1) * 100)} %

@@ -269,6 +269,13 @@ async function despublicarAudio(r: Room) {
   if (t) await r.localParticipant.unpublishTrack(t).catch(() => {});
 }
 
+// En la bandeja y sin llamada, WebView2 libera memoria; al abrir la ventana vuelve a lo normal (lib.rs).
+if ('__TAURI_INTERNALS__' in globalThis) {
+  void getCurrentWindow().listen('a-la-bandeja', () => {
+    if (!voz.salaId) import('@tauri-apps/api/core').then(({ invoke }) => invoke('memoria_baja')).catch(() => {});
+  });
+}
+
 /** El selector de WebView2 se dibuja adentro de la ventana y se corta si es chica: se lleva a 1280×800 lógicos como mínimo. */
 async function agrandarVentana() {
   if (!('__TAURI_INTERNALS__' in globalThis)) return;
@@ -295,10 +302,14 @@ async function arrancar(r: Room, c: AudioContext, mio: number, calidad: Calidad)
   const { ancho, alto, fps, mbps } = CALIDADES[calidad];
   voz.error = '';
   await agrandarVentana().catch(() => {});
+  // Nítido antes que fluido: con poca red baja los fps, no la resolución. La capa liviana es para el
+  // espectador con mala conexión; el resto sigue recibiendo la calidad elegida.
+  const liviana = alto > 720 ? new lk.VideoPreset(1280, 720, 2_500_000, 30) : new lk.VideoPreset(640, 360, 1_000_000, 30);
   try {
     await r.localParticipant.setScreenShareEnabled(true,
-      { audio: false, contentHint: 'motion', resolution: { width: ancho, height: alto, frameRate: fps } },
-      { videoCodec: 'h264', simulcast: false, screenShareEncoding: { maxBitrate: mbps * 1e6, maxFramerate: fps } });
+      { audio: false, contentHint: 'detail', resolution: { width: ancho, height: alto, frameRate: fps } },
+      { videoCodec: 'h264', simulcast: true, screenShareSimulcastLayers: [liviana], degradationPreference: 'maintain-resolution',
+        screenShareEncoding: { maxBitrate: mbps * 1e6, maxFramerate: fps } });
   } catch (e) {
     if (vigente()) voz.error = mensajeTransmision(e);
     return;
