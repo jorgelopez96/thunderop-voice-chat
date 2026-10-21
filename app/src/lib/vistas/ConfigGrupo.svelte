@@ -1,13 +1,17 @@
 <script lang="ts">
   import type { RecordModel } from 'pocketbase';
-  import { ImagePlus } from '@lucide/svelte';
+  import { ImagePlus, Plus, Trash2 } from '@lucide/svelte';
   import { pb } from '../pb';
   import { sesion, mensajeError } from '../sesion.svelte';
   import { borrarGrupo } from '../grupos.svelte';
   import Avatar from './Avatar.svelte';
   import Insignia from './Insignia.svelte';
+  import BotonEmoji from './BotonEmoji.svelte';
+  import SubirSonido from './SubirSonido.svelte';
+  import { sonidos, editar, borrar } from '../botonera.svelte';
 
-  // Configuraciones del grupo: foto, participantes y borrar (solo el dueño cambia foto y borra).
+  // Configuraciones del grupo. General: foto, participantes y borrar (solo el dueño cambia foto y borra).
+  // Sonidos: cada uno edita los que subió; el dueño, todos.
   // Borrar pide dos pasos: confirmar y escribir el nombre del grupo.
   let { grupo, cerrar }: { grupo: RecordModel; cerrar: () => void } = $props();
   let d = $state<HTMLDialogElement>();
@@ -18,6 +22,16 @@
   let escrito = $state('');
   let error = $state('');
   let ocupado = $state(false);
+  let solapa = $state<'general' | 'sonidos'>('general');
+  // svelte-ignore state_referenced_locally
+  const lista = sonidos(grupo.id);
+  $effect(() => lista.parar);
+  let nuevo = $state(false);
+  const puedeEditar = (x: RecordModel) => soyDueno || x.owner === sesion.usuario?.id;
+  function renombrar(x: RecordModel, name: string) {
+    name = name.trim();
+    if (name && name !== x.name) hacer(() => editar(x.id, { name }));
+  }
 
   async function hacer(f: () => Promise<unknown>) {
     error = ''; ocupado = true;
@@ -38,6 +52,33 @@
 
 <dialog class="config" bind:this={d} onclose={cerrar} onclick={(e) => e.target === d && d.close()}>
   <h2>Configuraciones de {grupo.name}</h2>
+  <div class="solapas" role="tablist">
+    <button role="tab" class="plano" aria-selected={solapa === 'general'} onclick={() => (solapa = 'general')}>General</button>
+    <button role="tab" class="plano" aria-selected={solapa === 'sonidos'} onclick={() => (solapa = 'sonidos')}>Sonidos</button>
+  </div>
+
+  {#if solapa === 'sonidos'}
+    <section>
+      <h3>Sonidos — {lista.estado.lista.length}</h3>
+      <ul class="sonidos">
+        {#each lista.estado.lista as x (x.id)}
+          {@const puede = puedeEditar(x)}
+          <li>
+            {#if puede}
+              <input value={x.name} maxlength="30" aria-label="Nombre del sonido" onchange={(e) => renombrar(x, e.currentTarget.value)} />
+              <BotonEmoji elegir={(e) => renombrar(x, x.name + e)} />
+              <input type="range" min="5" max="200" step="5" value={x.volumen || 100} aria-label={`Volumen de ${x.name}`} title={`${x.volumen || 100}%`}
+                onchange={(e) => hacer(() => editar(x.id, { volumen: +e.currentTarget.value }))} />
+              <small>{x.volumen || 100}%</small>
+              <button class="icono" title="Borrar" aria-label={`Borrar ${x.name}`} onclick={() => hacer(() => borrar(x.id))}><Trash2 size={14} strokeWidth={1.75} /></button>
+            {:else}<span>{x.name}</span><small>{x.volumen || 100}%</small>{/if}
+          </li>
+        {:else}<li class="tenue">Todavía no hay sonidos en este grupo.</li>{/each}
+      </ul>
+      <button onclick={() => (nuevo = true)}><Plus size={16} strokeWidth={1.75} /> Nuevo sonido</button>
+    </section>
+    {#if nuevo}<SubirSonido grupoId={grupo.id} cerrar={() => (nuevo = false)} />{/if}
+  {:else}
 
   <section>
     <h3>Foto del grupo</h3>
@@ -80,6 +121,8 @@
     </section>
   {/if}
 
+  {/if}
+
   {#if error}<p role="alert">{error}</p>{/if}
   <div class="fila fin"><button onclick={() => d?.close()}>Cerrar</button></div>
 </dialog>
@@ -99,4 +142,12 @@
   .peligroso p { margin: 0 0 8px; color: var(--tenue); font-size: 13px; }
   .peligroso label { margin-bottom: 8px; }
   .fin { justify-content: flex-end; }
+  .solapas { display: flex; gap: 4px; border-bottom: 1px solid var(--borde); }
+  .solapas button { border-radius: var(--radio) var(--radio) 0 0; color: var(--tenue); }
+  .solapas [aria-selected='true'] { color: var(--texto); box-shadow: inset 0 -2px var(--acento); }
+  .sonidos { max-height: 50vh; margin-bottom: 8px; }
+  .sonidos li > input:first-child, .sonidos li > span { flex: 1; min-width: 0; }
+  .sonidos input[type='range'] { width: 96px; padding: 0; border: 0; background: none; }
+  .sonidos small { width: 36px; color: var(--tenue); text-align: right; }
+  .tenue { color: var(--tenue); font-size: 13px; }
 </style>

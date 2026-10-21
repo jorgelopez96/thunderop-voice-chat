@@ -302,13 +302,14 @@ async function arrancar(r: Room, c: AudioContext, mio: number, calidad: Calidad)
   const { ancho, alto, fps, mbps } = CALIDADES[calidad];
   voz.error = '';
   await agrandarVentana().catch(() => {});
-  // Nítido antes que fluido: con poca red baja los fps, no la resolución. La capa liviana es para el
-  // espectador con mala conexión; el resto sigue recibiendo la calidad elegida.
+  // 'motion' y no 'detail': con 'detail' WebRTC usa el modo pantalla del codificador (pensado para texto)
+  // y en juegos, al girar la cámara rápido, se pixelea. La capa liviana es para el espectador con mala
+  // conexión; el resto sigue recibiendo la calidad elegida.
   const liviana = alto > 720 ? new lk.VideoPreset(1280, 720, 2_500_000, 30) : new lk.VideoPreset(640, 360, 1_000_000, 30);
   try {
     await r.localParticipant.setScreenShareEnabled(true,
-      { audio: false, contentHint: 'detail', resolution: { width: ancho, height: alto, frameRate: fps } },
-      { videoCodec: 'h264', simulcast: true, screenShareSimulcastLayers: [liviana], degradationPreference: 'maintain-resolution',
+      { audio: false, contentHint: 'motion', resolution: { width: ancho, height: alto, frameRate: fps } },
+      { videoCodec: 'h264', simulcast: true, screenShareSimulcastLayers: [liviana], degradationPreference: 'balanced',
         screenShareEncoding: { maxBitrate: mbps * 1e6, maxFramerate: fps } });
   } catch (e) {
     if (vigente()) voz.error = mensajeTransmision(e);

@@ -2,10 +2,10 @@
 export type Calidad = '720p30' | '720p60' | '1080p30' | '1080p60';
 // Límites de transmisión de pantalla (Global Constraints de la etapa 4).
 export const CALIDADES: Record<Calidad, { ancho: number; alto: number; fps: number; mbps: number }> = {
-  '720p30': { ancho: 1280, alto: 720, fps: 30, mbps: 3 },
-  '720p60': { ancho: 1280, alto: 720, fps: 60, mbps: 5 },
-  '1080p30': { ancho: 1920, alto: 1080, fps: 30, mbps: 8 },
-  '1080p60': { ancho: 1920, alto: 1080, fps: 60, mbps: 12 },
+  '720p30': { ancho: 1280, alto: 720, fps: 30, mbps: 5 },
+  '720p60': { ancho: 1280, alto: 720, fps: 60, mbps: 8 },
+  '1080p30': { ancho: 1920, alto: 1080, fps: 30, mbps: 12 },
+  '1080p60': { ancho: 1920, alto: 1080, fps: 60, mbps: 20 },
 };
 export type PrefsVoz = { entrada?: string; salida?: string; supresion: boolean; volumenes: Record<string, number>; calidad: Calidad; gpu: boolean; vistaPrevia: boolean; volBotonera: number; volMusica: number; gananciaDb: number };
 

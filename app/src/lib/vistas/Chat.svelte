@@ -1,6 +1,7 @@
 <script lang="ts">
   import Insignia from './Insignia.svelte';
   import { Paperclip, Smile, SmilePlus, Reply, Trash2, X } from '@lucide/svelte';
+  import { EMOJIS } from '../emojis';
   import { tick } from 'svelte';
   import type { RecordModel } from 'pocketbase';
   import { pb } from '../pb';
@@ -98,8 +99,6 @@
   function alScroll() { if (lista && lista.scrollTop === 0 && chat.hayMas) chat.cargarMas(); }
 
   // Menú de emojis: para escribir (destino '') o para reaccionar a un mensaje (destino = su id).
-  // ponytail: lista fija de los más usados; si piden todos, emoji-picker-element.
-  const EMOJIS = '😀 😂 🤣 😊 😍 🥰 😘 😎 🤔 😏 😅 😭 😢 😡 🤯 😱 🥳 😴 🤤 🙄 😬 🤡 💀 👻 👍 👎 👌 👏 🙌 🙏 💪 🤝 👀 🫡 🤙 ✌️ ❤️ 🧡 💛 💚 💙 💜 🖤 💔 🔥 ✨ ⭐ ⚡ 💯 ✅ ❌ ❓ ❗ 🎉 🎮 🏆 🍕 🍺 ☕ 🐐 🚀 💩'.split(' ');
   let menuEmojis: HTMLElement | undefined = $state();
   let destino = $state('');
   let posMenu = $state('');

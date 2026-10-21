@@ -10,7 +10,8 @@
   import Voz from './Voz.svelte';
   import { voz, entrarVoz } from '../voz.svelte';
   import Confirmar from './Confirmar.svelte';
-  import { ChevronDown, Plus, Hash, UserPlus, Pencil, X, Check, Settings } from '@lucide/svelte';
+  import { ChevronDown, Plus, Hash, UserPlus, Pencil, Trash2, Settings } from '@lucide/svelte';
+  import { abrirEnPunto } from '../menu';
   import ConfigGrupo from './ConfigGrupo.svelte';
   import { foto } from '../foto';
   import { grupos, grupoActual } from '../grupos.svelte';
@@ -69,34 +70,26 @@
   let menuGrupo = $state<HTMLElement>();
   let creando = $state<'chat' | 'voz' | null>(null);
   let config = $state(false);
+  // Clic derecho en una sala (solo el dueño): cambiar nombre o borrar. El nombre se cambia en un modal.
+  let menuSala = $state<RecordModel | null>(null);
+  let menuSalaEl = $state<HTMLElement>();
+  let dlgNombre = $state<HTMLDialogElement>();
+  $effect(() => { if (editando) dlgNombre?.showModal(); });
   async function guardarNombre() {
-    if (editando?.name.trim()) await renombrarSala(editando.id, editando.name.trim());
-    editando = null;
+    const e = editando;
+    dlgNombre?.close();
+    if (e?.name.trim()) await renombrarSala(e.id, e.name.trim());
   }
 </script>
 
 {#snippet sala(r: RecordModel)}
   {@const q = r.kind === 'voz' ? quienes(r) : []}
-  <li class="sala" class:activa={r.kind === 'chat' ? r.id === salaId && !centroVoz : r.id === voz.salaId && centroVoz}>
-    {#if editando?.id === r.id}
-      <form class="renombrar" onsubmit={(e) => { e.preventDefault(); hacer(guardarNombre); }}>
-        <input bind:value={editando.name} maxlength="40" aria-label="Nuevo nombre de la sala" onkeydown={(e) => e.key === 'Escape' && (editando = null)} />
-        <button class="icono" type="submit" aria-label="Guardar" title="Guardar"><Check size={16} strokeWidth={1.75} /></button>
-        <button class="icono" type="button" aria-label="Cancelar" title="Cancelar" onclick={() => (editando = null)}><X size={16} strokeWidth={1.75} /></button>
-      </form>
-    {:else}
+  <li class="sala" oncontextmenu={(e) => { if (!soyDueno) return; e.preventDefault(); menuSala = r; abrirEnPunto(menuSalaEl, e.clientX, e.clientY); }} class:activa={r.kind === 'chat' ? r.id === salaId && !centroVoz : r.id === voz.salaId && centroVoz}>
       <button class="plano nombre" aria-label={`${r.kind === 'chat' ? 'Sala de chat' : 'Sala de voz'} ${r.name}`} onclick={() => hacer(() => abrir(r))}>
         {#if r.kind === 'chat'}<Hash size={16} strokeWidth={1.75} />{/if}<span>{r.name}</span>
         {#if r.kind === 'voz'}<small class:verde={q.length}>{q.length ? `${q.length} en voz` : 'vacía'}</small>{/if}
         {#if noLeidos.salas[r.id]}<span class="contador" aria-label={`${noLeidos.salas[r.id]} sin leer`}>{noLeidos.salas[r.id]}</span>{/if}
       </button>
-      {#if soyDueno}
-        <span class="acciones">
-          <button class="icono" title="Renombrar" aria-label="Renombrar" onclick={() => (editando = { id: r.id, name: r.name })}><Pencil size={14} strokeWidth={1.75} /></button>
-          <button class="icono" title="Borrar sala" aria-label="Borrar sala" onclick={() => (confirmar = { texto: `¿Borrar la sala "${r.name}"?`, hacer: () => borrarSala(r.id) })}><X size={14} strokeWidth={1.75} /></button>
-        </span>
-      {/if}
-    {/if}
     {#if q.length}
       <ul class="quienes">{#each q as p (p.id)}{@const m = miembro(p.id)}
         <li title={p.nombre} style="background:{m?.color || ''}"><img alt="" src={foto(m)} /></li>
@@ -158,6 +151,21 @@
 
   {#if enSalaVoz}<div popover class="capa" bind:this={capaParticipantes}><Participantes {grupo} /></div>
   {:else}<Participantes {grupo} />{/if}
+  <div popover class="menu" bind:this={menuSalaEl}>
+    {#if menuSala}{@const r = menuSala}
+      <button class="plano" onclick={() => { menuSalaEl?.hidePopover(); editando = { id: r.id, name: r.name }; }}><Pencil size={16} strokeWidth={1.75} /> Cambiar nombre</button>
+      <hr /><button class="plano peligro" onclick={() => { menuSalaEl?.hidePopover(); confirmar = { texto: `¿Borrar la sala "${r.name}"?`, hacer: () => borrarSala(r.id) }; }}><Trash2 size={16} strokeWidth={1.75} /> Borrar sala</button>
+    {/if}
+  </div>
+  {#if editando}
+    <dialog bind:this={dlgNombre} onclose={() => (editando = null)}>
+      <form class="renombrar" onsubmit={(e) => { e.preventDefault(); hacer(guardarNombre); }}>
+        <h3>Cambiar nombre</h3>
+        <input bind:value={editando.name} required maxlength="40" aria-label="Nuevo nombre de la sala" />
+        <div class="fila"><button type="submit" class="primario">Guardar</button><button type="button" onclick={() => dlgNombre?.close()}>Cancelar</button></div>
+      </form>
+    </dialog>
+  {/if}
   {#if confirmar}
     <Confirmar texto={confirmar.texto} cancelar={() => (confirmar = null)}
       confirmar={() => { const c = confirmar!; confirmar = null; hacer(c.hacer); }} />
@@ -187,12 +195,10 @@
   .quienes { flex-basis: 100%; display: flex; gap: 4px; padding: 0 8px 8px; }
   .quienes li { width: 22px; height: 22px; border-radius: 999px; background: var(--hover); display: grid; place-items: center; font-size: 11px; font-weight: 600; color: #fff; overflow: hidden; }
   .quienes img { width: 100%; height: 100%; object-fit: cover; }
-  .acciones { display: none; }
-  .sala:hover .acciones, .sala:focus-within .acciones { display: flex; }
   .nueva { display: flex; gap: 4px; padding: 0 0 4px 8px; }
   .nueva input { flex: 1; min-width: 0; padding: 4px 8px; font-size: 13px; }
-  .renombrar { flex: 1; min-width: 0; display: flex; align-items: center; gap: 2px; padding: 2px 4px; }
-  .renombrar input { flex: 1; min-width: 0; padding: 4px 8px; }
+  .renombrar { display: flex; flex-direction: column; gap: 8px; width: min(320px, 80vw); }
+  .renombrar h3 { margin: 0; }
   .link { font-size: 12px; margin: 0 0 8px; }
   .otros { padding: 4px 8px 0; font-size: 11px; }
   .vacio { display: grid; place-items: center; color: var(--tenue); }

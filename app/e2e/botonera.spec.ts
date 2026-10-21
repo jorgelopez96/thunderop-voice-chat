@@ -15,7 +15,7 @@ const reproducidos = (p: Page) => p.evaluate(() => (globalThis as unknown as { _
 const entrar = (p: Page) => p.getByRole('button', { name: 'Sala de voz General' }).click();
 
 async function subir(p: Page, nombre: string, segundos: number) {
-  await p.getByRole('button', { name: 'Agregar sonido' }).click();
+  await p.getByRole('button', { name: 'Nuevo sonido' }).click();
   await p.getByLabel('Nombre del sonido').fill(nombre);
   await p.getByLabel('Archivo de audio').setInputFiles({ name: `${nombre}.wav`, mimeType: 'audio/wav', buffer: wav(segundos) });
   await p.getByRole('button', { name: 'Subir' }).click();

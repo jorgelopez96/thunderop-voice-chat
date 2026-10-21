@@ -23,7 +23,7 @@ export function sonidos(grupoId: string) {
 }
 
 /** Valida (tipo, tamaño y duración decodificada) y sube. Tira Error con el mensaje para mostrar. */
-export async function subir(grupoId: string, nombre: string, archivo: File) {
+export async function subir(grupoId: string, nombre: string, archivo: File, volumen: number) {
   const previo = validarSonido({ duracion: 0, tamaño: archivo.size, tipo: archivo.type });
   if (previo) throw new Error(previo);
   let duracion: number;
@@ -35,9 +35,14 @@ export async function subir(grupoId: string, nombre: string, archivo: File) {
   const msg = validarSonido({ duracion, tamaño: archivo.size, tipo: archivo.type });
   if (msg) throw new Error(msg);
   const dueño = pb.authStore.record?.id;
-  try { await pb.collection('sonidos').create({ group: grupoId, name: nombre.trim(), file: archivo, owner: dueño }); }
+  try { await pb.collection('sonidos').create({ group: grupoId, name: nombre.trim(), file: archivo, owner: dueño, volumen }); }
   catch (e) { throw new Error(mensajeSubida((e as { response?: Parameters<typeof mensajeSubida>[0] })?.response)); }
 }
+
+export const editar = (id: string, cambios: { name?: string; volumen?: number }) => pb.collection('sonidos').update(id, cambios);
+
+/** Volumen base del sonido (0,05 a 2). */
+export const volumenDe = (rec: RecordModel) => (rec.volumen || 100) / 100;
 
 export async function borrar(id: string) {
   await pb.collection('sonidos').delete(id);
@@ -58,7 +63,7 @@ async function buffer(id: string, c: AudioContext) {
 }
 
 /** Reproduce localmente por el contexto de la voz; si ya hay 3 sonando, se descarta. Sin voz no hay contexto: no suena. */
-async function reproducir(id: string) {
+async function reproducir(id: string, base: number) {
   const c = contextoVoz();
   if (!c) return;
   let cupo = cupos.get(c);
@@ -70,7 +75,7 @@ async function reproducir(id: string) {
     const b = await buffer(id, c);
     if (c.state === 'closed') return soltar();
     const fuente = c.createBufferSource(), vol = c.createGain();
-    fuente.buffer = b; vol.gain.value = leerPrefs().volBotonera;
+    fuente.buffer = b; vol.gain.value = leerPrefs().volBotonera * base;
     fuente.connect(vol).connect(c.destination);
     fuente.onended = () => { fuente.disconnect(); vol.disconnect(); soltar(); };
     fuente.start();
@@ -78,16 +83,22 @@ async function reproducir(id: string) {
   if (import.meta.env.DEV) (globalThis as unknown as { __botonera?: { reproducidos: number } }).__botonera!.reproducidos++;
 }
 
-/** Suena para todos en la sala de voz (y para uno mismo). Fuera de la voz no hace nada. */
-export async function tocar(id: string) {
+/** Suena para todos en la sala de voz (y para uno mismo). Fuera de la voz no hace nada.
+ *  El volumen base viaja con el aviso: así un cambio reciente suena igual para todos, aunque tengan el audio en caché. */
+export async function tocar(rec: RecordModel) {
   if (!voz.salaId) return;
-  void reproducir(id);
-  await publicarDatos(codificar({ id }), TOPIC);
+  const vol = volumenDe(rec);
+  void reproducir(rec.id, vol);
+  await publicarDatos(codificar({ id: rec.id, vol }), TOPIC);
 }
 
 alRecibirDatos((payload, topic) => {
   if (topic !== TOPIC) return;
-  try { const { id } = JSON.parse(new TextDecoder().decode(payload)); if (typeof id === 'string') void reproducir(id); } catch { /* dato ajeno o roto */ }
+  try {
+    const { id, vol } = JSON.parse(new TextDecoder().decode(payload));
+    // Mismo rango que la colección: un par no puede mandar un sonido a todo volumen.
+    if (typeof id === 'string') void reproducir(id, typeof vol === 'number' ? Math.min(2, Math.max(0.05, vol)) : 1);
+  } catch { /* dato ajeno o roto */ }
 });
 
 if (import.meta.env.DEV) (globalThis as unknown as { __botonera: unknown }).__botonera = { reproducidos: 0 };
