@@ -32,6 +32,7 @@ test('cuentas, grupos, invitaciones y chat', async ({ browser }) => {
   const hola = a.getByTestId('mensaje').filter({ hasText: 'hola' });
   await hola.hover(); // las herramientas del mensaje aparecen al pasar el mouse
   await hola.getByRole('button', { name: 'Borrar' }).click();
+  await a.getByRole('button', { name: 'Confirmar' }).click();
   await expect(b.getByTestId('mensaje').filter({ hasText: 'hola' })).toHaveCount(0);
 
   // 7

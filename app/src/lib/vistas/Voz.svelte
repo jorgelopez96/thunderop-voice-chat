@@ -1,14 +1,16 @@
 <script lang="ts">
   import Insignia from './Insignia.svelte';
   import type { RecordModel } from 'pocketbase';
-  import { MicOff, Users, Link, Volume2, VolumeX, Maximize, ChevronRight, MessageSquare, User } from '@lucide/svelte';
+  import { MicOff, Users, Link, ChevronRight, MessageSquare, User } from '@lucide/svelte';
   import { foto } from '../foto';
   import { mensajeError, sesion } from '../sesion.svelte';
   import { crearInvitacion } from '../grupos.svelte';
   import { abrirChat, enviar, borrar } from '../chat.svelte';
   import AhoraSuena from './AhoraSuena.svelte';
   import Chat from './Chat.svelte';
-  import { voz, volumen, silenciar, ver, pistaPantalla, pistaPantallaPropia, vistaPrevia, volumenPantalla } from '../voz.svelte';
+  import { voz, volumen, silenciar, ver, verVarias, pistaPantallaPropia, vistaPrevia } from '../voz.svelte';
+  import Pantalla from './Pantalla.svelte';
+  import Video from './Video.svelte';
   import { leerPrefs } from '../prefs';
   import { abrirEnPunto } from '../menu';
   import { mirar as mirarSala } from '../noLeidos.svelte';
@@ -37,37 +39,10 @@
     } catch (e) { error = mensajeError(e); }
   }
 
-  let vid = $state<HTMLVideoElement>();
-  let pctPantalla = $state(100);
-  let ultimoPct = 100;
-  let marco = $state<HTMLElement>();
-  function sonarPantalla(pct: number) {
-    if (pct) ultimoPct = pct;
-    pctPantalla = pct;
-    if (voz.viendo) volumenPantalla(voz.viendo, pct / 100);
-  }
-  // Se recalcula con cada cambio de `voz.participantes` (así se entera de que llegó la pista), pero solo
-  // avisa si cambia la pista: hablar o silenciarse no re-engancha el video.
-  const pista = $derived((void voz.participantes, voz.viendo ? pistaPantalla(voz.viendo) : undefined));
-  $effect(() => {
-    const t = pista;
-    if (!t || !vid) return;
-    const el = vid;
-    t.attach(el);
-    return () => { t.detach(el); };
-  });
-  // Vista previa de la propia transmisión: misma regla, solo reacciona a la referencia de la pista.
-  let prev = $state<HTMLVideoElement>();
-  const pistaPropia = $derived((void voz.participantes, voz.transmitiendo && voz.vistaPrevia ? pistaPantallaPropia() : undefined));
-  $effect(() => {
-    const t = pistaPropia;
-    if (!t || !prev) return;
-    const el = prev;
-    t.attach(el);
-    return () => { t.detach(el); };
-  });
-  const mirar = (id: string | null) => { pctPantalla = 100; if (id) volumenPantalla(id, 1); ver(id); };
-  const quien = $derived(voz.participantes.find((p) => p.id === voz.viendo)?.nombre ?? '');
+  // Vista previa propia; se recalcula cuando cambian los participantes (llega o se va la pista).
+  const propia = $derived((void voz.participantes, voz.transmitiendo && voz.vistaPrevia ? pistaPantallaPropia() : undefined));
+  const hayTransmisiones = $derived(voz.participantes.some((p) => !p.local && p.transmite));
+
   // Fondo de la tarjeta: el color del usuario, o un tono derivado del nombre.
   const fondo = (color: string | undefined, nombre: string) =>
     `color-mix(in srgb, ${color || `hsl(${[...nombre].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 7)} 45% 40%)`} 35%, var(--panel))`;
@@ -106,17 +81,16 @@
     {#if aviso}<p role="status">{aviso}</p>{/if}
     {#if error}<p role="alert">{error}</p>{/if}
 
-    {#if voz.viendo}
-      <!-- Pantalla completa sobre el contenedor (no el <video>): el mute nativo del video no toca el audio, que va por otra pista. -->
-      <div class="escenario" bind:this={marco}>
-        <video bind:this={vid} autoplay playsinline muted aria-label={`Pantalla de ${quien}`}></video>
-        <span class="etiqueta"><span class="punto"></span>{quien}{@render espectadores(voz.participantes.find((p) => p.id === voz.viendo)?.espectadores ?? 0)}</span>
-        <div class="controles">
-          <button class="icono" onclick={() => sonarPantalla(pctPantalla ? 0 : ultimoPct)} aria-label={pctPantalla ? 'Silenciar transmisión' : 'Activar sonido'}>
-            {#if pctPantalla}<Volume2 size={16} strokeWidth={1.75} />{:else}<VolumeX size={16} strokeWidth={1.75} />{/if}</button>
-          <input type="range" min="0" max="200" step="5" bind:value={pctPantalla} aria-label="Volumen de la transmisión" oninput={() => sonarPantalla(pctPantalla)} />
-          <button class="icono" onclick={() => (document.fullscreenElement ? document.exitFullscreen() : marco?.requestFullscreen())?.catch(() => {})} aria-label="Pantalla completa" title="Pantalla completa"><Maximize size={16} strokeWidth={1.75} /></button>
-        </div>
+    {#if hayTransmisiones}
+      <div class="a-la-vez" role="group" aria-label="Pantallas a la vez">
+        <span class="tenue">Ver a la vez</span>
+        {#each [1, 2, 3] as n (n)}<button class="plano" aria-pressed={voz.verVarias === n} onclick={() => verVarias(n)}>{n}</button>{/each}
+      </div>
+    {/if}
+    {#if voz.viendo.length}
+      <!-- Una sola: grande. Varias: lado a lado si entran a un tamaño que se distinga, si no una abajo de la otra. -->
+      <div class="escenarios" class:varias={voz.viendo.length > 1}>
+        {#each voz.viendo as sid (sid)}<Pantalla {sid} />{/each}
       </div>
     {/if}
     <ul class="franja">
@@ -125,7 +99,8 @@
         <li class:hablando={p.hablando} class:transmite={p.transmite} style="background:{fondo(m?.color, p.nombre)}" oncontextmenu={(e) => abrirMenu(e, p)}>
           <img class="avatar" alt="" src={foto(m, '256x256')} />
           {#if p.transmite}<span class="vivo">EN VIVO{@render espectadores(p.espectadores)}</span>
-            {#if !p.local}<button class="primario ver" onclick={() => mirar(voz.viendo === p.id ? null : p.id)}>{voz.viendo === p.id ? 'Dejar de ver' : 'Ver'}</button>{/if}{/if}
+            {#if !p.local && p.pantalla}{@const sid = p.pantalla}{@const viendo = voz.viendo.includes(sid)}
+              <button class="primario ver" aria-pressed={viendo} onclick={() => ver(sid, !viendo)}>{viendo ? 'Dejar de ver' : 'Ver'}</button>{/if}{/if}
           <span class="etiqueta-nombre">
             {#if p.silenciado}<span class="mic" title="Sin micrófono" aria-label="Silenciado"><MicOff size={16} strokeWidth={1.75} /></span>{/if}
             <span class="nombre">{p.nombre}{p.local ? ' (vos)' : ''}</span><Insignia usuario={m} />
@@ -135,7 +110,7 @@
     </ul>
     {#if voz.transmitiendo}<div class="propia">
       {#if voz.vistaPrevia}
-        <video class="previa" bind:this={prev} autoplay playsinline muted aria-label="Vista previa de tu transmisión"></video>
+        {#if propia}<Video pista={propia} clase="previa" etiqueta="Vista previa de tu transmisión" />{/if}
         <button class="plano" onclick={() => vistaPrevia(false)}>Ocultar vista previa</button>
       {:else}<button class="plano" onclick={() => vistaPrevia(true)}>Mostrar vista previa</button>{/if}
     </div>{/if}
@@ -147,7 +122,7 @@
     {@const id = voz.salaId}
     <aside class="chatSala">
       <button class="icono plegar" onclick={() => plegarChat(false)} aria-label="Plegar chat de la sala" title="Plegar"><ChevronRight size={16} strokeWidth={1.75} /></button>
-      {#key id}<Chat titulo="Chat de la sala" abrir={() => abrirChat(id)} enviar={(t, f, r) => enviar(id, t, f, r)} {borrar}
+      {#key id}<Chat titulo="Chat de la sala" abrir={() => abrirChat(id)} enviar={(t, f, r) => enviar(id, t, f, r)} {borrar} silencio={id}
         puedeBorrar={(m) => m.author === sesion.usuario?.id || soyDueno} />{/key}
     </aside>
   {/if}
@@ -184,19 +159,17 @@
   .ver { position: absolute; bottom: 8px; right: 8px; }
   .espectadores { display: inline-flex; align-items: center; gap: 2px; margin-left: 6px; color: var(--peligro); font-weight: 600; }
   .vivo .espectadores { color: #fff; }
-  .escenario { position: relative; background: var(--hondo); border: 1px solid var(--borde); border-radius: var(--radio-tarjeta); overflow: hidden; }
-  .escenario video { display: block; width: 100%; max-height: 60vh; object-fit: contain; }
-  .etiqueta { position: absolute; top: 12px; left: 12px; display: flex; align-items: center; gap: 8px; padding: 4px 8px; font-size: 13px; font-weight: 500; background: rgb(0 0 0 / .6); border-radius: var(--radio); }
-  .punto { width: 6px; height: 6px; border-radius: 999px; background: var(--ok); }
-  .controles { position: absolute; right: 12px; bottom: 12px; display: flex; align-items: center; gap: 4px; padding: 2px 4px; background: rgb(0 0 0 / .6); border-radius: var(--radio); }
-  .controles input { width: 100px; padding: 0; background: none; border: 0; }
-  .escenario:fullscreen { display: grid; place-items: center; border: 0; border-radius: 0; background: #000; }
-  .escenario:fullscreen video { max-height: none; height: 100%; }
+  .a-la-vez { display: flex; align-items: center; gap: 4px; align-self: flex-end; font-size: 13px; }
+  .a-la-vez button { min-width: 32px; justify-content: center; }
+  .a-la-vez [aria-pressed='true'] { background: var(--acento-suave); color: var(--texto); }
+  /* Cada pantalla mide al menos 520 px de ancho (se distingue lo que muestra); si no entran, bajan a otra fila. */
+  .escenarios { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 520px), 1fr)); }
+  .escenarios.varias { --alto: 46vh; }
   /* Pegada abajo, justo arriba del dock, aunque haya pocas tarjetas o muchas (sticky al scrollear). */
   .pie-musica { margin-top: auto; position: sticky; bottom: 0; }
   .pie-musica:empty { display: none; }
   .propia { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
-  .previa { width: 240px; max-width: 100%; aspect-ratio: 16 / 9; background: var(--hondo); border-radius: var(--radio); }
+  .propia :global(.previa) { width: 240px; max-width: 100%; aspect-ratio: 16 / 9; background: var(--hondo); border-radius: var(--radio); }
   .chatSala { position: relative; display: flex; flex-direction: column; min-height: 0; border-left: 1px solid var(--borde); background: var(--fondo); }
   .chatSala :global(.chat) { flex: 1; }
   .chatSala :global(.titulo) { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--tenue); }

@@ -64,7 +64,7 @@
     {#key u.id}
       <Chat titulo={u.name} abrir={() => abrirPrivado(u.id)} enviar={(t, f, r) => enviarPrivado(u.id, t, f, r)} borrar={borrarPrivado}
         puedeBorrar={(m) => m.author === sesion.usuario?.id} alVer={(m) => marcarLeido(u.id, m.created)}
-        soloLectura={amistad ? '' : 'Ya no son amigos: no se pueden mandar mensajes.'} />
+        soloLectura={amistad ? '' : 'Ya no son amigos: no se pueden mandar mensajes.'} silencio={u.id} />
     {/key}
     <div class="fila pie">
       {#if amistad}<button class="plano peligro" onclick={() => (eliminar = true)}>Eliminar amigo</button>{/if}

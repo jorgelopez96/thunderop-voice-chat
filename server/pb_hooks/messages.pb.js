@@ -51,3 +51,15 @@ onRecordCreateRequest((e) => {
   }
   e.next();
 }, "messages", "privados");
+
+// Editar: solo se manda `text`, y no puede quedar vacío si no hay archivo. La fecha de edición la pone el servidor.
+onRecordUpdateRequest((e) => {
+  const esUsuario = e.auth && e.auth.collection().name === "users";
+  if (esUsuario) {
+    const claves = Object.keys(e.requestInfo().body);
+    if (claves.length !== 1 || claves[0] !== "text") throw new BadRequestError("Solo se puede cambiar el texto.");
+    if (e.record.getString("text").trim() === "" && !e.record.getString("file")) throw new BadRequestError("El mensaje necesita texto o un archivo.");
+    e.record.set("editado", new Date().toISOString());
+  }
+  e.next();
+}, "messages", "privados");

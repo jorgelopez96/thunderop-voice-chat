@@ -68,6 +68,7 @@
     r.id === voz.salaId ? voz.participantes : (enVoz.grupo === grupo.id ? enVoz.salas[r.id] ?? [] : []).map((p) => ({ id: p.id, nombre: p.name }));
   const miembro = (id: string) => ((grupo.expand?.members ?? []) as RecordModel[]).find((m) => m.id === id);
   let menuGrupo = $state<HTMLElement>();
+  let cabecera = $state<HTMLElement>();
   let creando = $state<'chat' | 'voz' | null>(null);
   let config = $state(false);
   // Clic derecho en una sala (solo el dueño): cambiar nombre o borrar. El nombre se cambia en un modal.
@@ -115,7 +116,8 @@
 
 <div class="grupo" class:enSalaVoz>
   <nav class="salas">
-    <button class="plano cabecera" onclick={(e) => { const r = e.currentTarget.getBoundingClientRect(); menuGrupo!.style.left = `${r.left}px`; menuGrupo!.style.top = `${r.bottom + 4}px`; menuGrupo?.showPopover(); }}>
+    <!-- popovertarget: el navegador abre y cierra con el mismo botón (con onclick, el clic cerraba y volvía a abrir) -->
+    <button class="plano cabecera" bind:this={cabecera} popovertarget="menu-grupo">
       <h2>{grupo.name}</h2><ChevronDown size={16} strokeWidth={1.75} />
     </button>
     {#if link}<p role="status" class="link">Link copiado: <code data-testid="link-invitacion">{link}</code></p>{/if}
@@ -132,7 +134,8 @@
   </nav>
 
   <!-- Menú del nombre del grupo: invitar, configuraciones y cambiar de grupo. Borrar va adentro de Configuraciones (a propósito, lejos). -->
-  <div popover class="menu" bind:this={menuGrupo}>
+  <div popover id="menu-grupo" class="menu" bind:this={menuGrupo}
+    onbeforetoggle={(e) => { if (e.newState !== 'open' || !cabecera) return; const r = cabecera.getBoundingClientRect(); menuGrupo!.style.left = `${r.left}px`; menuGrupo!.style.top = `${r.bottom + 4}px`; }}>
     <button class="plano" onclick={() => { menuGrupo?.hidePopover(); hacer(invitar); }}><UserPlus size={16} strokeWidth={1.75} /> Invitar al grupo</button>
     <button class="plano" onclick={() => { menuGrupo?.hidePopover(); config = true; }}><Settings size={16} strokeWidth={1.75} /> Configuraciones</button>
     {#if grupos.lista.length > 1}
@@ -145,7 +148,7 @@
   {#if config}<ConfigGrupo {grupo} cerrar={() => (config = false)} />{/if}
 
   {#if enSalaVoz && salaVoz}<Voz {grupo} {soyDueno} sala={salaVoz.name} verParticipantes={() => capaParticipantes?.showPopover()} />
-  {:else if salaAbierta}{#key salaAbierta.id}<Chat titulo={`# ${salaAbierta.name}`} abrir={() => abrirChat(salaAbierta.id)} enviar={(t, f, r) => enviar(salaAbierta.id, t, f, r)} {borrar}
+  {:else if salaAbierta}{#key salaAbierta.id}<Chat titulo={`# ${salaAbierta.name}`} abrir={() => abrirChat(salaAbierta.id)} enviar={(t, f, r) => enviar(salaAbierta.id, t, f, r)} {borrar} silencio={salaAbierta.id}
     puedeBorrar={(m) => m.author === sesion.usuario?.id || soyDueno} />{/key}
   {:else}<div class="vacio">Elegí una sala de chat</div>{/if}
 

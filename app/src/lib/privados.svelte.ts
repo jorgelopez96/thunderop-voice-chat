@@ -1,5 +1,6 @@
 import { pb } from './pb';
 import { abrirLista } from './chat.svelte';
+import { avisar, silenciadoHasta, resumen } from './notificaciones.svelte';
 
 // Mensajes privados entre amigos. Lo leído se guarda en esta PC (`localStorage['dm.leido.' + yo]`: { amigo: created }).
 
@@ -61,7 +62,10 @@ export function iniciarPrivados(): () => void {
     .catch(() => {});
   // El chat abierto marca leído al mostrar el mensaje nuevo (Chat → alVer), que llega después de este evento.
   const sub = pb.collection('privados').subscribe('*', (e) => {
-    if (e.action === 'create' && e.record.para === yo()) noLeidos[e.record.author] = (noLeidos[e.record.author] ?? 0) + 1;
+    if (e.action !== 'create' || e.record.para !== yo()) return;
+    const de = e.record.author as string;
+    noLeidos[de] = (noLeidos[de] ?? 0) + 1;
+    if (!silenciadoHasta(de)) pb.collection('users').getOne(de, { fields: 'name' }).then((u) => avisar(de, u.name, resumen(e.record)), () => {});
   }, { filter: recibidos });
   return () => { sub.then((f) => f()).catch(() => {}); };
 }

@@ -1,6 +1,6 @@
 <script lang="ts">
   import Insignia from './Insignia.svelte';
-  import { Paperclip, Smile, SmilePlus, Reply, Trash2, X } from '@lucide/svelte';
+  import { Paperclip, Smile, SmilePlus, Reply, Trash2, X, Pencil } from '@lucide/svelte';
   import { EMOJIS } from '../emojis';
   import { tick } from 'svelte';
   import type { RecordModel } from 'pocketbase';
@@ -9,13 +9,17 @@
   import { validarAdjunto, duracionVideo } from '../adjuntos';
   import type { ChatAbierto } from '../chat.svelte';
   import { mensajeError, sesion } from '../sesion.svelte';
+  import Confirmar from './Confirmar.svelte';
+  import Silenciar from './Silenciar.svelte';
 
   // Sirve para salas de grupo y privados: quien lo usa dice qué lista abrir y cómo enviar y borrar.
   // `soloLectura`: oculta el compositor y muestra ese texto (privado con alguien que ya no es amigo).
-  let { titulo, abrir, enviar, borrar, puedeBorrar, soloLectura = '', alVer }: {
+  // `silencio`: id del chat para la campanita de silenciar avisos.
+  let { titulo, abrir, enviar, borrar, puedeBorrar, soloLectura = '', alVer, silencio }: {
     titulo: string; abrir: () => ChatAbierto; enviar: (texto: string, archivo?: File, respondeA?: string) => Promise<unknown>;
     borrar: (id: string) => Promise<unknown>; puedeBorrar: (m: RecordModel) => boolean; soloLectura?: string;
     alVer?: (ultimo: RecordModel) => void; // se llama con el último mensaje visible (privados: marcar leído)
+    silencio?: string;
   } = $props();
   // svelte-ignore state_referenced_locally
   const chat = abrir(); // se recrea con #key en quien lo usa
@@ -93,7 +97,22 @@
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviarMensaje(); }
     if (e.key === 'Escape' && respondiendo) { e.preventDefault(); respondiendo = null; }
   }
+  let aBorrar = $state<RecordModel | null>(null);
+  // Edición en el lugar: Enter guarda, Esc cancela. Sin cambios no se manda nada.
+  let editando = $state<{ id: string; texto: string; original: string } | null>(null);
+  async function guardarEdicion() {
+    const e = editando;
+    if (!e) return;
+    editando = null;
+    if (e.texto.trim() === e.original.trim()) return;
+    try { await chat.editar(e.id, e.texto.trim()); } catch (err) { error = mensajeError(err); }
+  }
+  function teclaEdicion(ev: KeyboardEvent) {
+    if (ev.key === 'Enter' && !ev.shiftKey) { ev.preventDefault(); guardarEdicion(); }
+    if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); editando = null; }
+  }
   async function quitar(m: RecordModel) {
+    aBorrar = null;
     try { await borrar(m.id); } catch (e) { error = mensajeError(e); }
   }
   function alScroll() { if (lista && lista.scrollTop === 0 && chat.hayMas) chat.cargarMas(); }
@@ -139,7 +158,7 @@
 </script>
 
 <section class="chat" aria-label="Chat {titulo}">
-  <h2 class="titulo">{titulo}</h2>
+  <h2 class="titulo">{titulo}{#if silencio}<Silenciar chat={silencio} />{/if}</h2>
   <div class="lista" bind:this={lista} onscroll={alScroll} data-testid="mensajes">
     {#if chat.hayMas}<button class="plano" onclick={() => chat.cargarMas()}>Cargar anteriores</button>{/if}
     {#if chat.error}<p role="alert">{chat.error}</p>{/if}
@@ -162,7 +181,11 @@
               {:else}<span>Mensaje borrado</span>{/if}
             </button>
           {/if}
-          {#if m.text}<p class="texto">{m.text}</p>{/if}
+          {#if editando?.id === m.id}
+            <!-- svelte-ignore a11y_autofocus -->
+            <textarea class="edicion" bind:value={editando.texto} onkeydown={teclaEdicion} maxlength="2000" rows="2" autofocus aria-label="Editar mensaje"></textarea>
+            <small class="ayuda">Enter guarda · Esc cancela</small>
+          {:else if m.text}<p class="texto">{m.text}{#if m.editado}<small class="editado" title={`Editado ${new Date(m.editado.replace(' ', 'T')).toLocaleString('es')}`}> (editado)</small>{/if}</p>{/if}
           {#if m.file}
             {@const url = pb.files.getURL(m, m.file)}
             {#if esVideo(m)}<video class="adjunto" controls src={url}><track kind="captions" /></video>
@@ -177,7 +200,8 @@
         <div class="herramientas">
           <button class="icono" title="Responder" aria-label="Responder" onclick={() => responder(m)}><Reply size={16} strokeWidth={1.75} /></button>
           <button class="icono" title="Reaccionar" aria-label="Reaccionar" onclick={(e) => abrirEmojis(e, m.id)}><SmilePlus size={16} strokeWidth={1.75} /></button>
-          {#if puedeBorrar(m)}<button class="icono borrar" title="Borrar" aria-label="Borrar" onclick={() => quitar(m)}><Trash2 size={16} strokeWidth={1.75} /></button>{/if}
+          {#if m.author === sesion.usuario?.id && !soloLectura}<button class="icono" title="Editar" aria-label="Editar" onclick={() => (editando = { id: m.id, texto: m.text, original: m.text })}><Pencil size={16} strokeWidth={1.75} /></button>{/if}
+          {#if puedeBorrar(m)}<button class="icono borrar" title="Borrar" aria-label="Borrar" onclick={() => (aBorrar = m)}><Trash2 size={16} strokeWidth={1.75} /></button>{/if}
         </div>
       </article>
     {/each}
@@ -202,6 +226,7 @@
     <textarea bind:this={caja} bind:value={texto} onkeydown={tecla} onpaste={pegar} maxlength="2000" rows="1" placeholder="Escribí un mensaje" title="Enter envía, Shift+Enter hace una línea nueva"></textarea>
     <button class="primario" onclick={enviarMensaje} disabled={enviando}>Enviar</button>
   </div>{/if}
+  {#if aBorrar}{@const m = aBorrar}<Confirmar texto="¿Borrar este mensaje?" cancelar={() => (aBorrar = null)} confirmar={() => quitar(m)} />{/if}
   <div popover class="emojis" bind:this={menuEmojis} style={posMenu}>
     {#each EMOJIS as emoji (emoji)}<button class="plano" onclick={() => elegirEmoji(emoji)}>{emoji}</button>{/each}
   </div>
@@ -220,7 +245,7 @@
 
 <style>
   .chat { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
-  .titulo { font-size: 15px; padding: 12px 16px; border-bottom: 1px solid var(--hover); }
+  .titulo { font-size: 15px; padding: 12px 16px; border-bottom: 1px solid var(--hover); display: flex; align-items: center; justify-content: space-between; gap: 8px; }
   .lista { flex: 1; overflow-y: auto; padding: 8px 0; }
   /* Separados entre sí; los seguidos del mismo autor van sin nombre ni foto. */
   .msg { position: relative; display: flex; gap: 12px; margin: 12px 12px 0; padding: 8px 12px; border-radius: var(--radio-menu); transition: background-color .12s; }
@@ -233,6 +258,9 @@
   header { display: flex; align-items: baseline; gap: 8px; margin-bottom: 2px; }
   header small { font-size: 11px; }
   .texto { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; }
+  .editado { font-size: 11px; color: var(--apagado); }
+  .edicion { width: 100%; resize: vertical; }
+  .ayuda { font-size: 11px; color: var(--tenue); }
   .cita { display: flex; gap: 6px; align-items: center; max-width: 100%; margin-bottom: 4px; padding: 2px 8px; font-size: 12px; color: var(--tenue);
     border-left: 2px solid var(--acento); border-radius: 0 var(--radio) var(--radio) 0; background: var(--hover); justify-content: flex-start; }
   .cita span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

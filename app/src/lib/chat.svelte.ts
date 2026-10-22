@@ -38,7 +38,7 @@ export function abrirLista(coleccion: 'messages' | 'privados', filtroSala: strin
 
   const sub = pb.collection(coleccion).subscribe('*', async (e) => {
     if (e.action === 'delete') { estado.mensajes = estado.mensajes.filter((m) => m.id !== e.record.id); return; }
-    if (e.action === 'update') { // reacciones: se conserva el autor ya expandido
+    if (e.action === 'update') { // reacciones o texto editado: se conserva el autor ya expandido
       estado.mensajes = estado.mensajes.map((m) => (m.id === e.record.id ? { ...e.record, expand: m.expand } : m));
       return;
     }
@@ -63,6 +63,8 @@ export function abrirLista(coleccion: 'messages' | 'privados', filtroSala: strin
     },
     /** Pone o saca mi reacción; llega a todos por el realtime. */
     reaccionar: (id: string, emoji: string) => pb.send('/api/reaccionar', { method: 'POST', body: { coleccion, id, emoji } }),
+    /** Cambia el texto de un mensaje mío; el servidor lo marca como editado. */
+    editar: (id: string, text: string) => pb.collection(coleccion).update(id, { text }),
     cerrar() { cerrado = true; sub.then((f) => f()).catch(() => {}); },
   };
 }

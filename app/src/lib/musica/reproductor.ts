@@ -36,11 +36,12 @@ type YTPlayer = {
   loadVideoById(o: { videoId: string; startSeconds: number }): void;
   playVideo(): void; pauseVideo(): void; seekTo(s: number, permitir: boolean): void;
   getCurrentTime(): number; getDuration(): number; setVolume(v: number): void; destroy(): void;
+  getPlaylist(): string[] | null;
 };
 type YTApi = { Player: new (el: HTMLElement, o: object) => YTPlayer };
 
 let api: Promise<YTApi> | null = null;
-function cargarApi(): Promise<YTApi> {
+export function cargarApi(): Promise<YTApi> {
   const g = globalThis as unknown as { YT?: YTApi & { loaded?: number }; onYouTubeIframeAPIReady?: () => void };
   return api ??= new Promise<YTApi>((ok, mal) => {
     if (g.YT?.loaded) return ok(g.YT);

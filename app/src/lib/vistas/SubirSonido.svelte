@@ -1,23 +1,31 @@
 <script lang="ts">
-  import { subir } from '../botonera.svelte';
+  import type { RecordModel } from 'pocketbase';
+  import { subir, editar } from '../botonera.svelte';
   import { mensajeError } from '../sesion.svelte';
   import BotonEmoji from './BotonEmoji.svelte';
 
-  // Modal para subir un sonido al grupo. Quien lo usa lo monta con {#if} y lo desmonta en `cerrar`.
-  let { grupoId, cerrar }: { grupoId: string; cerrar: () => void } = $props();
+  // Modal para subir un sonido al grupo, o para editar `sonido` (nombre y volumen). Quien lo usa lo monta con {#if} y lo desmonta en `cerrar`.
+  let { grupoId, cerrar, sonido }: { grupoId: string; cerrar: () => void; sonido?: RecordModel } = $props();
   let dlg = $state<HTMLDialogElement>();
   $effect(() => { dlg?.showModal(); });
-  let nombre = $state('');
+  // svelte-ignore state_referenced_locally
+  let nombre = $state(sonido?.name ?? '');
   let archivo = $state<File>();
-  let volumen = $state(100);
+  // svelte-ignore state_referenced_locally
+  let volumen = $state(sonido?.volumen || 100);
   let error = $state('');
   let subiendo = $state(false);
 
   async function enviar(e: SubmitEvent) {
     e.preventDefault();
+    if (sonido) return guardar(() => editar(sonido.id, { name: nombre.trim(), volumen }));
     if (!archivo) return (error = 'Elegí un archivo de audio.');
+    const a = archivo;
+    await guardar(() => subir(grupoId, nombre, a, volumen));
+  }
+  async function guardar(f: () => Promise<unknown>) {
     error = ''; subiendo = true;
-    try { await subir(grupoId, nombre, archivo, volumen); dlg?.close(); }
+    try { await f(); dlg?.close(); }
     catch (e) { error = e instanceof Error ? e.message : mensajeError(e); }
     finally { subiendo = false; }
   }
@@ -25,17 +33,17 @@
 
 <dialog bind:this={dlg} onclose={cerrar}>
   <form onsubmit={enviar}>
-    <h3>Subir un sonido</h3>
+    <h3>{sonido ? 'Editar sonido' : 'Subir un sonido'}</h3>
     <div class="nombre">
       <input bind:value={nombre} required maxlength="30" placeholder="Nombre del sonido" aria-label="Nombre del sonido" />
       <BotonEmoji elegir={(e) => (nombre += e)} />
     </div>
-    <input type="file" accept="audio/*" required aria-label="Archivo de audio" onchange={(e) => (archivo = e.currentTarget.files?.[0])} />
+    {#if !sonido}<input type="file" accept="audio/*" required aria-label="Archivo de audio" onchange={(e) => (archivo = e.currentTarget.files?.[0])} />{/if}
     <label>Volumen para todos: {volumen}%
       <input type="range" min="5" max="200" step="5" bind:value={volumen} aria-label="Volumen del sonido" /></label>
     {#if error}<p role="alert">{error}</p>{/if}
     <div class="fila">
-      <button type="submit" class="primario" disabled={subiendo}>Subir</button>
+      <button type="submit" class="primario" disabled={subiendo}>{sonido ? 'Guardar' : 'Subir'}</button>
       <button type="button" onclick={() => dlg?.close()}>Cancelar</button>
     </div>
   </form>

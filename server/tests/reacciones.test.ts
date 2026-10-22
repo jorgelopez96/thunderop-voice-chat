@@ -39,3 +39,19 @@ describe('respuestas', () => {
     await expect(a.collection('privados').create({ author: id(a), para: id(c), text: 'x', respondeA: m.id })).rejects.toMatchObject({ status: 400 });
   });
 });
+
+describe('editar', () => {
+  it('el autor cambia solo el texto y queda marcado; nadie más puede', async () => {
+    const [a, b] = await Promise.all(['ana', 'beto'].map((n) => h.nuevoUsuario(n)));
+    await a.send('/api/amigos/solicitar', { method: 'POST', body: { usuario: id(b) } });
+    await b.send('/api/amigos/solicitar', { method: 'POST', body: { usuario: id(a) } });
+    const m = await a.collection('privados').create({ author: id(a), para: id(b), text: 'hola' });
+    expect(m.editado).toBe('');
+    const e = await a.collection('privados').update(m.id, { text: 'chau' });
+    expect(e.text).toBe('chau');
+    expect(e.editado).not.toBe('');
+    await expect(a.collection('privados').update(m.id, { text: '  ' })).rejects.toMatchObject({ status: 400 });
+    await expect(a.collection('privados').update(m.id, { text: 'x', para: id(a) })).rejects.toMatchObject({ status: 400 });
+    await expect(b.collection('privados').update(m.id, { text: 'x' })).rejects.toMatchObject({ status: 404 });
+  });
+});

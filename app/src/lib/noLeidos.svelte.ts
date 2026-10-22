@@ -1,4 +1,5 @@
 import { pb } from './pb';
+import { avisar, ver, silenciadoHasta, resumen } from './notificaciones.svelte';
 
 // Mensajes sin leer por sala (chats y chats de salas de voz). Lo leído se guarda en este dispositivo:
 // `localStorage['dm.leido.<usuario>']` = { sala: fecha del último mensaje visto }.
@@ -19,7 +20,8 @@ export const delGrupo = (groupId: string) =>
 export function mirar(sala: string) {
   mirando.add(sala);
   marcarLeida(sala);
-  return () => { mirando.delete(sala); marcarLeida(sala); };
+  const dejar = ver(sala);
+  return () => { mirando.delete(sala); dejar(); marcarLeida(sala); };
 }
 
 export function marcarLeida(sala: string) {
@@ -50,6 +52,8 @@ export function iniciarNoLeidos() {
     if (e.action !== 'create' || e.record.author === yo) return;
     const s = e.record.room as string;
     if (!noLeidos.grupoDe[s]) pb.collection('rooms').getOne(s, { fields: 'id,group' }).then((r) => (noLeidos.grupoDe[s] = r.group), () => {});
+    if (!silenciadoHasta(s)) pb.collection('messages').getOne(e.record.id, { expand: 'author,room' })
+      .then((m) => avisar(s, `${m.expand?.author?.name ?? 'Alguien'} · ${m.expand?.room?.name ?? ''}`, resumen(m)), () => {});
     if (mirando.has(s)) return marcarLeida(s);
     noLeidos.salas[s] = (noLeidos.salas[s] ?? 0) + 1;
   });

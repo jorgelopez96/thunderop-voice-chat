@@ -9,12 +9,13 @@ import { iniciarAudioPantalla, detenerAudioPantalla } from './audioPantalla';
 import { mensajeTransmision } from './transmision';
 
 /** `silenciado`: no está mandando audio (muteado, sin permiso del dueño o sin micrófono publicado). */
-/** `transmite`: está compartiendo pantalla. `espectadores`: cuántos la están mirando. */
-export type Participante = { id: string; nombre: string; hablando: boolean; silenciado: boolean; local: boolean; transmite: boolean; espectadores: number };
+/** `pantalla`: sid de la pantalla que comparte. `espectadores`: cuántos lo están mirando. */
+export type Participante = { id: string; nombre: string; hablando: boolean; silenciado: boolean; local: boolean; transmite: boolean; pantalla: string | undefined; espectadores: number };
 
-/** `sinPermiso`: el dueño nos silenció (los permisos de LiveKit no dejan publicar el micrófono). `viendo`: identidad cuya pantalla miramos. */
-export const voz = $state<{ salaId: string | null; salaNombre: string; grupoId: string | null; conectando: boolean; error: string; muteado: boolean; ensordecido: boolean; sinPermiso: boolean; supresion: boolean; participantes: Participante[]; transmitiendo: boolean; viendo: string | null; vistaPrevia: boolean }>({
-  salaId: null, salaNombre: '', grupoId: null, conectando: false, error: '', muteado: false, ensordecido: false, sinPermiso: false, supresion: leerPrefs().supresion, participantes: [], transmitiendo: false, viendo: null, vistaPrevia: leerPrefs().vistaPrevia,
+/** `sinPermiso`: el dueño nos silenció (los permisos de LiveKit no dejan publicar el micrófono). `viendo`: sids de las pantallas que miramos
+ *  (las más nuevas al final, hasta `verVarias`). */
+export const voz = $state<{ salaId: string | null; salaNombre: string; grupoId: string | null; conectando: boolean; error: string; muteado: boolean; ensordecido: boolean; sinPermiso: boolean; supresion: boolean; participantes: Participante[]; transmitiendo: boolean; viendo: string[]; verVarias: number; vistaPrevia: boolean }>({
+  salaId: null, salaNombre: '', grupoId: null, conectando: false, error: '', muteado: false, ensordecido: false, sinPermiso: false, supresion: leerPrefs().supresion, participantes: [], transmitiendo: false, viendo: [], verVarias: leerPrefs().verVarias, vistaPrevia: leerPrefs().vistaPrevia,
 });
 
 // LiveKit se carga recién al entrar a la voz: el arranque de la app no lo paga. Mientras haya `room`, `lk` está cargado.
@@ -45,9 +46,12 @@ const microfono = () => room?.localParticipant.getTrackPublication(lk.Track.Sour
 
 function actualizar() {
   if (!room) { voz.participantes = []; voz.sinPermiso = false; return; }
-  const mirando = [...room.remoteParticipants.values()].map((x) => x.attributes.mirando);
-  const p = (x: Participant, local: boolean): Participante => ({ id: x.identity, nombre: x.name || x.identity, hablando: x.isSpeaking, silenciado: !x.isMicrophoneEnabled, local,
-    transmite: !!x.getTrackPublication(lk.Track.Source.ScreenShare), espectadores: mirando.filter((m) => m === x.identity).length });
+  const mirando = [...room.remoteParticipants.values()].flatMap(mirandoDe);
+  const p = (x: Participant, local: boolean): Participante => {
+    const pantalla = x.getTrackPublication(lk.Track.Source.ScreenShare)?.trackSid;
+    return { id: x.identity, nombre: x.name || x.identity, hablando: x.isSpeaking, silenciado: !x.isMicrophoneEnabled, local,
+      transmite: !!pantalla, pantalla, espectadores: mirando.filter((m) => m === x.identity).length };
+  };
   voz.participantes = [p(room.localParticipant, true), ...[...room.remoteParticipants.values()].map((x) => p(x, false))];
   // Misma regla que usa LiveKit para dejar publicar (sin fuentes listadas = todas permitidas).
   const perm = room.localParticipant.permissions;
@@ -95,7 +99,7 @@ function limpiar() {
   room = null; ctx = null; tx++;
   if (typeof document !== 'undefined') for (const el of document.querySelectorAll('audio[data-voz]')) el.remove();
   if (voz.ensordecido && !muteadoAntes) voz.muteado = false; // la sordera no deja el mic apagado para la próxima sala
-  Object.assign(voz, { salaId: null, salaNombre: '', grupoId: null, conectando: false, ensordecido: false, sinPermiso: false, participantes: [], transmitiendo: false, viendo: null });
+  Object.assign(voz, { salaId: null, salaNombre: '', grupoId: null, conectando: false, ensordecido: false, sinPermiso: false, participantes: [], transmitiendo: false, viendo: [] });
   void detenerAudioPantalla();
   avisarSala(null);
   (r?.disconnect() ?? Promise.resolve()).catch(() => {}).finally(() => c?.close().catch(() => {}));
@@ -117,12 +121,12 @@ export async function entrarVoz(roomId: string, salaNombre = '', grupoId: string
   const r = new Room({ adaptiveStream: true, dynacast: true, webAudioMix: { audioContext: c } });
   room = r;
 
-  // Pitido corto al entrar alguien (o yo) y al irse: sube o baja. Ensordecido no suena.
-  const pitido = (sube: boolean) => {
+  // Tono corto que va de `desde` a `hasta` Hz, `en` segundos desde ahora. Ensordecido no suena.
+  const tono = (desde: number, hasta: number, en = 0) => {
     if (voz.ensordecido) return;
-    const o = c.createOscillator(), g = c.createGain(), t = c.currentTime;
-    o.frequency.setValueAtTime(sube ? 520 : 700, t);
-    o.frequency.linearRampToValueAtTime(sube ? 780 : 460, t + 0.12);
+    const o = c.createOscillator(), g = c.createGain(), t = c.currentTime + en;
+    o.frequency.setValueAtTime(desde, t);
+    o.frequency.linearRampToValueAtTime(hasta, t + 0.12);
     g.gain.setValueAtTime(0.0001, t);
     g.gain.exponentialRampToValueAtTime(0.12, t + 0.02);
     g.gain.exponentialRampToValueAtTime(0.0001, t + 0.18);
@@ -130,22 +134,33 @@ export async function entrarVoz(roomId: string, salaNombre = '', grupoId: string
     o.start(t);
     o.stop(t + 0.2);
   };
+  // Al entrar alguien (o yo) sube; al irse baja.
+  const pitido = (sube: boolean) => (sube ? tono(520, 780) : tono(700, 460));
   r.on(RoomEvent.Connected, () => pitido(true));
   r.on(RoomEvent.ParticipantConnected, () => pitido(true));
   r.on(RoomEvent.ParticipantDisconnected, () => pitido(false));
+  // Alguien empieza a transmitir: dos notas que suben. A quien transmite: una nota aguda cuando alguien se pone a mirarlo.
+  r.on(RoomEvent.TrackPublished, (pub) => { if (pub.source === Track.Source.ScreenShare) { tono(660, 660); tono(990, 990, 0.14); } });
+  const meMiran = new Set<string>();
+  r.on(RoomEvent.ParticipantAttributesChanged, (cambios, part) => {
+    if (part === r.localParticipant || cambios.mirando === undefined) return;
+    const mira = mirandoDe(part).includes(r.localParticipant.identity);
+    if (mira && !meMiran.has(part.identity)) tono(1100, 1320);
+    if (mira) meMiran.add(part.identity); else meMiran.delete(part.identity);
+  });
   r.on(RoomEvent.TrackSubscribed, (t: RemoteTrack, _pub, part) => {
     if (t.kind !== Track.Kind.Audio) return;
     const el = t.attach(); el.dataset.voz = ''; document.body.append(el); audios.set(t, el);
-    part.setVolume(voz.ensordecido ? 0 : leerPrefs().volumenes[part.identity] ?? 1);
+    part.setVolume(voz.ensordecido ? 0 : ganancia(leerPrefs().volumenes[part.identity]));
   });
   // LiveKit ya desenganchó la pista de todos sus elementos (también el <video> de la vista): se borra solo el <audio> propio.
   r.on(RoomEvent.TrackUnsubscribed, (t: RemoteTrack) => { audios.get(t)?.remove(); audios.delete(t); });
-  // Suscripción manual: micrófonos siempre; pantallas solo la que se mira (`ver`), aunque su audio llegue después.
+  // Suscripción manual: micrófonos siempre; pantallas solo las que se miran (`ver`), y su audio aunque llegue después.
   r.on(RoomEvent.TrackPublished, (pub, part) => {
-    if (pub.source === Track.Source.Microphone || (part.identity === voz.viendo && esPantalla(pub.source))) pub.setSubscribed(true);
+    if (pub.source === Track.Source.Microphone || (pub.source === Track.Source.ScreenShareAudio && voz.viendo.some((s) => part.trackPublications.has(s)))) pub.setSubscribed(true);
   });
-  r.on(RoomEvent.TrackUnpublished, (pub, part) => { if (pub.source === Track.Source.ScreenShare && part.identity === voz.viendo) mirar(null); });
-  r.on(RoomEvent.ParticipantDisconnected, (part) => { if (part.identity === voz.viendo) mirar(null); });
+  r.on(RoomEvent.TrackUnpublished, (pub) => { if (voz.viendo.includes(pub.trackSid)) aplicarVista(voz.viendo.filter((s) => s !== pub.trackSid)); });
+  r.on(RoomEvent.ParticipantDisconnected, () => aplicarVista(voz.viendo.filter((s) => pubPantalla(s))));
   // Fin de la transmisión propia, por el botón o porque Windows cortó la captura: todo pasa por acá.
   r.on(RoomEvent.LocalTrackUnpublished, (pub) => {
     if (pub.source !== Track.Source.ScreenShare || room !== r) return; // una sala vieja no toca la transmisión actual
@@ -242,19 +257,23 @@ export async function elegirSalida(deviceId: string) {
   await room?.switchActiveDevice('audiooutput', deviceId).catch(() => {});
 }
 
-/** Volumen de un usuario (0 a 2; con webAudioMix se puede pasar de 1). Se guarda en prefs. */
+// El 100% de la barrita es el doble de lo que llega (con todos al 200% se pidió que ese fuera el 100% nuevo).
+// Con webAudioMix la ganancia puede pasar de 1.
+const ganancia = (v: number | undefined) => (v ?? 1) * 2;
+
+/** Volumen de un usuario como lo muestra la barrita (0 a 2 = 0% a 200%). Se guarda en prefs. */
 export function volumen(userId: string, v: number) {
   if (!Number.isFinite(v)) return;
   v = Math.min(2, Math.max(0, v));
   guardarPrefs({ volumenes: { [userId]: v } });
-  if (!voz.ensordecido) room?.remoteParticipants.get(userId)?.setVolume(v);
+  if (!voz.ensordecido) room?.remoteParticipants.get(userId)?.setVolume(ganancia(v));
 }
 
 /** Ensordecerse (auriculares): no escucho a nadie y apago el micrófono; al volver, el micrófono vuelve como estaba. */
 let muteadoAntes = false;
 function aplicarSordera() {
   const vols = leerPrefs().volumenes;
-  for (const p of room?.remoteParticipants.values() ?? []) p.setVolume(voz.ensordecido ? 0 : vols[p.identity] ?? 1);
+  for (const p of room?.remoteParticipants.values() ?? []) p.setVolume(voz.ensordecido ? 0 : ganancia(vols[p.identity]));
 }
 export async function ensordecer(si: boolean) {
   voz.ensordecido = si;
@@ -263,7 +282,8 @@ export async function ensordecer(si: boolean) {
   else if (voz.muteado && !muteadoAntes) await alternarMute();
 }
 
-const esPantalla = (s: Track.Source) => s === lk.Track.Source.ScreenShare || s === lk.Track.Source.ScreenShareAudio;
+// El atributo `mirando` lleva las identidades de quienes miro, separadas por coma.
+const mirandoDe = (x: Participant) => (x.attributes.mirando ?? '').split(',').filter(Boolean);
 
 async function despublicarAudio(r: Room) {
   const t = r.localParticipant.getTrackPublication(lk.Track.Source.ScreenShareAudio)?.track;
@@ -340,27 +360,41 @@ export async function dejarDeTransmitir() {
   await r.localParticipant.setScreenShareEnabled(false).catch(() => {}); // el resto lo hace LocalTrackUnpublished
 }
 
-/** Mira la pantalla de `identidad` (o ninguna con `null`): solo se suscribe a la pantalla que se mira. */
-export function ver(identidad: string | null) {
-  if (!room) return;
-  const suscribir = (id: string | null, si: boolean) => {
-    const p = id ? room?.remoteParticipants.get(id) : undefined;
-    for (const s of [lk.Track.Source.ScreenShare, lk.Track.Source.ScreenShareAudio]) p?.getTrackPublication(s)?.setSubscribed(si);
-  };
-  if (voz.viendo !== identidad) suscribir(voz.viendo, false);
-  suscribir(identidad, true);
-  mirar(identidad);
+const pubPantalla = (sid: string) => {
+  for (const p of room?.remoteParticipants.values() ?? []) { const pub = p.trackPublications.get(sid); if (pub) return { p, pub }; }
+};
+
+/** Empieza (`si`) o deja de mirar la pantalla `sid` (de cualquiera de la sala). Si ya se miran `verVarias`, sale la más vieja. */
+export function ver(sid: string, si: boolean) {
+  const lista = voz.viendo.filter((s) => s !== sid);
+  if (si) lista.push(sid);
+  aplicarVista(lista.slice(-voz.verVarias));
 }
 
-// El resto cuenta los espectadores de cada transmisión con este atributo (necesita canUpdateOwnMetadata en el token).
-function mirar(identidad: string | null) {
-  voz.viendo = identidad;
-  room?.localParticipant.setAttributes({ mirando: identidad ?? '' }).catch(() => {});
+/** Cuántas pantallas se ven a la vez (1 a 3, se guarda). */
+export function verVarias(n: number) {
+  voz.verVarias = n;
+  guardarPrefs({ verVarias: n });
+  aplicarVista(voz.viendo.slice(-n));
 }
 
-/** Pista de video de la pantalla de `identidad`, si ya está suscrita (para hacerle `attach`). */
-export function pistaPantalla(identidad: string): RemoteTrack | undefined {
-  return room?.remoteParticipants.get(identidad)?.getTrackPublication(lk.Track.Source.ScreenShare)?.track as RemoteTrack | undefined;
+// Solo se suscribe a las pantallas que se miran, y al sonido de quienes las comparten. El atributo `mirando`
+// (identidades) le sirve al resto para contar espectadores (necesita canUpdateOwnMetadata en el token).
+function aplicarVista(lista: string[]) {
+  for (const s of voz.viendo) if (!lista.includes(s)) pubPantalla(s)?.pub.setSubscribed(false);
+  voz.viendo = lista;
+  const r = room;
+  if (!r) return;
+  for (const s of lista) pubPantalla(s)?.pub.setSubscribed(true);
+  const personas = [...new Set(lista.map((s) => pubPantalla(s)?.p.identity).filter((x): x is string => !!x))];
+  for (const p of r.remoteParticipants.values()) p.getTrackPublication(lk.Track.Source.ScreenShareAudio)?.setSubscribed(personas.includes(p.identity));
+  r.localParticipant.setAttributes({ mirando: personas.join(',') }).catch(() => {});
+}
+
+/** Pista de video de la pantalla `sid` (si ya está suscrita, para hacerle `attach`) y de quién es. */
+export function pistaPantalla(sid: string): { pista: RemoteTrack | undefined; identidad: string } | undefined {
+  const x = pubPantalla(sid);
+  return x && { pista: x.pub.track as RemoteTrack | undefined, identidad: x.p.identity };
 }
 
 /** Pista de video de nuestra propia transmisión, para la vista previa. */

@@ -46,7 +46,7 @@ test('tres personas en una sala de voz', async ({ browser }) => {
   await expect(tarjeta(c, 'Beto').getByLabel('Silenciado')).toBeVisible({ timeout: 5000 });
   await expect.poll(async () => de((await stats(c)).remotos, 'Beto')?.mic, { timeout: 5000 }).toBe(false);
   await expect.poll(async () => (await stats(b)).mic, { timeout: 5000 }).toBe(false);
-  await expect(b.getByText('El dueño te silenció.')).toBeVisible();
+  await expect(b.getByTitle('El dueño te silenció')).toBeDisabled();
   expect(await audioLlega(c, 'Beto')).toBe(false);
 
   // Beto sale y vuelve: sigue silenciado y no puede publicar.
@@ -61,7 +61,7 @@ test('tres personas en una sala de voz', async ({ browser }) => {
   expect((await stats(b)).mic).toBe(false);
   expect(de((await stats(c)).remotos, 'Beto')?.mic).toBe(false);
   expect(await audioLlega(c, 'Beto')).toBe(false);
-  await expect(b.getByText('El dueño te silenció.')).toBeVisible();
+  await expect(b.getByTitle('El dueño te silenció')).toBeDisabled();
 
   // Ana echa a Caro: Caro queda fuera de la llamada en menos de 15 s.
   await a.getByRole('button', { name: /^Participantes · / }).click();
@@ -76,7 +76,7 @@ test('tres personas en una sala de voz', async ({ browser }) => {
   await tarjeta(a, 'Beto').click({ button: 'right' });
   await a.getByRole('button', { name: 'Quitar silencio' }).click();
   await expect.poll(async () => de((await stats(a)).remotos, 'Beto')?.mic, { timeout: 10_000 }).toBe(true);
-  await expect(b.getByText('El dueño te silenció.')).toHaveCount(0);
+  await expect(b.getByTitle('El dueño te silenció')).toHaveCount(0);
   await expect.poll(() => audioLlega(a, 'Beto'), { timeout: 10_000 }).toBe(true);
 
   // Ana (supresión prendida por defecto) la apaga y la vuelve a prender: el audio sigue fluyendo en los dos sentidos.

@@ -8,6 +8,7 @@
   import Insignia from './Insignia.svelte';
   import BotonEmoji from './BotonEmoji.svelte';
   import SubirSonido from './SubirSonido.svelte';
+  import Confirmar from './Confirmar.svelte';
   import { sonidos, editar, borrar } from '../botonera.svelte';
 
   // Configuraciones del grupo. General: foto, participantes y borrar (solo el dueño cambia foto y borra).
@@ -27,6 +28,7 @@
   const lista = sonidos(grupo.id);
   $effect(() => lista.parar);
   let nuevo = $state(false);
+  let aBorrar = $state<RecordModel | null>(null);
   const puedeEditar = (x: RecordModel) => soyDueno || x.owner === sesion.usuario?.id;
   function renombrar(x: RecordModel, name: string) {
     name = name.trim();
@@ -70,7 +72,7 @@
               <input type="range" min="5" max="200" step="5" value={x.volumen || 100} aria-label={`Volumen de ${x.name}`} title={`${x.volumen || 100}%`}
                 onchange={(e) => hacer(() => editar(x.id, { volumen: +e.currentTarget.value }))} />
               <small>{x.volumen || 100}%</small>
-              <button class="icono" title="Borrar" aria-label={`Borrar ${x.name}`} onclick={() => hacer(() => borrar(x.id))}><Trash2 size={14} strokeWidth={1.75} /></button>
+              <button class="icono" title="Borrar" aria-label={`Borrar ${x.name}`} onclick={() => (aBorrar = x)}><Trash2 size={14} strokeWidth={1.75} /></button>
             {:else}<span>{x.name}</span><small>{x.volumen || 100}%</small>{/if}
           </li>
         {:else}<li class="tenue">Todavía no hay sonidos en este grupo.</li>{/each}
@@ -78,6 +80,8 @@
       <button onclick={() => (nuevo = true)}><Plus size={16} strokeWidth={1.75} /> Nuevo sonido</button>
     </section>
     {#if nuevo}<SubirSonido grupoId={grupo.id} cerrar={() => (nuevo = false)} />{/if}
+    {#if aBorrar}{@const x = aBorrar}<Confirmar texto={`¿Borrar el sonido "${x.name}"?`} cancelar={() => (aBorrar = null)}
+      confirmar={() => { aBorrar = null; hacer(() => borrar(x.id)); }} />{/if}
   {:else}
 
   <section>
@@ -128,8 +132,6 @@
 </dialog>
 
 <style>
-  .config { width: min(480px, 92vw); max-width: none; max-height: 85vh; overflow-y: auto; }
-  .config[open] { display: flex; flex-direction: column; gap: 20px; }
   h2 { font-size: 18px; font-weight: 600; }
   h3 { margin: 0 0 8px; }
   .foto { display: flex; align-items: center; gap: 12px; }
@@ -141,10 +143,7 @@
   .peligroso { border: 1px solid color-mix(in srgb, var(--peligro) 40%, transparent); border-radius: var(--radio-tarjeta); padding: 12px; }
   .peligroso p { margin: 0 0 8px; color: var(--tenue); font-size: 13px; }
   .peligroso label { margin-bottom: 8px; }
-  .fin { justify-content: flex-end; }
-  .solapas { display: flex; gap: 4px; border-bottom: 1px solid var(--borde); }
-  .solapas button { border-radius: var(--radio) var(--radio) 0 0; color: var(--tenue); }
-  .solapas [aria-selected='true'] { color: var(--texto); box-shadow: inset 0 -2px var(--acento); }
+  .fin { justify-content: flex-end; margin-top: auto; }
   .sonidos { max-height: 50vh; margin-bottom: 8px; }
   .sonidos li > input:first-child, .sonidos li > span { flex: 1; min-width: 0; }
   .sonidos input[type='range'] { width: 96px; padding: 0; border: 0; background: none; }

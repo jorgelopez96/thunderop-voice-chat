@@ -94,6 +94,17 @@ describe('música', () => {
     }
   });
 
+  it('agregarLista suma la tanda en orden y arranca la primera; rechaza ids inválidos', async () => {
+    const { b, voz } = await setup();
+    const canciones = ['LLLLLLLLLL1', 'LLLLLLLLLL2', 'LLLLLLLLLL3'].map((videoId) => ({ videoId, titulo: `T ${videoId}` }));
+    const r = await musica(b, voz, { accion: 'agregarLista', canciones });
+    const cola = await b.collection('canciones').getFullList({ filter: `room = "${voz}"`, sort: 'created,orden' });
+    expect(cola.map((c: any) => c.videoId)).toEqual(['LLLLLLLLLL1', 'LLLLLLLLLL2', 'LLLLLLLLLL3']);
+    expect(r.reproduccion.actual).toBe(cola[0].id);
+    await expect(musica(b, voz, { accion: 'agregarLista', canciones: [{ videoId: 'x', titulo: 'y' }] })).rejects.toMatchObject({ status: 400 });
+    await expect(musica(b, voz, { accion: 'agregarLista', canciones: [] })).rejects.toMatchObject({ status: 400 });
+  });
+
   it('pausar y reanudar conservan la posición', async () => {
     const { b, voz } = await setup();
     const r0 = await musica(b, voz, { accion: 'agregar', url: yt('BBBBBBBBBBB') });

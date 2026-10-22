@@ -106,3 +106,36 @@ test('transmitir y ver una pantalla', async ({ browser }) => {
   // El <audio> del micrófono de Ana se va con ella; queda solo el de Caro.
   await expect(b.locator('audio[data-voz]')).toHaveCount(1, { timeout: 10_000 });
 });
+
+test('mirar dos transmisiones a la vez', async ({ browser }) => {
+  const [a, b, c] = await Promise.all([0, 1, 2].map(async () => (await browser.newContext()).newPage()));
+  await crearCuenta(a, 'Ana');
+  const link = await crearGrupo(a, 'Dos transmisiones');
+  await crearCuenta(b, 'Beto');
+  await unirse(b, link);
+  await crearCuenta(c, 'Caro');
+  await unirse(c, link);
+  for (const p of [a, b, c]) await entrar(p);
+  await expect(c.locator('section.voz li')).toHaveCount(3, { timeout: 10_000 });
+
+  for (const p of [a, b]) {
+    await p.getByRole('button', { name: 'Transmitir' }).click();
+    await p.getByLabel('Calidad').selectOption({ label: '720p · 30 fps' });
+    await p.getByRole('button', { name: 'Empezar' }).click();
+  }
+
+  // Caro elige ver 2 a la vez y mira a Ana y a Beto.
+  await c.getByRole('group', { name: 'Pantallas a la vez' }).getByRole('button', { name: '2' }).click();
+  await tarjeta(c, 'Ana').getByRole('button', { name: 'Ver' }).click({ timeout: 10_000 });
+  await tarjeta(c, 'Beto').getByRole('button', { name: 'Ver' }).click({ timeout: 10_000 });
+  await expect(c.getByLabel('Pantalla de Ana')).toBeVisible({ timeout: 10_000 });
+  await expect(c.getByLabel('Pantalla de Beto')).toBeVisible({ timeout: 10_000 });
+  await expect.poll(async () => (await framesDe(c, 'Ana')) > 0 && (await framesDe(c, 'Beto')) > 0, { timeout: 10_000 }).toBe(true);
+
+  // Con 1 a la vez queda solo la última elegida (Beto). Si Beto corta, no queda ninguna.
+  await c.getByRole('group', { name: 'Pantallas a la vez' }).getByRole('button', { name: '1' }).click();
+  await expect(c.getByLabel('Pantalla de Ana')).toHaveCount(0);
+  await expect(c.getByLabel('Pantalla de Beto')).toBeVisible();
+  await b.getByRole('button', { name: 'Dejar de transmitir' }).click();
+  await expect(c.getByLabel('Pantalla de Beto')).toHaveCount(0, { timeout: 10_000 });
+});

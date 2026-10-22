@@ -21,12 +21,23 @@ routerAdd("POST", "/api/rooms/{id}/musica", (e) => {
   const body = e.requestInfo().body;
   const accion = body.accion;
   const cancionId = typeof body.cancionId === "string" ? body.cancionId : "";
-  if (!["agregar", "pausar", "reanudar", "saltar", "termino", "error", "quitar"].includes(accion)) {
+  if (!["agregar", "agregarLista", "pausar", "reanudar", "saltar", "termino", "error", "quitar"].includes(accion)) {
     throw new BadRequestError("Acción desconocida.");
   }
 
   // Link de YouTube → id de 11 caracteres. El host tiene que ser exacto (nada de youtube.com.evil.com).
-  let videoId, titulo;
+  let videoId, titulo, nuevas = [];
+  if (accion === "agregarLista") {
+    // Lista de reproducción: los ids y títulos los arma la app (IFrame API + oEmbed). Hasta 200, como la API.
+    const canciones = Array.isArray(body.canciones) ? body.canciones : [];
+    if (!canciones.length || canciones.length > 200) throw new BadRequestError("La lista tiene que tener entre 1 y 200 temas.");
+    for (const c of canciones) {
+      const id = c && typeof c.videoId === "string" ? c.videoId : "";
+      if (!/^[A-Za-z0-9_-]{11}$/.test(id)) throw new BadRequestError("La lista tiene un video inválido.");
+      const t = c && typeof c.titulo === "string" ? c.titulo.trim().slice(0, 200) : "";
+      nuevas.push({ videoId: id, titulo: t || "Video de YouTube" });
+    }
+  }
   if (accion === "agregar") {
     const m = /^(?:https?:\/\/)?([^\/?#]+)(\/[^?#]*)?(?:\?([^#]*))?/i.exec(typeof body.url === "string" ? body.url.trim() : "");
     const host = m ? m[1].toLowerCase() : "";
@@ -51,6 +62,7 @@ routerAdd("POST", "/api/rooms/{id}/musica", (e) => {
       const t = res.statusCode === 200 && res.json && res.json.title;
       if (typeof t === "string" && t.trim()) titulo = t.trim().slice(0, 200);
     } catch (_) { /* queda el genérico */ }
+    nuevas = [{ videoId, titulo }];
   }
 
   let rep, ahora;
@@ -82,19 +94,25 @@ routerAdd("POST", "/api/rooms/{id}/musica", (e) => {
       const c = tx.findRecordById("canciones", actual);
       c.set("estado", estado);
       tx.save(c);
-      const sig = tx.findRecordsByFilter("canciones", "room = {:r} && estado = 'cola'", "created", 1, 0, { r: room.id });
+      const sig = tx.findRecordsByFilter("canciones", "room = {:r} && estado = 'cola'", "created,orden", 1, 0, { r: room.id });
       sonar(sig[0]);
     };
 
-    if (accion === "agregar") {
-      const c = new Record(tx.findCollectionByNameOrId("canciones"));
-      c.set("room", room.id);
-      c.set("videoId", videoId);
-      c.set("titulo", titulo);
-      c.set("agregadoPor", e.auth.id);
-      c.set("estado", "cola");
-      tx.save(c);
-      if (!actual) sonar(c);
+    if (nuevas.length) {
+      const col = tx.findCollectionByNameOrId("canciones");
+      let primera = null;
+      nuevas.forEach((n, i) => {
+        const c = new Record(col);
+        c.set("room", room.id);
+        c.set("videoId", n.videoId);
+        c.set("titulo", n.titulo);
+        c.set("agregadoPor", e.auth.id);
+        c.set("estado", "cola");
+        c.set("orden", i);
+        tx.save(c);
+        primera = primera || c;
+      });
+      if (!actual) sonar(primera);
     } else if (accion === "pausar") {
       if (actual && pausaS == null) rep.set("pausaS", Math.max(0, (ahora - rep.getInt("inicioMs")) / 1000));
     } else if (accion === "reanudar") {

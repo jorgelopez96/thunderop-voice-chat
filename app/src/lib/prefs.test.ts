@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { leerPrefs, guardarPrefs } from './prefs';
 import { volumen } from './voz.svelte';
 
-const DEFAULTS = { supresion: true, volumenes: {}, calidad: '1080p60', gpu: true, vistaPrevia: true, volBotonera: 0.8, volMusica: 50, gananciaDb: 0 };
+const DEFAULTS = { supresion: true, volumenes: {}, calidad: '1080p60', gpu: true, vistaPrevia: true, volBotonera: 0.8, volMusica: 50, gananciaDb: 0, sonidoMensajes: true, notificaciones: true, verVarias: 1 };
 
 describe('prefs de voz', () => {
   // Vitest corre en Node (sin localStorage): uno en memoria por test.
@@ -85,5 +85,10 @@ describe('prefs de voz', () => {
     volumen('a', 5); volumen('b', -1); volumen('c', 1.5);
     volumen('a', NaN); volumen('d', Infinity);
     expect(leerPrefs().volumenes).toEqual({ a: 2, b: 0, c: 1.5 });
+  });
+
+  it('los volúmenes guardados antes de la versión 3 se pasan a la mitad (200% viejo = 100% nuevo)', () => {
+    localStorage.setItem('dm.voz', JSON.stringify({ v: 2, supresion: false, volumenes: { a: 2, b: 1 } }));
+    expect(leerPrefs()).toMatchObject({ supresion: false, volumenes: { a: 1, b: 0.5 } });
   });
 });

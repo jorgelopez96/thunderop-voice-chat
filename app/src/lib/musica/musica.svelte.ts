@@ -31,9 +31,10 @@ let cargada: Cancion | null = null; // la que tiene el reproductor
 let estado = -1;
 let vigia: ReturnType<typeof setInterval> | undefined;
 
-const ahoraServidor = () => Date.now() + (reloj?.desfase ?? 0);
+// Reloj local monotónico (performance.now): si Windows corrige la hora de la PC, Date.now() salta y la música saltaba con él.
+const ahoraServidor = () => (reloj ? performance.now() + reloj.desfase : Date.now());
 const anotar = (r: { ahora?: unknown }, enviado: number) => {
-  if (typeof r?.ahora === 'number') { const ahora = Date.now(); reloj = mejor(reloj, muestra(r.ahora, enviado, ahora), ahora); }
+  if (typeof r?.ahora === 'number') { const ahora = performance.now(); reloj = mejor(reloj, muestra(r.ahora, enviado, ahora), ahora); }
 };
 
 /** Escucha la cola y la reproducción de la sala de voz `roomId`. */
@@ -51,7 +52,7 @@ export function conectar(roomId: string) {
 async function medir() {
   const s = sala;
   for (let i = 0; i < 3 && s && s === sala; i++) {
-    const enviado = Date.now();
+    const enviado = performance.now();
     try { anotar(await pb.send(`/api/rooms/${s}/musica`, { method: 'GET', requestKey: null }), enviado); }
     catch { return; } // sin medición se sigue con la anterior (o 0)
   }
@@ -75,6 +76,7 @@ export function ubicarReproductor(el: HTMLElement | null) {
 }
 
 export const agregar = (url: string) => enviar('agregar', { url });
+export const agregarLista = (canciones: { videoId: string; titulo: string }[]) => enviar('agregarLista', { canciones });
 export const pausar = () => enviar('pausar');
 export const reanudar = () => enviar('reanudar');
 export const saltar = () => (musica.actual ? enviar('saltar', { cancionId: musica.actual.id }) : Promise.resolve(false));
@@ -94,11 +96,11 @@ export function volumenMusica(v: number) {
 }
 
 /** POST a la ruta de música. Mide el desfase con su `ahora` y relee el estado. false si falló (queda en `musica.error`). */
-async function enviar(accion: string, extra: Record<string, string> = {}): Promise<boolean> {
+async function enviar(accion: string, extra: Record<string, unknown> = {}): Promise<boolean> {
   const s = sala;
   if (!s) return false;
   musica.error = '';
-  const enviado = Date.now();
+  const enviado = performance.now();
   try {
     const r = await pb.send(`/api/rooms/${s}/musica`, { method: 'POST', body: { accion, ...extra }, requestKey: null });
     if (s !== sala) return false;
@@ -119,7 +121,7 @@ async function cargar() {
     { r: s, desde: new Date(ahoraServidor() - ERROR_VISIBLE_MS) });
   try {
     const [cola, r] = await Promise.all([
-      pb.collection('canciones').getFullList<Cancion>({ filter: filtro, sort: 'created', requestKey: null }),
+      pb.collection('canciones').getFullList<Cancion>({ filter: filtro, sort: 'created,orden', requestKey: null }),
       pb.collection('reproducciones').getFirstListItem<Rep>(pb.filter('room = {:r}', { r: s }), { requestKey: null })
         .catch((e) => { if (e?.status === 404) return null; throw e; }), // sin música todavía
     ]);
@@ -141,7 +143,7 @@ function sincronizar() {
     nuevo.onEstado((e) => { if (rp === nuevo) alEstado(e); });
     nuevo.onError((codigo) => { if (rp === nuevo) alError(codigo); });
     nuevo.volumen(oido(leerPrefs().volMusica));
-    vigia = setInterval(corregir, 5000);
+    vigia = setInterval(() => corregir(false), 5000);
   }
   if (cargada?.id !== c.id) { cargada = c; estado = -1; rp.cargar(c.videoId, posicion(rep, ahoraServidor())); }
   else corregir();
@@ -151,11 +153,16 @@ function sincronizar() {
 /** Si el reproductor se desvió más de 2 s de la posición compartida, salta a ella.
  *  Solo con el video andando o pausado de verdad: no en anuncios ni cargando, ni recién cargado en pausa
  *  (ahí la posición ya la dio `cargar`, y en YouTube un `seekTo` sobre un video sin arrancar lo hace sonar). */
-function corregir() {
+// En el chequeo periódico el desvío tiene que verse dos veces seguidas: una medición suelta mala no hace saltar el tema.
+// Al cambiar el estado compartido (pausa, tema nuevo, fin de anuncio) se corrige enseguida.
+let desviado = false;
+function corregir(enseguida = true) {
   if (!rp || !rep || !cargada) return;
   if (estado !== (rep.pausaS == null ? SONANDO : PAUSADO)) return;
   const compartida = posicion(rep, ahoraServidor());
-  if (Math.abs(rp.tiempo() - compartida) > TOLERANCIA_S) rp.seek(compartida);
+  const lejos = Math.abs(rp.tiempo() - compartida) > TOLERANCIA_S;
+  if (lejos && (enseguida || desviado)) { rp.seek(compartida); desviado = false; }
+  else desviado = lejos;
 }
 
 function alEstado(e: number) {

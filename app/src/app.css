@@ -74,6 +74,12 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color:
 
 dialog { background: var(--elevado); color: var(--texto); border: 1px solid var(--borde); border-radius: var(--radio-tarjeta); padding: 20px; max-width: 420px; }
 dialog::backdrop { background: rgb(0 0 0 / .6); }
+/* Modales de configuración (generales y del grupo): grandes y con solapas arriba. */
+dialog.config { width: min(720px, 92vw); max-width: none; height: min(640px, 85vh); overflow-y: auto; }
+dialog.config[open] { display: flex; flex-direction: column; gap: 20px; }
+.solapas { display: flex; gap: 4px; border-bottom: 1px solid var(--borde); }
+.solapas button { border-radius: var(--radio) var(--radio) 0 0; color: var(--tenue); }
+.solapas [aria-selected='true'] { color: var(--texto); box-shadow: inset 0 -2px var(--acento); }
 
 .avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--hover); flex: none; object-fit: cover; }
 

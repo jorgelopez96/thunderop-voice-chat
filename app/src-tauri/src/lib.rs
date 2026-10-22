@@ -76,6 +76,7 @@ pub fn run() {
                 .build(app)?;
             Ok(())
         })
+        .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(audio::Captura::default())
         .invoke_handler(tauri::generate_handler![audio::iniciar_audio, audio::detener_audio, memoria_baja, salir])

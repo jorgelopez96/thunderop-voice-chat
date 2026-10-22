@@ -111,6 +111,10 @@ $DOMINIO {
 	handle /rtc* {
 		reverse_proxy 127.0.0.1:7880
 	}
+	# El panel de PocketBase no se expone: se entra desde la misma máquina (http://127.0.0.1:8090/_/).
+	handle /_/* {
+		respond 403
+	}
 	# Instalador y actualizaciones de la app (lo que deja npm run release en app/release/).
 	handle_path /descargas/* {
 		root * $DEST/descargas
