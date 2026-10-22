@@ -8,7 +8,7 @@
   import { abrirChat, enviar, borrar } from '../chat.svelte';
   import AhoraSuena from './AhoraSuena.svelte';
   import Chat from './Chat.svelte';
-  import { voz, volumen, silenciar, ver, verVarias, pistaPantallaPropia, vistaPrevia } from '../voz.svelte';
+  import { voz, volumen, silenciar, desconectar, ver, pistaPantallaPropia, vistaPrevia } from '../voz.svelte';
   import Pantalla from './Pantalla.svelte';
   import Video from './Video.svelte';
   import { leerPrefs } from '../prefs';
@@ -31,6 +31,11 @@
     const nuevo = !silenciado(id);
     try { await silenciar(grupo.id, id, nuevo); pedidos[id] = nuevo; } catch (e) { error = mensajeError(e); }
   }
+  async function sacar(id: string) {
+    menu?.hidePopover();
+    error = '';
+    try { await desconectar(grupo.id, id); } catch (e) { error = mensajeError(e); }
+  }
   async function copiarLink() {
     error = '';
     try {
@@ -41,7 +46,6 @@
 
   // Vista previa propia; se recalcula cuando cambian los participantes (llega o se va la pista).
   const propia = $derived((void voz.participantes, voz.transmitiendo && voz.vistaPrevia ? pistaPantallaPropia() : undefined));
-  const hayTransmisiones = $derived(voz.participantes.some((p) => !p.local && p.transmite));
 
   // Fondo de la tarjeta: el color del usuario, o un tono derivado del nombre.
   const fondo = (color: string | undefined, nombre: string) =>
@@ -81,12 +85,6 @@
     {#if aviso}<p role="status">{aviso}</p>{/if}
     {#if error}<p role="alert">{error}</p>{/if}
 
-    {#if hayTransmisiones}
-      <div class="a-la-vez" role="group" aria-label="Pantallas a la vez">
-        <span class="tenue">Ver a la vez</span>
-        {#each [1, 2, 3] as n (n)}<button class="plano" aria-pressed={voz.verVarias === n} onclick={() => verVarias(n)}>{n}</button>{/each}
-      </div>
-    {/if}
     {#if voz.viendo.length}
       <!-- Una sola: grande. Varias: lado a lado si entran a un tamaño que se distinga, si no una abajo de la otra. -->
       <div class="escenarios" class:varias={voz.viendo.length > 1}>
@@ -135,7 +133,8 @@
       <input type="range" min="0" max="200" step="5" value={Math.round((vols[p.id] ?? 1) * 100)}
         aria-label={`Volumen de ${p.nombre}`} oninput={(e) => cambiar(p.id, +e.currentTarget.value)} />
     </label>
-    {#if soyDueno}<hr /><button class="plano peligro" onclick={() => alternar(p.id)}>{silenciado(p.id) ? 'Quitar silencio' : 'Silenciar'}</button>{/if}
+    {#if soyDueno}<hr /><button class="plano peligro" onclick={() => alternar(p.id)}>{silenciado(p.id) ? 'Quitar silencio' : 'Silenciar'}</button>
+      <button class="plano peligro" onclick={() => sacar(p.id)}>Desconectar de la llamada</button>{/if}
   {/if}
 </div>
 
@@ -159,9 +158,6 @@
   .ver { position: absolute; bottom: 8px; right: 8px; }
   .espectadores { display: inline-flex; align-items: center; gap: 2px; margin-left: 6px; color: var(--peligro); font-weight: 600; }
   .vivo .espectadores { color: #fff; }
-  .a-la-vez { display: flex; align-items: center; gap: 4px; align-self: flex-end; font-size: 13px; }
-  .a-la-vez button { min-width: 32px; justify-content: center; }
-  .a-la-vez [aria-pressed='true'] { background: var(--acento-suave); color: var(--texto); }
   /* Cada pantalla mide al menos 520 px de ancho (se distingue lo que muestra); si no entran, bajan a otra fila. */
   .escenarios { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 520px), 1fr)); }
   .escenarios.varias { --alto: 46vh; }
@@ -172,7 +168,7 @@
   .propia :global(.previa) { width: 240px; max-width: 100%; aspect-ratio: 16 / 9; background: var(--hondo); border-radius: var(--radio); }
   .chatSala { position: relative; display: flex; flex-direction: column; min-height: 0; border-left: 1px solid var(--borde); background: var(--fondo); }
   .chatSala :global(.chat) { flex: 1; }
-  .chatSala :global(.titulo) { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--tenue); }
+  .chatSala :global(.titulo) { padding-right: 44px; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--tenue); }
   .plegar { position: absolute; top: 8px; right: 8px; z-index: 1; }
   .menu { position: fixed; inset: auto; margin: 0; padding: 8px; min-width: 220px; flex-direction: column; gap: 4px;
     background: var(--elevado); color: var(--texto); border: 1px solid var(--borde); border-radius: var(--radio-menu); }

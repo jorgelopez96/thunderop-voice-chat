@@ -4,19 +4,15 @@ export type Novedad = { version: string; fecha: string; cambios: { tipo: 'nuevo'
 
 export const NOVEDADES: Novedad[] = [
   {
-    version: '0.3.7', fecha: '2026-10-22', cambios: [
-      { tipo: 'nuevo', texto: 'Mirá varias transmisiones a la vez: arriba elegí ver 1, 2 o 3, y tocá "Ver" en cada uno que transmite.' },
-      { tipo: 'nuevo', texto: 'Música: pegá una lista de YouTube o YouTube Music y se agregan todos sus temas (hasta 200), en orden o mezclados.' },
-      { tipo: 'nuevo', texto: 'Editá tus mensajes con el lápiz: quedan marcados como "(editado)".' },
-      { tipo: 'nuevo', texto: 'Aviso de mensajes nuevos con sonido, y notificación de Windows si la app no está a la vista. Cada chat se puede silenciar con su campanita.' },
-      { tipo: 'nuevo', texto: 'Sonidos al empezar alguien a transmitir y, para el que transmite, cuando alguien se pone a mirarlo.' },
-      { tipo: 'nuevo', texto: 'Clic derecho en un sonido de la botonera para cambiarle el nombre o el volumen.' },
-      { tipo: 'nuevo', texto: 'Configuraciones más grandes y por secciones: Audio, Transmisión y Notificaciones.' },
-      { tipo: 'arreglo', texto: 'Volumen de las personas: el 200% de antes ahora es el 100%, y se puede subir hasta el doble.' },
-      { tipo: 'arreglo', texto: 'Se pide confirmación antes de borrar mensajes y sonidos. Los sonidos se borran solo desde Configuraciones.' },
-      { tipo: 'arreglo', texto: 'El menú del nombre del grupo se cierra al volver a tocarlo.' },
-      { tipo: 'arreglo', texto: 'La música ya no debería saltar para adelante o para atrás de golpe.' },
-      { tipo: 'arreglo', texto: 'La app busca actualizaciones cada hora (nunca en plena llamada).' },
+    version: '0.3.8', fecha: '2026-10-22', cambios: [
+      { tipo: 'nuevo', texto: 'Mirá varias transmisiones a la vez: tocá "Ver" en la tarjeta de cada uno y se van sumando. "Dejar de ver" saca esa sola.' },
+      { tipo: 'nuevo', texto: 'Los links del chat se abren en tu navegador y muestran una vista previa con imagen y título (YouTube y la mayoría de las páginas).' },
+      { tipo: 'nuevo', texto: 'Tres puntitos arriba de cada chat: silenciar notificaciones y, en privados, eliminar amigo.' },
+      { tipo: 'nuevo', texto: 'El dueño del grupo puede desconectar a alguien de la llamada (clic derecho en su tarjeta).' },
+      { tipo: 'nuevo', texto: 'Configuración → Audio: volumen del micrófono de 0% a 100% y barritas que se mueven cuando hablás.' },
+      { tipo: 'arreglo', texto: 'Si dejabas de escuchar a alguien después de un corte, ahora se vuelve a conectar solo.' },
+      { tipo: 'arreglo', texto: 'Ensordecido ya no escuchás los sonidos de la botonera.' },
+      { tipo: 'arreglo', texto: 'La música vuelve a sincronizar como antes.' },
     ],
   },
 ];

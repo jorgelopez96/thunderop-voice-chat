@@ -56,6 +56,19 @@ routerAdd("POST", "/api/groups/{id}/silenciar", (e) => {
   return e.json(200, { ok: true });
 }, $apis.requireAuth("users"));
 
+// Dueño saca a un miembro de la llamada (puede volver a entrar; para que no hable, está silenciar).
+routerAdd("POST", "/api/groups/{id}/desconectar", (e) => {
+  const lk = require(`${__hooks}/livekit.js`);
+  const group = lk.grupoDeMiembro(e.app, e.request.pathValue("id"), e.auth.id);
+  if (group.getString("owner") !== e.auth.id) throw new ForbiddenError("Solo el dueño puede desconectar.");
+  const user = e.requestInfo().body.user;
+  if (typeof user !== "string" || !user) throw new BadRequestError("Falta el usuario.");
+  if (user === e.auth.id) throw new BadRequestError("No te podés desconectar a vos mismo desde acá.");
+  if (!group.getStringSlice("members").includes(user)) throw new BadRequestError("Ese usuario no es miembro del grupo.");
+  lk.enSalasDeVoz(e.app, group.id, "RemoveParticipant", { identity: user });
+  return e.json(200, { ok: true });
+}, $apis.requireAuth("users"));
+
 onRecordAfterDeleteSuccess((e) => {
   if (e.record.getString("kind") === "voz") {
     const lk = require(`${__hooks}/livekit.js`);

@@ -1,6 +1,8 @@
 <script lang="ts">
   import { voz, vistaPrevia, dispositivos, elegirEntrada, elegirSalida, cambiarSupresion, cambiarGanancia } from '../voz.svelte';
   import { leerPrefs, guardarPrefs } from '../prefs';
+  import { dbDePorcentaje, porcentajeDeDb } from '../ganancia';
+  import MedidorMic from './MedidorMic.svelte';
 
   // Configuraciones generales, por solapas como las del grupo.
   let { cerrar }: { cerrar: () => void } = $props();
@@ -9,7 +11,8 @@
   let solapa = $state<'audio' | 'transmision' | 'notificaciones'>('audio');
   let lista = $state<Awaited<ReturnType<typeof dispositivos>>>({ entradas: [], salidas: [] });
   const prefs = leerPrefs();
-  let ganancia = $state(prefs.gananciaDb);
+  let pctMic = $state(porcentajeDeDb(prefs.gananciaDb));
+  let entrada = $state(prefs.entrada);
   $effect(() => { if (!d.open) d.showModal(); dispositivos().then((x) => (lista = x)).catch(() => (error = 'No se pudieron listar los dispositivos de audio.')); });
   const SOLAPAS = [['audio', 'Audio'], ['transmision', 'Transmisión'], ['notificaciones', 'Notificaciones']] as const;
 </script>
@@ -24,7 +27,7 @@
   {#if solapa === 'audio'}
     <section>
       <label>Entrada
-        <select value={prefs.entrada ?? 'default'} onchange={(e) => elegirEntrada(e.currentTarget.value)}>
+        <select value={prefs.entrada ?? 'default'} onchange={(e) => { entrada = e.currentTarget.value; elegirEntrada(entrada); }}>
           <option value="default">Predeterminado</option>
           {#each lista.entradas.filter((x) => x.deviceId !== 'default') as x (x.deviceId)}<option value={x.deviceId}>{x.label || 'Micrófono'}</option>{/each}
         </select>
@@ -36,10 +39,11 @@
         </select>
       </label>
       <label class="casilla"><input type="checkbox" checked={voz.supresion} onchange={(e) => cambiarSupresion(e.currentTarget.checked)} /> Supresión de ruido</label>
-      <label>Ganancia del micrófono: {ganancia > 0 ? '+' : ''}{ganancia} dB
-        <input type="range" min="-20" max="20" step="1" bind:value={ganancia} oninput={() => cambiarGanancia(ganancia)} />
+      <label>Volumen del micrófono: {pctMic}%
+        <input type="range" min="0" max="100" step="1" bind:value={pctMic} oninput={() => cambiarGanancia(dbDePorcentaje(pctMic))} />
       </label>
-      <small>Sube o baja cómo te escuchan los demás.</small>
+      <small>Sube o baja cómo te escuchan los demás (50% = sin cambios). Hablá y mirá las barritas: las rojas son que satura.</small>
+      <MedidorMic {entrada} gananciaDb={dbDePorcentaje(pctMic)} />
     </section>
   {:else if solapa === 'notificaciones'}
     <section>

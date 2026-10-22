@@ -124,16 +124,15 @@ test('mirar dos transmisiones a la vez', async ({ browser }) => {
     await p.getByRole('button', { name: 'Empezar' }).click();
   }
 
-  // Caro elige ver 2 a la vez y mira a Ana y a Beto.
-  await c.getByRole('group', { name: 'Pantallas a la vez' }).getByRole('button', { name: '2' }).click();
+  // Caro suma a Ana y a Beto.
   await tarjeta(c, 'Ana').getByRole('button', { name: 'Ver' }).click({ timeout: 10_000 });
   await tarjeta(c, 'Beto').getByRole('button', { name: 'Ver' }).click({ timeout: 10_000 });
   await expect(c.getByLabel('Pantalla de Ana')).toBeVisible({ timeout: 10_000 });
   await expect(c.getByLabel('Pantalla de Beto')).toBeVisible({ timeout: 10_000 });
   await expect.poll(async () => (await framesDe(c, 'Ana')) > 0 && (await framesDe(c, 'Beto')) > 0, { timeout: 10_000 }).toBe(true);
 
-  // Con 1 a la vez queda solo la última elegida (Beto). Si Beto corta, no queda ninguna.
-  await c.getByRole('group', { name: 'Pantallas a la vez' }).getByRole('button', { name: '1' }).click();
+  // "Dejar de ver" saca solo esa. Si Beto corta, no queda ninguna.
+  await tarjeta(c, 'Ana').getByRole('button', { name: 'Dejar de ver' }).click();
   await expect(c.getByLabel('Pantalla de Ana')).toHaveCount(0);
   await expect(c.getByLabel('Pantalla de Beto')).toBeVisible();
   await b.getByRole('button', { name: 'Dejar de transmitir' }).click();

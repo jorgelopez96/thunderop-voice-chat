@@ -10,16 +10,19 @@
   import type { ChatAbierto } from '../chat.svelte';
   import { mensajeError, sesion } from '../sesion.svelte';
   import Confirmar from './Confirmar.svelte';
-  import Silenciar from './Silenciar.svelte';
+  import MenuChat from './MenuChat.svelte';
+  import VistaPrevia from './VistaPrevia.svelte';
+  import { partirEnLinks, primerLink, abrirLink } from '../links';
+  import type { Snippet } from 'svelte';
 
   // Sirve para salas de grupo y privados: quien lo usa dice qué lista abrir y cómo enviar y borrar.
   // `soloLectura`: oculta el compositor y muestra ese texto (privado con alguien que ya no es amigo).
-  // `silencio`: id del chat para la campanita de silenciar avisos.
-  let { titulo, abrir, enviar, borrar, puedeBorrar, soloLectura = '', alVer, silencio }: {
+  // `silencio`: id del chat para el menú de tres puntitos (silenciar avisos); `acciones`: más opciones en ese menú.
+  let { titulo, abrir, enviar, borrar, puedeBorrar, soloLectura = '', alVer, silencio, acciones }: {
     titulo: string; abrir: () => ChatAbierto; enviar: (texto: string, archivo?: File, respondeA?: string) => Promise<unknown>;
     borrar: (id: string) => Promise<unknown>; puedeBorrar: (m: RecordModel) => boolean; soloLectura?: string;
     alVer?: (ultimo: RecordModel) => void; // se llama con el último mensaje visible (privados: marcar leído)
-    silencio?: string;
+    silencio?: string; acciones?: Snippet<[() => void]>;
   } = $props();
   // svelte-ignore state_referenced_locally
   const chat = abrir(); // se recrea con #key en quien lo usa
@@ -158,7 +161,7 @@
 </script>
 
 <section class="chat" aria-label="Chat {titulo}">
-  <h2 class="titulo">{titulo}{#if silencio}<Silenciar chat={silencio} />{/if}</h2>
+  <h2 class="titulo">{titulo}{#if silencio}<MenuChat chat={silencio} {acciones} />{/if}</h2>
   <div class="lista" bind:this={lista} onscroll={alScroll} data-testid="mensajes">
     {#if chat.hayMas}<button class="plano" onclick={() => chat.cargarMas()}>Cargar anteriores</button>{/if}
     {#if chat.error}<p role="alert">{chat.error}</p>{/if}
@@ -185,7 +188,8 @@
             <!-- svelte-ignore a11y_autofocus -->
             <textarea class="edicion" bind:value={editando.texto} onkeydown={teclaEdicion} maxlength="2000" rows="2" autofocus aria-label="Editar mensaje"></textarea>
             <small class="ayuda">Enter guarda · Esc cancela</small>
-          {:else if m.text}<p class="texto">{m.text}{#if m.editado}<small class="editado" title={`Editado ${new Date(m.editado.replace(' ', 'T')).toLocaleString('es')}`}> (editado)</small>{/if}</p>{/if}
+          {:else if m.text}<p class="texto">{#each partirEnLinks(m.text) as parte, j (j)}{#if parte.url}{@const url = parte.url}<a href={url} onclick={(e) => { e.preventDefault(); abrirLink(url); }}>{parte.texto}</a>{:else}{parte.texto}{/if}{/each}{#if m.editado}<small class="editado" title={`Editado ${new Date(m.editado.replace(' ', 'T')).toLocaleString('es')}`}> (editado)</small>{/if}</p>{/if}
+          {#if m.text && editando?.id !== m.id}{@const link = primerLink(m.text)}{#if link}<VistaPrevia url={link} />{/if}{/if}
           {#if m.file}
             {@const url = pb.files.getURL(m, m.file)}
             {#if esVideo(m)}<video class="adjunto" controls src={url}><track kind="captions" /></video>
@@ -258,6 +262,7 @@
   header { display: flex; align-items: baseline; gap: 8px; margin-bottom: 2px; }
   header small { font-size: 11px; }
   .texto { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; }
+  .texto a { color: var(--acento); text-decoration: underline; }
   .editado { font-size: 11px; color: var(--apagado); }
   .edicion { width: 100%; resize: vertical; }
   .ayuda { font-size: 11px; color: var(--tenue); }

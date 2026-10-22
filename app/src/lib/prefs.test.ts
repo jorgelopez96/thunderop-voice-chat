@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { leerPrefs, guardarPrefs } from './prefs';
 import { volumen } from './voz.svelte';
 
-const DEFAULTS = { supresion: true, volumenes: {}, calidad: '1080p60', gpu: true, vistaPrevia: true, volBotonera: 0.8, volMusica: 50, gananciaDb: 0, sonidoMensajes: true, notificaciones: true, verVarias: 1 };
+const DEFAULTS = { supresion: true, volumenes: {}, calidad: '1080p60', gpu: true, vistaPrevia: true, volBotonera: 0.8, volMusica: 50, gananciaDb: 0, sonidoMensajes: true, notificaciones: true };
 
 describe('prefs de voz', () => {
   // Vitest corre en Node (sin localStorage): uno en memoria por test.

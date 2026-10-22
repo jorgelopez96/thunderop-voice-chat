@@ -140,6 +140,14 @@ describe('voz', () => {
       expect(c.video.canPublishSources).toBeUndefined();
     });
 
+    it('desconectar: solo el dueño, y no a sí mismo', async () => {
+      const { a, b, g } = await setup();
+      const desconectar = (pb: { send: Function }, user: string) => pb.send(`/api/groups/${g.id}/desconectar`, { method: 'POST', body: { user } });
+      expect(await desconectar(a, b.authStore.record!.id)).toEqual({ ok: true });
+      await expect(desconectar(b, a.authStore.record!.id)).rejects.toMatchObject({ status: 403 });
+      await expect(desconectar(a, a.authStore.record!.id)).rejects.toMatchObject({ status: 400 });
+    });
+
     it('no dueño → 403', async () => {
       const { a, b, g } = await setup();
       await expect(silenciar(b, g.id, a.authStore.record!.id, true)).rejects.toMatchObject({ status: 403 });

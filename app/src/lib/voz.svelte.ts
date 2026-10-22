@@ -13,9 +13,9 @@ import { mensajeTransmision } from './transmision';
 export type Participante = { id: string; nombre: string; hablando: boolean; silenciado: boolean; local: boolean; transmite: boolean; pantalla: string | undefined; espectadores: number };
 
 /** `sinPermiso`: el dueño nos silenció (los permisos de LiveKit no dejan publicar el micrófono). `viendo`: sids de las pantallas que miramos
- *  (las más nuevas al final, hasta `verVarias`). */
-export const voz = $state<{ salaId: string | null; salaNombre: string; grupoId: string | null; conectando: boolean; error: string; muteado: boolean; ensordecido: boolean; sinPermiso: boolean; supresion: boolean; participantes: Participante[]; transmitiendo: boolean; viendo: string[]; verVarias: number; vistaPrevia: boolean }>({
-  salaId: null, salaNombre: '', grupoId: null, conectando: false, error: '', muteado: false, ensordecido: false, sinPermiso: false, supresion: leerPrefs().supresion, participantes: [], transmitiendo: false, viendo: [], verVarias: leerPrefs().verVarias, vistaPrevia: leerPrefs().vistaPrevia,
+ *  (en el orden en que se eligieron). */
+export const voz = $state<{ salaId: string | null; salaNombre: string; grupoId: string | null; conectando: boolean; error: string; muteado: boolean; ensordecido: boolean; sinPermiso: boolean; supresion: boolean; participantes: Participante[]; transmitiendo: boolean; viendo: string[]; vistaPrevia: boolean }>({
+  salaId: null, salaNombre: '', grupoId: null, conectando: false, error: '', muteado: false, ensordecido: false, sinPermiso: false, supresion: leerPrefs().supresion, participantes: [], transmitiendo: false, viendo: [], vistaPrevia: leerPrefs().vistaPrevia,
 });
 
 // LiveKit se carga recién al entrar a la voz: el arranque de la app no lo paga. Mientras haya `room`, `lk` está cargado.
@@ -159,6 +159,11 @@ export async function entrarVoz(roomId: string, salaNombre = '', grupoId: string
   r.on(RoomEvent.TrackPublished, (pub, part) => {
     if (pub.source === Track.Source.Microphone || (pub.source === Track.Source.ScreenShareAudio && voz.viendo.some((s) => part.trackPublications.has(s)))) pub.setSubscribed(true);
   });
+  // Red de seguridad: tras una reconexión (o una suscripción que falló) algún micrófono podía quedar sin suscribir y dejaba
+  // de escucharse a esa persona hasta que saliera y volviera. Se revisa al reconectar, al fallar y cada 10 s.
+  r.on(RoomEvent.Reconnected, () => asegurarSuscripciones(r));
+  r.on(RoomEvent.TrackSubscriptionFailed, () => setTimeout(() => asegurarSuscripciones(r), 2000));
+  const revisar = setInterval(() => (room === r ? asegurarSuscripciones(r) : clearInterval(revisar)), 10_000);
   r.on(RoomEvent.TrackUnpublished, (pub) => { if (voz.viendo.includes(pub.trackSid)) aplicarVista(voz.viendo.filter((s) => s !== pub.trackSid)); });
   r.on(RoomEvent.ParticipantDisconnected, () => aplicarVista(voz.viendo.filter((s) => pubPantalla(s))));
   // Fin de la transmisión propia, por el botón o porque Windows cortó la captura: todo pasa por acá.
@@ -282,6 +287,18 @@ export async function ensordecer(si: boolean) {
   else if (voz.muteado && !muteadoAntes) await alternarMute();
 }
 
+/** Suscribe lo que tiene que estar suscrito y no lo está: todos los micrófonos y las pantallas que se miran (con su sonido). */
+function asegurarSuscripciones(r: Room) {
+  if (r.state !== lk.ConnectionState.Connected) return;
+  for (const p of r.remoteParticipants.values()) {
+    const miro = voz.viendo.some((s) => p.trackPublications.has(s));
+    for (const pub of p.trackPublications.values()) {
+      const quiero = pub.source === lk.Track.Source.Microphone || voz.viendo.includes(pub.trackSid) || (miro && pub.source === lk.Track.Source.ScreenShareAudio);
+      if (quiero && !pub.isSubscribed) pub.setSubscribed(true);
+    }
+  }
+}
+
 // El atributo `mirando` lleva las identidades de quienes miro, separadas por coma.
 const mirandoDe = (x: Participant) => (x.attributes.mirando ?? '').split(',').filter(Boolean);
 
@@ -364,18 +381,11 @@ const pubPantalla = (sid: string) => {
   for (const p of room?.remoteParticipants.values() ?? []) { const pub = p.trackPublications.get(sid); if (pub) return { p, pub }; }
 };
 
-/** Empieza (`si`) o deja de mirar la pantalla `sid` (de cualquiera de la sala). Si ya se miran `verVarias`, sale la más vieja. */
+/** Suma (`si`) o saca la pantalla `sid` (de cualquiera de la sala) de las que se miran. */
 export function ver(sid: string, si: boolean) {
   const lista = voz.viendo.filter((s) => s !== sid);
   if (si) lista.push(sid);
-  aplicarVista(lista.slice(-voz.verVarias));
-}
-
-/** Cuántas pantallas se ven a la vez (1 a 3, se guarda). */
-export function verVarias(n: number) {
-  voz.verVarias = n;
-  guardarPrefs({ verVarias: n });
-  aplicarVista(voz.viendo.slice(-n));
+  aplicarVista(lista);
 }
 
 // Solo se suscribe a las pantallas que se miran, y al sonido de quienes las comparten. El atributo `mirando`
@@ -446,6 +456,11 @@ if (import.meta.env.DEV) {
       t?.stop(); t?.dispatchEvent(new Event('ended'));
     },
   };
+}
+
+/** Solo el dueño: saca a un miembro de la llamada (puede volver a entrar). */
+export async function desconectar(groupId: string, userId: string) {
+  await pb.send(`/api/groups/${groupId}/desconectar`, { method: 'POST', body: { user: userId } });
 }
 
 /** Solo el dueño: silencia o des-silencia a un miembro en todas las salas de voz del grupo. */

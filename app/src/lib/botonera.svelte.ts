@@ -65,7 +65,7 @@ async function buffer(id: string, c: AudioContext) {
 /** Reproduce localmente por el contexto de la voz; si ya hay 3 sonando, se descarta. Sin voz no hay contexto: no suena. */
 async function reproducir(id: string, base: number) {
   const c = contextoVoz();
-  if (!c) return;
+  if (!c || voz.ensordecido) return; // ensordecido no escucha nada, tampoco la botonera
   let cupo = cupos.get(c);
   if (!cupo) cupos.set(c, cupo = new Limite(3));
   if (!cupo.intentar()) return;
