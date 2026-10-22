@@ -1,6 +1,6 @@
 <script lang="ts">
   import Insignia from './Insignia.svelte';
-  import { Paperclip, Smile, SmilePlus, Reply, Trash2, X, Pencil } from '@lucide/svelte';
+  import { Paperclip, Smile, SmilePlus, Reply, Trash2, X, Pencil, Download } from '@lucide/svelte';
   import { EMOJIS } from '../emojis';
   import { tick } from 'svelte';
   import type { RecordModel } from 'pocketbase';
@@ -12,7 +12,8 @@
   import Confirmar from './Confirmar.svelte';
   import MenuChat from './MenuChat.svelte';
   import VistaPrevia from './VistaPrevia.svelte';
-  import { partirEnLinks, primerLink, abrirLink } from '../links';
+  import Gifs from './Gifs.svelte';
+  import { partirEnLinks, primerLink, abrirLink, esGif } from '../links';
   import type { Snippet } from 'svelte';
 
   // Sirve para salas de grupo y privados: quien lo usa dice qué lista abrir y cómo enviar y borrar.
@@ -132,6 +133,20 @@
     posMenu = r.top > 320 ? `left:${x}px;bottom:${innerHeight - r.top + 4}px` : `left:${x}px;top:${r.bottom + 4}px`;
     menuEmojis?.showPopover();
   }
+  // GIFs: panel arriba del botón; elegir uno lo manda enseguida (respondiendo, si había una respuesta en curso).
+  let panelGifs = $state<HTMLElement>();
+  let gifsAbierto = $state(false);
+  let posGifs = $state('');
+  function abrirGifs(e: MouseEvent) {
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    posGifs = `left:${Math.max(8, Math.min(r.left, innerWidth - 392))}px;bottom:${innerHeight - r.top + 4}px`;
+    panelGifs?.showPopover();
+  }
+  async function mandarGif(url: string) {
+    panelGifs?.hidePopover();
+    error = '';
+    try { await enviar(url, undefined, respondiendo?.id); respondiendo = null; } catch (e) { error = mensajeError(e); }
+  }
   async function elegirEmoji(emoji: string) {
     menuEmojis?.hidePopover();
     if (destino) return reaccionar(destino, emoji);
@@ -151,12 +166,23 @@
   let grande = $state<RecordModel | null>(null);
   let zoom = $state(1);
   let origen = $state('50% 50%');
-  function verGrande(m: RecordModel) { grande = m; zoom = 1; visor?.showModal(); }
+  let mover = $state({ x: 0, y: 0 }); // arrastre con el mouse cuando hay zoom
+  let arrastre = $state<{ x: number; y: number } | null>(null);
+  function verGrande(m: RecordModel) { grande = m; zoom = 1; mover = { x: 0, y: 0 }; visor?.showModal(); }
   function rueda(e: WheelEvent) {
     e.preventDefault();
     const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
     origen = `${((e.clientX - r.left) / r.width) * 100}% ${((e.clientY - r.top) / r.height) * 100}%`;
-    zoom = Math.min(8, Math.max(0.5, zoom * (e.deltaY < 0 ? 1.15 : 1 / 1.15)));
+    zoom = Math.min(8, Math.max(1, zoom * (e.deltaY < 0 ? 1.15 : 1 / 1.15))); // nunca más chica que entera
+    if (zoom === 1) mover = { x: 0, y: 0 };
+  }
+  function agarrar(e: PointerEvent) {
+    if (zoom === 1) return;
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    arrastre = { x: e.clientX - mover.x, y: e.clientY - mover.y };
+  }
+  function arrastrar(e: PointerEvent) {
+    if (arrastre) mover = { x: e.clientX - arrastre.x, y: e.clientY - arrastre.y };
   }
 </script>
 
@@ -188,8 +214,9 @@
             <!-- svelte-ignore a11y_autofocus -->
             <textarea class="edicion" bind:value={editando.texto} onkeydown={teclaEdicion} maxlength="2000" rows="2" autofocus aria-label="Editar mensaje"></textarea>
             <small class="ayuda">Enter guarda · Esc cancela</small>
+          {:else if m.text && esGif(m.text)}<img class="gif" src={m.text.trim()} alt="GIF" loading="lazy" referrerpolicy="no-referrer" />
           {:else if m.text}<p class="texto">{#each partirEnLinks(m.text) as parte, j (j)}{#if parte.url}{@const url = parte.url}<a href={url} onclick={(e) => { e.preventDefault(); abrirLink(url); }}>{parte.texto}</a>{:else}{parte.texto}{/if}{/each}{#if m.editado}<small class="editado" title={`Editado ${new Date(m.editado.replace(' ', 'T')).toLocaleString('es')}`}> (editado)</small>{/if}</p>{/if}
-          {#if m.text && editando?.id !== m.id}{@const link = primerLink(m.text)}{#if link}<VistaPrevia url={link} />{/if}{/if}
+          {#if m.text && editando?.id !== m.id && !esGif(m.text)}{@const link = primerLink(m.text)}{#if link}<VistaPrevia url={link} />{/if}{/if}
           {#if m.file}
             {@const url = pb.files.getURL(m, m.file)}
             {#if esVideo(m)}<video class="adjunto" controls src={url}><track kind="captions" /></video>
@@ -204,7 +231,7 @@
         <div class="herramientas">
           <button class="icono" title="Responder" aria-label="Responder" onclick={() => responder(m)}><Reply size={16} strokeWidth={1.75} /></button>
           <button class="icono" title="Reaccionar" aria-label="Reaccionar" onclick={(e) => abrirEmojis(e, m.id)}><SmilePlus size={16} strokeWidth={1.75} /></button>
-          {#if m.author === sesion.usuario?.id && !soloLectura}<button class="icono" title="Editar" aria-label="Editar" onclick={() => (editando = { id: m.id, texto: m.text, original: m.text })}><Pencil size={16} strokeWidth={1.75} /></button>{/if}
+          {#if m.author === sesion.usuario?.id && !soloLectura && !esGif(m.text ?? '')}<button class="icono" title="Editar" aria-label="Editar" onclick={() => (editando = { id: m.id, texto: m.text, original: m.text })}><Pencil size={16} strokeWidth={1.75} /></button>{/if}
           {#if puedeBorrar(m)}<button class="icono borrar" title="Borrar" aria-label="Borrar" onclick={() => (aBorrar = m)}><Trash2 size={16} strokeWidth={1.75} /></button>{/if}
         </div>
       </article>
@@ -227,21 +254,25 @@
   {:else}<div class="composer">
     <label class="clip" title="Adjuntar imagen o video"><Paperclip size={18} strokeWidth={1.75} /><input type="file" hidden accept="image/png,image/jpeg,image/gif,image/webp,video/mp4,video/webm" onchange={elegir} data-testid="adjuntar" /></label>
     <button class="plano emoji" title="Emojis" aria-label="Emojis" onclick={(e) => abrirEmojis(e, '')}><Smile size={18} strokeWidth={1.75} /></button>
+    <button class="plano gif-boton" title="GIFs" aria-label="GIFs" onclick={abrirGifs}>GIF</button>
     <textarea bind:this={caja} bind:value={texto} onkeydown={tecla} onpaste={pegar} maxlength="2000" rows="1" placeholder="Escribí un mensaje" title="Enter envía, Shift+Enter hace una línea nueva"></textarea>
     <button class="primario" onclick={enviarMensaje} disabled={enviando}>Enviar</button>
   </div>{/if}
   {#if aBorrar}{@const m = aBorrar}<Confirmar texto="¿Borrar este mensaje?" cancelar={() => (aBorrar = null)} confirmar={() => quitar(m)} />{/if}
+  <div popover class="panel-gifs" bind:this={panelGifs} style={posGifs} ontoggle={(e) => (gifsAbierto = e.newState === 'open')}>
+    {#if gifsAbierto}<Gifs elegir={mandarGif} />{/if}
+  </div>
   <div popover class="emojis" bind:this={menuEmojis} style={posMenu}>
     {#each EMOJIS as emoji (emoji)}<button class="plano" onclick={() => elegirEmoji(emoji)}>{emoji}</button>{/each}
   </div>
   <dialog class="visor" bind:this={visor} onclose={() => (grande = null)} onclick={(e) => e.target === visor && visor.close()}>
     {#if grande}
       <div class="acciones">
-        <a class="boton plano" href={pb.files.getURL(grande, grande.file, { download: true })} download title="Descargar" aria-label="Descargar">⬇</a>
-        <button class="plano" onclick={() => visor?.close()} title="Cerrar" aria-label="Cerrar">✕</button>
+        <a class="boton plano" href={pb.files.getURL(grande, grande.file, { download: true })} download title="Descargar" aria-label="Descargar"><Download size={18} strokeWidth={1.75} /></a>
+        <button class="plano" onclick={() => visor?.close()} title="Cerrar" aria-label="Cerrar"><X size={18} strokeWidth={1.75} /></button>
       </div>
-      <div class="marco" onwheel={rueda}>
-        <img src={pb.files.getURL(grande, grande.file)} alt="Imagen adjunta" style="transform: scale({zoom}); transform-origin: {origen}" />
+      <div class="marco" role="presentation" class:movible={zoom > 1} class:agarrado={!!arrastre} onwheel={rueda} onpointerdown={agarrar} onpointermove={arrastrar} onpointerup={() => (arrastre = null)} onpointercancel={() => (arrastre = null)}>
+        <img src={pb.files.getURL(grande, grande.file)} alt="Imagen adjunta" style="transform: translate({mover.x}px, {mover.y}px) scale({zoom}); transform-origin: {origen}" draggable="false" />
       </div>
     {/if}
   </dialog>
@@ -287,6 +318,9 @@
   .reacciones { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
   .chip { min-height: 26px; padding: 2px 8px; font-size: 13px; border-color: var(--borde); }
   .emoji { padding: 4px; color: var(--icono); }
+  .gif { display: block; max-width: 280px; max-height: 240px; border-radius: var(--radio); margin-top: 2px; }
+  .gif-boton { font-size: 11px; font-weight: 700; letter-spacing: .04em; padding: 2px 6px; border: 1.5px solid var(--icono); border-radius: 4px; color: var(--icono); }
+  .panel-gifs { position: fixed; inset: auto; margin: 0; padding: 10px; background: var(--elevado); color: var(--texto); border: 1px solid var(--borde); border-radius: var(--radio-menu); }
   .emojis { position: fixed; inset: auto; margin: 0; padding: 6px; width: 296px; flex-wrap: wrap; gap: 2px;
     background: var(--panel); border: 1px solid var(--borde); border-radius: 10px; }
   .emojis:popover-open { display: flex; }
@@ -297,7 +331,10 @@
   .acciones .boton { display: inline-flex; align-items: center; padding: 6px 14px; color: var(--tenue); text-decoration: none; border-radius: var(--radio); }
   .acciones .boton:hover { color: var(--texto); background: var(--hover); }
   .marco { flex: 1; min-height: 0; overflow: hidden; display: flex; align-items: center; justify-content: center; }
-  .marco img { max-width: 100%; max-height: 100%; object-fit: contain; transition: transform .08s; }
+  .marco img { max-width: 100%; max-height: 100%; object-fit: contain; transition: transform .08s; user-select: none; }
+  .marco.movible { cursor: grab; }
+  .marco.agarrado { cursor: grabbing; }
+  .marco.agarrado img { transition: none; }
   .composer { display: flex; align-items: center; gap: 8px; margin: 8px 16px 16px; background: var(--panel); border: 1px solid var(--borde); border-radius: 8px; padding: 6px 8px; }
   .composer textarea { flex: 1; min-width: 0; resize: none; field-sizing: content; max-height: 120px; background: none; border: 0; padding: 6px 4px; }
   .clip { cursor: pointer; flex-direction: row; color: var(--icono); padding: 4px; }

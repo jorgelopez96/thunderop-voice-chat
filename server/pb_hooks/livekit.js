@@ -63,6 +63,18 @@ function enSalasDeVoz(app, groupId, method, body, salas) {
   });
 }
 
+// Base64 de un texto ASCII (la JSVM no trae btoa). Para el campo `data` de SendData.
+function base64(texto) {
+  const abc = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+  let out = "";
+  for (let i = 0; i < texto.length; i += 3) {
+    const [a, b, c] = [texto.charCodeAt(i), texto.charCodeAt(i + 1), texto.charCodeAt(i + 2)];
+    const n = (a << 16) | ((b || 0) << 8) | (c || 0);
+    out += abc[(n >> 18) & 63] + abc[(n >> 12) & 63] + (isNaN(b) ? "=" : abc[(n >> 6) & 63]) + (isNaN(c) ? "=" : abc[n & 63]);
+  }
+  return out;
+}
+
 // Busca el grupo y exige que `userId` sea miembro.
 function grupoDeMiembro(app, groupId, userId) {
   let group;
@@ -97,4 +109,15 @@ function silenciado(p, silenciados) {
   return !(p.tracks || []).some((t) => (t.source === "MICROPHONE" || t.source === 2) && !t.muted);
 }
 
-module.exports = { config, token, roomService, enSalasDeVoz, grupoDeMiembro, salaDeVoz, silenciado };
+// Moderación del dueño sobre otro miembro del grupo de la ruta (`id`): valida y devuelve { group, user }.
+function moderar(e) {
+  const group = grupoDeMiembro(e.app, e.request.pathValue("id"), e.auth.id);
+  if (group.getString("owner") !== e.auth.id) throw new ForbiddenError("Solo el dueño puede hacer esto.");
+  const user = e.requestInfo().body.user;
+  if (typeof user !== "string" || !user) throw new BadRequestError("Falta el usuario.");
+  if (user === e.auth.id) throw new BadRequestError("No podés hacerte esto a vos mismo.");
+  if (!group.getStringSlice("members").includes(user)) throw new BadRequestError("Ese usuario no es miembro del grupo.");
+  return { group, user };
+}
+
+module.exports = { config, token, roomService, enSalasDeVoz, grupoDeMiembro, salaDeVoz, silenciado, base64, moderar };

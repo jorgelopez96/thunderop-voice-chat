@@ -34,6 +34,10 @@ onRecordUpdateRequest((e) => {
     if (e.auth.id !== e.record.original().getString("owner") && silenciados(e.record) !== silenciados(e.record.original())) {
       throw new ForbiddenError("Solo el dueño puede silenciar.");
     }
+    const bloqueados = (r) => JSON.stringify(r.getStringSlice("bloqueados"));
+    if (e.auth.id !== e.record.original().getString("owner") && bloqueados(e.record) !== bloqueados(e.record.original())) {
+      throw new ForbiddenError("Solo el dueño puede bloquear la voz.");
+    }
   }
   e.next();
 }, "groups");

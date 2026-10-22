@@ -3,18 +3,20 @@
   import { leerPrefs, guardarPrefs } from '../prefs';
   import { dbDePorcentaje, porcentajeDeDb } from '../ganancia';
   import MedidorMic from './MedidorMic.svelte';
+  import { TEMAS, aplicarTema, temaGuardado } from '../tema';
 
   // Configuraciones generales, por solapas como las del grupo.
   let { cerrar }: { cerrar: () => void } = $props();
   let d: HTMLDialogElement;
   let error = $state('');
-  let solapa = $state<'audio' | 'transmision' | 'notificaciones'>('audio');
+  let solapa = $state<'audio' | 'transmision' | 'notificaciones' | 'apariencia'>('audio');
+  let tema = $state(temaGuardado());
   let lista = $state<Awaited<ReturnType<typeof dispositivos>>>({ entradas: [], salidas: [] });
   const prefs = leerPrefs();
   let pctMic = $state(porcentajeDeDb(prefs.gananciaDb));
   let entrada = $state(prefs.entrada);
   $effect(() => { if (!d.open) d.showModal(); dispositivos().then((x) => (lista = x)).catch(() => (error = 'No se pudieron listar los dispositivos de audio.')); });
-  const SOLAPAS = [['audio', 'Audio'], ['transmision', 'Transmisión'], ['notificaciones', 'Notificaciones']] as const;
+  const SOLAPAS = [['audio', 'Audio'], ['transmision', 'Transmisión'], ['notificaciones', 'Notificaciones'], ['apariencia', 'Apariencia']] as const;
 </script>
 
 <dialog class="config" bind:this={d} oncancel={cerrar} onclose={cerrar} onclick={(e) => e.target === d && d.close()}>
@@ -45,6 +47,17 @@
       <small>Sube o baja cómo te escuchan los demás (50% = sin cambios). Hablá y mirá las barritas: las rojas son que satura.</small>
       <MedidorMic {entrada} gananciaDb={dbDePorcentaje(pctMic)} />
     </section>
+  {:else if solapa === 'apariencia'}
+    <section>
+      <span>Color de la app</span>
+      <div class="temas" role="radiogroup" aria-label="Color de la app">
+        {#each TEMAS as t (t.id)}
+          <button class="plano tema" role="radio" aria-checked={tema === t.id} onclick={() => { tema = t.id; aplicarTema(t.id); }}>
+            <span class="muestra" style="background:{t.color}"></span>{t.nombre}</button>
+        {/each}
+      </div>
+      <small>Solo cambia cómo la ves vos, en esta PC.</small>
+    </section>
   {:else if solapa === 'notificaciones'}
     <section>
       <label class="casilla"><input type="checkbox" checked={prefs.sonidoMensajes} onchange={(e) => guardarPrefs({ sonidoMensajes: e.currentTarget.checked })} /> Sonido al llegar un mensaje</label>
@@ -70,4 +83,8 @@
   input[type='range'] { padding: 0; background: none; }
   select { font: inherit; color: var(--texto); background: var(--hondo); border: 0; border-radius: var(--radio); padding: 8px 10px; }
   .fin { justify-content: flex-end; margin-top: auto; }
+  .temas { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .tema { justify-content: flex-start; gap: 10px; padding: 10px 12px; border: 1px solid var(--borde); color: var(--texto); }
+  .tema[aria-checked='true'] { border-color: var(--acento); background: var(--acento-suave); }
+  .muestra { width: 20px; height: 20px; border-radius: 999px; flex: none; }
 </style>

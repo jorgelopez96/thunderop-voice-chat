@@ -1,6 +1,7 @@
 import { isTauri } from '@tauri-apps/api/core';
 import { pb } from './pb';
 import { leerPrefs } from './prefs';
+import { esGif } from './links';
 
 // Aviso de mensaje nuevo (privados y salas): sonido y, si la ventana no está a la vista, notificación de Windows.
 // Cada chat se puede silenciar hasta una fecha o para siempre; se guarda en este dispositivo:
@@ -67,4 +68,5 @@ export async function avisar(chat: string, titulo: string, texto: string) {
 }
 
 /** Texto corto para la notificación. */
-export const resumen = (m: { [k: string]: unknown }) => (m.text ? String(m.text).slice(0, 120) : m.file ? 'Mandó un archivo' : '');
+export const resumen = (m: { [k: string]: unknown }) =>
+  (m.text ? (esGif(String(m.text)) ? 'Mandó un GIF' : String(m.text).slice(0, 120)) : m.file ? 'Mandó un archivo' : '');

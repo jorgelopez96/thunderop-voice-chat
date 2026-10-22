@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { partirEnLinks, primerLink } from './links';
+import { partirEnLinks, primerLink, esGif } from './links';
 
 describe('partirEnLinks', () => {
   it('separa links del texto y deja afuera la puntuación final', () => {
@@ -13,4 +13,10 @@ describe('partirEnLinks', () => {
     expect(primerLink('http://a.com y https://b.com')).toBe('https://b.com');
     expect(primerLink('nada')).toBeUndefined();
   });
+});
+
+it('esGif: solo un link de media.giphy.com, nada más en el mensaje', () => {
+  expect(esGif('https://media1.giphy.com/media/abc/200.gif')).toBe(true);
+  expect(esGif('mirá https://media1.giphy.com/media/abc/200.gif')).toBe(false);
+  expect(esGif('https://evil.com/media/abc/200.gif')).toBe(false);
 });

@@ -174,7 +174,17 @@ export async function entrarVoz(roomId: string, salaNombre = '', grupoId: string
     void detenerAudioPantalla();
     void despublicarAudio(r);
   });
-  r.on(RoomEvent.DataReceived, (payload, _part, _kind, topic) => { for (const f of oyentesDatos) f(payload, topic); });
+  r.on(RoomEvent.DataReceived, (payload, part, _kind, topic) => {
+    // El dueño nos movió a otra sala: el aviso lo manda el servidor (sin participante), nunca otro usuario.
+    if (topic === 'mover' && !part) {
+      try {
+        const { sala, nombre } = JSON.parse(new TextDecoder().decode(payload));
+        if (typeof sala === 'string' && sala !== voz.salaId) void entrarVoz(sala, typeof nombre === 'string' ? nombre : '', voz.grupoId);
+      } catch { /* aviso roto: se ignora */ }
+      return;
+    }
+    for (const f of oyentesDatos) f(payload, topic);
+  });
   r.on(RoomEvent.LocalTrackPublished, () => { aplicarProcesador(); actualizar(); });
   r.on(RoomEvent.ParticipantPermissionsChanged, (_prev, part) => {
     // El dueño nos des-silenció: se vuelve a publicar el micrófono (LiveKit lo despublicó al silenciar).
@@ -456,6 +466,16 @@ if (import.meta.env.DEV) {
       t?.stop(); t?.dispatchEvent(new Event('ended'));
     },
   };
+}
+
+/** Solo el dueño: lleva a un miembro que está en la llamada a otra sala de voz del grupo. */
+export async function moverA(groupId: string, userId: string, sala: string) {
+  await pb.send(`/api/groups/${groupId}/mover`, { method: 'POST', body: { user: userId, sala } });
+}
+
+/** Solo el dueño: saca a un miembro de la voz y no lo deja volver (`bloqueado`), o lo vuelve a dejar. */
+export async function bloquearVoz(groupId: string, userId: string, bloqueado: boolean) {
+  await pb.send(`/api/groups/${groupId}/bloquear-voz`, { method: 'POST', body: { user: userId, bloqueado } });
 }
 
 /** Solo el dueño: saca a un miembro de la llamada (puede volver a entrar). */

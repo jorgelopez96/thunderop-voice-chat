@@ -39,7 +39,7 @@
   li { display: flex; align-items: flex-start; gap: 12px; min-height: 36px; padding: 8px 0; font-size: 13px; border-top: 1px solid var(--borde); }
   li:first-child { border-top: 0; }
   .chip { flex: none; width: 64px; text-align: center; font-size: 11px; font-weight: 600; padding: 2px 0; border-radius: 999px;
-    color: var(--acento-texto); background: rgb(139 124 246 / .16); }
+    color: var(--acento-texto); background: var(--acento-suave); }
   .arreglo { color: var(--tenue); background: var(--hover); }
   details { border-top: 1px solid var(--borde); padding-top: 8px; }
   summary { cursor: pointer; font-size: 13px; color: var(--tenue); padding: 4px 0; }

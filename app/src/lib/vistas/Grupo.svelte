@@ -10,7 +10,7 @@
   import Voz from './Voz.svelte';
   import { voz, entrarVoz } from '../voz.svelte';
   import Confirmar from './Confirmar.svelte';
-  import { ChevronDown, Plus, Hash, UserPlus, Pencil, Trash2, Settings } from '@lucide/svelte';
+  import { ChevronDown, Hash, UserPlus, Pencil, Trash2, Settings, Volume2 } from '@lucide/svelte';
   import { abrirEnPunto } from '../menu';
   import ConfigGrupo from './ConfigGrupo.svelte';
   import { foto } from '../foto';
@@ -38,7 +38,7 @@
   $effect(() => { if (salaAbierta && !centroVoz) return mirar(salaAbierta.id); });
   let link = $state('');
   let error = $state('');
-  let nueva = $state({ chat: '', voz: '' });
+  let nueva = $state('');
   let editando = $state<{ id: string; name: string } | null>(null);
   let confirmar = $state<null | { texto: string; hacer: () => Promise<void> }>(null);
 
@@ -51,10 +51,9 @@
     try { await navigator.clipboard.writeText(link); } catch { /* sin permiso: el link queda visible */ }
   }
   async function agregar(kind: 'chat' | 'voz') {
-    const name = nueva[kind].trim();
-    if (!name) return;
-    await crearSala(grupo.id, name, kind, s.estado.lista.length);
-    nueva[kind] = '';
+    const name = nueva.trim();
+    dlgNueva?.close();
+    if (name) await crearSala(grupo.id, name, kind, s.estado.lista.length);
   }
   async function abrir(r: RecordModel) {
     if (r.kind === 'chat') { salaId = r.id; centroVoz = false; return; }
@@ -69,7 +68,10 @@
   const miembro = (id: string) => ((grupo.expand?.members ?? []) as RecordModel[]).find((m) => m.id === id);
   let menuGrupo = $state<HTMLElement>();
   let cabecera = $state<HTMLElement>();
+  // Nueva sala (solo el dueño, desde el menú del grupo): modal con Cancelar, Esc o clic afuera.
   let creando = $state<'chat' | 'voz' | null>(null);
+  let dlgNueva = $state<HTMLDialogElement>();
+  $effect(() => { if (creando) { nueva = ''; dlgNueva?.showModal(); } });
   let config = $state(false);
   // Clic derecho en una sala (solo el dueño): cambiar nombre o borrar. El nombre se cambia en un modal.
   let menuSala = $state<RecordModel | null>(null);
@@ -99,19 +101,16 @@
   </li>
 {/snippet}
 
-{#snippet titulo(kind: 'chat' | 'voz', texto: string)}
-  <div class="seccion-salas"><h3>{texto}</h3>
-    {#if soyDueno}<button class="icono" aria-label={kind === 'chat' ? 'Nueva sala de chat' : 'Nueva sala de voz'} title="Nueva sala" onclick={() => (creando = creando === kind ? null : kind)}><Plus size={14} strokeWidth={1.75} /></button>{/if}
-  </div>
+<!-- Tres puntitos del chat de una sala (dueño): cambiarle el nombre o borrarla. -->
+{#snippet accionesSala(cerrar: () => void)}
+  {#if salaAbierta}{@const r = salaAbierta}
+    <button class="plano" onclick={() => { cerrar(); editando = { id: r.id, name: r.name }; }}><Pencil size={16} strokeWidth={1.75} /> Cambiar nombre</button>
+    <button class="plano peligro" onclick={() => { cerrar(); confirmar = { texto: `¿Borrar la sala "${r.name}"?`, hacer: () => borrarSala(r.id) }; }}><Trash2 size={16} strokeWidth={1.75} /> Borrar sala</button>
+  {/if}
 {/snippet}
 
-{#snippet nuevaSala(kind: 'chat' | 'voz')}
-  {#if soyDueno && creando === kind}
-    <form class="nueva" onsubmit={(e) => { e.preventDefault(); hacer(() => agregar(kind)); }}>
-      <input placeholder={kind === 'chat' ? 'Nueva sala de chat' : 'Nueva sala de voz'} bind:value={nueva[kind]} maxlength="40" />
-      <button class="icono" type="submit" aria-label={kind === 'chat' ? 'Crear sala de chat' : 'Crear sala de voz'}><Plus size={14} strokeWidth={1.75} /></button>
-    </form>
-  {/if}
+{#snippet titulo(texto: string)}
+  <div class="seccion-salas"><h3>{texto}</h3></div>
 {/snippet}
 
 <div class="grupo" class:enSalaVoz>
@@ -123,13 +122,11 @@
     {#if link}<p role="status" class="link">Link copiado: <code data-testid="link-invitacion">{link}</code></p>{/if}
     {#if error}<p role="alert">{error}</p>{/if}
 
-    {@render titulo('voz', 'Salas de voz')}
+    {@render titulo('Salas de voz')}
     <ul>{#each salasVoz as r (r.id)}{@render sala(r)}{/each}</ul>
-    {@render nuevaSala('voz')}
 
-    {@render titulo('chat', 'Chats')}
+    {@render titulo('Chats')}
     <ul>{#each chat as r (r.id)}{@render sala(r)}{/each}</ul>
-    {@render nuevaSala('chat')}
 
   </nav>
 
@@ -137,6 +134,10 @@
   <div popover id="menu-grupo" class="menu" bind:this={menuGrupo}
     onbeforetoggle={(e) => { if (e.newState !== 'open' || !cabecera) return; const r = cabecera.getBoundingClientRect(); menuGrupo!.style.left = `${r.left}px`; menuGrupo!.style.top = `${r.bottom + 4}px`; }}>
     <button class="plano" onclick={() => { menuGrupo?.hidePopover(); hacer(invitar); }}><UserPlus size={16} strokeWidth={1.75} /> Invitar al grupo</button>
+    {#if soyDueno}
+      <button class="plano" onclick={() => { menuGrupo?.hidePopover(); creando = 'voz'; }}><Volume2 size={16} strokeWidth={1.75} /> Nueva sala de voz</button>
+      <button class="plano" onclick={() => { menuGrupo?.hidePopover(); creando = 'chat'; }}><Hash size={16} strokeWidth={1.75} /> Nueva sala de chat</button>
+    {/if}
     <button class="plano" onclick={() => { menuGrupo?.hidePopover(); config = true; }}><Settings size={16} strokeWidth={1.75} /> Configuraciones</button>
     {#if grupos.lista.length > 1}
       <hr /><small class="otros">Cambiar de grupo</small>
@@ -147,8 +148,8 @@
   </div>
   {#if config}<ConfigGrupo {grupo} cerrar={() => (config = false)} />{/if}
 
-  {#if enSalaVoz && salaVoz}<Voz {grupo} {soyDueno} sala={salaVoz.name} verParticipantes={() => capaParticipantes?.showPopover()} />
-  {:else if salaAbierta}{#key salaAbierta.id}<Chat titulo={`# ${salaAbierta.name}`} abrir={() => abrirChat(salaAbierta.id)} enviar={(t, f, r) => enviar(salaAbierta.id, t, f, r)} {borrar} silencio={salaAbierta.id}
+  {#if enSalaVoz && salaVoz}<Voz {grupo} {soyDueno} {salasVoz} sala={salaVoz.name} verParticipantes={() => capaParticipantes?.showPopover()} />
+  {:else if salaAbierta}{#key salaAbierta.id}<Chat titulo={`# ${salaAbierta.name}`} abrir={() => abrirChat(salaAbierta.id)} enviar={(t, f, r) => enviar(salaAbierta.id, t, f, r)} {borrar} silencio={salaAbierta.id} acciones={soyDueno ? accionesSala : undefined}
     puedeBorrar={(m) => m.author === sesion.usuario?.id || soyDueno} />{/key}
   {:else}<div class="vacio">Elegí una sala de chat</div>{/if}
 
@@ -166,6 +167,15 @@
         <h3>Cambiar nombre</h3>
         <input bind:value={editando.name} required maxlength="40" aria-label="Nuevo nombre de la sala" />
         <div class="fila"><button type="submit" class="primario">Guardar</button><button type="button" onclick={() => dlgNombre?.close()}>Cancelar</button></div>
+      </form>
+    </dialog>
+  {/if}
+  {#if creando}{@const kind = creando}
+    <dialog bind:this={dlgNueva} onclose={() => (creando = null)} onclick={(e) => e.target === dlgNueva && dlgNueva.close()}>
+      <form class="renombrar" onsubmit={(e) => { e.preventDefault(); hacer(() => agregar(kind)); }}>
+        <h3>{kind === 'voz' ? 'Nueva sala de voz' : 'Nueva sala de chat'}</h3>
+        <input bind:value={nueva} required maxlength="40" placeholder="Nombre de la sala" aria-label="Nombre de la sala" />
+        <div class="fila"><button type="submit" class="primario">Crear</button><button type="button" onclick={() => dlgNueva?.close()}>Cancelar</button></div>
       </form>
     </dialog>
   {/if}
@@ -198,8 +208,6 @@
   .quienes { flex-basis: 100%; display: flex; gap: 4px; padding: 0 8px 8px; }
   .quienes li { width: 22px; height: 22px; border-radius: 999px; background: var(--hover); display: grid; place-items: center; font-size: 11px; font-weight: 600; color: #fff; overflow: hidden; }
   .quienes img { width: 100%; height: 100%; object-fit: cover; }
-  .nueva { display: flex; gap: 4px; padding: 0 0 4px 8px; }
-  .nueva input { flex: 1; min-width: 0; padding: 4px 8px; font-size: 13px; }
   .renombrar { display: flex; flex-direction: column; gap: 8px; width: min(320px, 80vw); }
   .renombrar h3 { margin: 0; }
   .link { font-size: 12px; margin: 0 0 8px; }

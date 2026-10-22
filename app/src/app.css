@@ -73,6 +73,17 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color:
 .fila { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 
 dialog { background: var(--elevado); color: var(--texto); border: 1px solid var(--borde); border-radius: var(--radio-tarjeta); padding: 20px; max-width: 420px; }
+/* Temas de color (Configuración → Apariencia): cambian el acento y tiñen apenas los fondos. Sin data-tema = Pulse (violeta). */
+:root[data-tema='oceano'] { --acento: #3B9EE8; --acento-suave: rgb(59 158 232 / .14); --acento-texto: #9DD0F7; --foco: #3B9EE8;
+  --fondo: #0B1016; --panel: #121A23; --elevado: #17212C; --hondo: #080C11; }
+:root[data-tema='bosque'] { --acento: #3FB37F; --acento-suave: rgb(63 179 127 / .14); --acento-texto: #93DDB9; --foco: #3FB37F;
+  --fondo: #0C120F; --panel: #131C17; --elevado: #18241E; --hondo: #090D0B; }
+:root[data-tema='fuego'] { --acento: #F07A3E; --acento-suave: rgb(240 122 62 / .14); --acento-texto: #F8B791; --foco: #F07A3E;
+  --fondo: #130F0D; --panel: #1C1613; --elevado: #251C18; --hondo: #0E0B09; }
+:root[data-tema='rosa'] { --acento: #E5609E; --acento-suave: rgb(229 96 158 / .14); --acento-texto: #F4A9CC; --foco: #E5609E;
+  --fondo: #130E11; --panel: #1C1519; --elevado: #251B21; --hondo: #0E0A0C; }
+:root[data-tema='grafito'] { --acento: #A5ABBD; --acento-suave: rgb(165 171 189 / .14); --acento-texto: #D3D6E0; --foco: #A5ABBD;
+  --fondo: #101010; --panel: #181818; --elevado: #202020; --hondo: #0A0A0A; }
 dialog::backdrop { background: rgb(0 0 0 / .6); }
 /* Modales de configuración (generales y del grupo): grandes y con solapas arriba. */
 dialog.config { width: min(720px, 92vw); max-width: none; height: min(640px, 85vh); overflow-y: auto; }

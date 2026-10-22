@@ -8,6 +8,9 @@
   import { actualizacion, buscarActualizacion } from '$lib/actualizacion.svelte';
   import Actualizacion from '$lib/vistas/Actualizacion.svelte';
   import { voz } from '$lib/voz.svelte';
+  import { aplicarTema, temaGuardado } from '$lib/tema';
+
+  aplicarTema(temaGuardado());
 
   onMount(validarSesionAlIniciar);
   onMount(() => {

@@ -4,15 +4,14 @@ export type Novedad = { version: string; fecha: string; cambios: { tipo: 'nuevo'
 
 export const NOVEDADES: Novedad[] = [
   {
-    version: '0.3.8', fecha: '2026-10-22', cambios: [
-      { tipo: 'nuevo', texto: 'Mirá varias transmisiones a la vez: tocá "Ver" en la tarjeta de cada uno y se van sumando. "Dejar de ver" saca esa sola.' },
-      { tipo: 'nuevo', texto: 'Los links del chat se abren en tu navegador y muestran una vista previa con imagen y título (YouTube y la mayoría de las páginas).' },
-      { tipo: 'nuevo', texto: 'Tres puntitos arriba de cada chat: silenciar notificaciones y, en privados, eliminar amigo.' },
-      { tipo: 'nuevo', texto: 'El dueño del grupo puede desconectar a alguien de la llamada (clic derecho en su tarjeta).' },
-      { tipo: 'nuevo', texto: 'Configuración → Audio: volumen del micrófono de 0% a 100% y barritas que se mueven cuando hablás.' },
-      { tipo: 'arreglo', texto: 'Si dejabas de escuchar a alguien después de un corte, ahora se vuelve a conectar solo.' },
-      { tipo: 'arreglo', texto: 'Ensordecido ya no escuchás los sonidos de la botonera.' },
-      { tipo: 'arreglo', texto: 'La música vuelve a sincronizar como antes.' },
+    version: '0.4.0', fecha: '2026-10-22', cambios: [
+      { tipo: 'nuevo', texto: 'GIFs en el chat: tocá "GIF" al lado de los emojis, buscá y mandalo.' },
+      { tipo: 'nuevo', texto: 'Colores de la app: elegí entre 6 temas en Configuración → Apariencia.' },
+      { tipo: 'nuevo', texto: 'Dueño del grupo: con clic derecho en la sala de voz podés mover a alguien a otra sala o desconectarlo sin dejarlo volver (se lo vuelve a dejar desde Participantes).' },
+      { tipo: 'nuevo', texto: 'Dueño del grupo: cambiá el nombre o borrá una sala de chat desde sus tres puntitos.' },
+      { tipo: 'nuevo', texto: 'Fotos en grande: con zoom podés arrastrar la imagen con el mouse.' },
+      { tipo: 'nuevo', texto: 'Las salas nuevas se crean desde el menú del nombre del grupo, con un cartel que se puede cancelar.' },
+      { tipo: 'arreglo', texto: 'Al alejar la foto ya no se achica más que su tamaño entero, y los botones de descargar y cerrar son nuevos.' },
     ],
   },
 ];

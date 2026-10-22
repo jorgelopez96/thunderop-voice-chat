@@ -26,3 +26,6 @@ export async function abrirLink(url: string) {
   const { openUrl } = await import('@tauri-apps/plugin-opener');
   await openUrl(url);
 }
+
+/** El mensaje es solo un GIF de GIPHY (así se mandan desde el selector): se muestra como imagen. */
+export const esGif = (texto: string) => /^https:\/\/media\d*\.giphy\.com\/media\/[^\s]+\.(gif|webp)(\?[^\s]*)?$/.test(texto.trim());

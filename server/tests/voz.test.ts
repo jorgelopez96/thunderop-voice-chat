@@ -148,6 +148,26 @@ describe('voz', () => {
       await expect(desconectar(a, a.authStore.record!.id)).rejects.toMatchObject({ status: 400 });
     });
 
+    it('bloquear la voz: no recibe token hasta que el dueño lo permite; solo el dueño', async () => {
+      const { a, b, g, voz } = await setup();
+      const bId = b.authStore.record!.id;
+      const bloquear = (pb: { send: Function }, user: string, bloqueado: boolean) =>
+        pb.send(`/api/groups/${g.id}/bloquear-voz`, { method: 'POST', body: { user, bloqueado } });
+      expect(await bloquear(a, bId, true)).toEqual({ ok: true });
+      await expect(token(b, voz.id)).rejects.toMatchObject({ status: 403 });
+      await expect(b.collection('groups').update(g.id, { bloqueados: [] })).rejects.toBeTruthy();
+      await expect(bloquear(b, a.authStore.record!.id, true)).rejects.toMatchObject({ status: 403 });
+      await bloquear(a, bId, false);
+      expect((await token(b, voz.id)).token).toBeTruthy();
+    });
+
+    it('mover: solo a una sala de voz del mismo grupo', async () => {
+      const { a, b, g, voz } = await setup();
+      const mover = (sala: string) => a.send(`/api/groups/${g.id}/mover`, { method: 'POST', body: { user: b.authStore.record!.id, sala } });
+      expect(await mover(voz.id)).toEqual({ ok: true });
+      await expect(mover('noexiste123456')).rejects.toMatchObject({ status: 400 });
+    });
+
     it('no dueño → 403', async () => {
       const { a, b, g } = await setup();
       await expect(silenciar(b, g.id, a.authStore.record!.id, true)).rejects.toMatchObject({ status: 403 });

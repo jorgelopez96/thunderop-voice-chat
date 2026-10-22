@@ -3,7 +3,7 @@
   import { MicOff, HeadphoneOff, Monitor } from '@lucide/svelte';
   import { sesion, mensajeError } from '../sesion.svelte';
   import { echar, salirDe, enVoz } from '../grupos.svelte';
-  import { voz, volumen } from '../voz.svelte';
+  import { voz, volumen, bloquearVoz } from '../voz.svelte';
   import { leerPrefs } from '../prefs';
   import { abrirEnPunto } from '../menu';
   import { enLinea } from '../presencia.svelte';
@@ -86,6 +86,9 @@
     {#if m.id !== sesion.usuario?.id}
       <label class="vol">Volumen · {vol} %
         <input type="range" min="0" max="200" step="5" bind:value={vol} aria-label={`Volumen de ${m.name}`} oninput={() => volumen(m.id, vol / 100)} /></label>
+    {/if}
+    {#if puedoEchar(m.id) && ((grupo.bloqueados ?? []) as string[]).includes(m.id)}
+      <hr /><button class="plano" onclick={() => { menu?.hidePopover(); hacer(() => bloquearVoz(grupo.id, m.id, false)); }}>Permitir volver a la voz</button>
     {/if}
     {#if puedoEchar(m.id)}<hr /><button class="plano peligro" onclick={() => { menu?.hidePopover(); aEchar = m; }}>Expulsar del grupo</button>{/if}
   {/if}

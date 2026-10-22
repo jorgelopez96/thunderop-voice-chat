@@ -8,14 +8,14 @@
   import { abrirChat, enviar, borrar } from '../chat.svelte';
   import AhoraSuena from './AhoraSuena.svelte';
   import Chat from './Chat.svelte';
-  import { voz, volumen, silenciar, desconectar, ver, pistaPantallaPropia, vistaPrevia } from '../voz.svelte';
+  import { voz, volumen, silenciar, desconectar, moverA, bloquearVoz, ver, pistaPantallaPropia, vistaPrevia } from '../voz.svelte';
   import Pantalla from './Pantalla.svelte';
   import Video from './Video.svelte';
   import { leerPrefs } from '../prefs';
   import { abrirEnPunto } from '../menu';
   import { mirar as mirarSala } from '../noLeidos.svelte';
 
-  let { grupo, soyDueno, sala, verParticipantes }: { grupo: RecordModel; soyDueno: boolean; sala: string; verParticipantes: () => void } = $props();
+  let { grupo, soyDueno, sala, verParticipantes, salasVoz = [] }: { grupo: RecordModel; soyDueno: boolean; sala: string; verParticipantes: () => void; salasVoz?: RecordModel[] } = $props();
   const miembros = $derived((grupo.expand?.members ?? []) as RecordModel[]);
   const miembro = (id: string) => miembros.find((m) => m.id === id);
   // Silencios recién pedidos, hasta que el grupo se refresque con el valor del servidor.
@@ -31,10 +31,10 @@
     const nuevo = !silenciado(id);
     try { await silenciar(grupo.id, id, nuevo); pedidos[id] = nuevo; } catch (e) { error = mensajeError(e); }
   }
-  async function sacar(id: string) {
+  async function moderar(f: () => Promise<void>) {
     menu?.hidePopover();
     error = '';
-    try { await desconectar(grupo.id, id); } catch (e) { error = mensajeError(e); }
+    try { await f(); } catch (e) { error = mensajeError(e); }
   }
   async function copiarLink() {
     error = '';
@@ -134,7 +134,11 @@
         aria-label={`Volumen de ${p.nombre}`} oninput={(e) => cambiar(p.id, +e.currentTarget.value)} />
     </label>
     {#if soyDueno}<hr /><button class="plano peligro" onclick={() => alternar(p.id)}>{silenciado(p.id) ? 'Quitar silencio' : 'Silenciar'}</button>
-      <button class="plano peligro" onclick={() => sacar(p.id)}>Desconectar de la llamada</button>{/if}
+      {#each salasVoz.filter((s) => s.id !== voz.salaId) as s (s.id)}
+        <button class="plano" onclick={() => moderar(() => moverA(grupo.id, p.id, s.id))}>Mover a {s.name}</button>
+      {/each}
+      <button class="plano peligro" onclick={() => moderar(() => desconectar(grupo.id, p.id))}>Desconectar de la llamada</button>
+      <button class="plano peligro" onclick={() => moderar(() => bloquearVoz(grupo.id, p.id, true))}>Desconectar y no dejar volver</button>{/if}
   {/if}
 </div>
 
