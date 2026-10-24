@@ -14,17 +14,37 @@
   import VistaPrevia from './VistaPrevia.svelte';
   import Gifs from './Gifs.svelte';
   import { partirEnLinks, primerLink, abrirLink, esGif } from '../links';
+  import { mencionEnCurso, sugerencias, completar, partirMenciones, menciona } from '../menciones';
   import type { Snippet } from 'svelte';
 
   // Sirve para salas de grupo y privados: quien lo usa dice qué lista abrir y cómo enviar y borrar.
   // `soloLectura`: oculta el compositor y muestra ese texto (privado con alguien que ya no es amigo).
   // `silencio`: id del chat para el menú de tres puntitos (silenciar avisos); `acciones`: más opciones en ese menú.
-  let { titulo, abrir, enviar, borrar, puedeBorrar, soloLectura = '', alVer, silencio, acciones }: {
+  // `miembros`: quiénes pueden estar en el chat, para los nombres de las reacciones y las menciones con @.
+  let { titulo, abrir, enviar, borrar, puedeBorrar, soloLectura = '', alVer, silencio, acciones, miembros = [] }: {
     titulo: string; abrir: () => ChatAbierto; enviar: (texto: string, archivo?: File, respondeA?: string) => Promise<unknown>;
     borrar: (id: string) => Promise<unknown>; puedeBorrar: (m: RecordModel) => boolean; soloLectura?: string;
     alVer?: (ultimo: RecordModel) => void; // se llama con el último mensaje visible (privados: marcar leído)
-    silencio?: string; acciones?: Snippet<[() => void]>;
+    silencio?: string; acciones?: Snippet<[() => void]>; miembros?: { id: string; name: string }[];
   } = $props();
+  const nombres = $derived(miembros.map((m) => m.name).filter(Boolean));
+  const nombreDe = (id: string) => miembros.find((m) => m.id === id)?.name ?? 'Ex miembro';
+
+  // @ en el compositor: lista de gente del grupo que coincide con lo escrito; flechas eligen, Enter o Tab completan.
+  let mencion = $state<{ inicio: number; consulta: string } | null>(null);
+  let elegida = $state(0);
+  const opciones = $derived(mencion ? sugerencias(nombres.filter((n) => n !== sesion.usuario?.name), mencion.consulta) : []);
+  function revisarMencion() {
+    mencion = caja ? mencionEnCurso(texto, caja.selectionStart) : null;
+    elegida = 0;
+  }
+  function elegirMencion(nombre: string) {
+    if (!mencion || !caja) return;
+    const r = completar(texto, mencion.inicio, caja.selectionStart, nombre);
+    texto = r.texto;
+    mencion = null;
+    tick().then(() => { caja?.focus(); caja?.setSelectionRange(r.cursor, r.cursor); });
+  }
   // svelte-ignore state_referenced_locally
   const chat = abrir(); // se recrea con #key en quien lo usa
   $effect(() => chat.cerrar);
@@ -98,6 +118,12 @@
     finally { enviando = false; }
   }
   function tecla(e: KeyboardEvent) {
+    if (mencion && opciones.length) {
+      const n = opciones.length;
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); elegida = (elegida + (e.key === 'ArrowDown' ? 1 : n - 1)) % n; return; }
+      if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); elegirMencion(opciones[elegida]); return; }
+      if (e.key === 'Escape') { e.preventDefault(); mencion = null; return; }
+    }
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviarMensaje(); }
     if (e.key === 'Escape' && respondiendo) { e.preventDefault(); respondiendo = null; }
   }
@@ -195,7 +221,7 @@
       {@const a = autor(m)}
       {@const sigue = seguido(i)}
       {@const cita = m.expand?.respondeA as RecordModel | undefined}
-      <article class="msg" class:sigue class:elegido={respondiendo?.id === m.id} class:resaltado={resaltado === m.id} id="msg-{m.id}" data-testid="mensaje">
+      <article class="msg" class:sigue class:elegido={respondiendo?.id === m.id} class:resaltado={resaltado === m.id} class:mencionado={m.author !== sesion.usuario?.id && menciona(m.text, sesion.usuario?.name)} id="msg-{m.id}" data-testid="mensaje">
         {#if sigue}<small class="hora-lado">{hora(m)}</small>
         {:else}<img class="avatar" src={foto(a)} alt="" />{/if}
         <div class="cuerpo">
@@ -215,7 +241,7 @@
             <textarea class="edicion" bind:value={editando.texto} onkeydown={teclaEdicion} maxlength="2000" rows="2" autofocus aria-label="Editar mensaje"></textarea>
             <small class="ayuda">Enter guarda · Esc cancela</small>
           {:else if m.text && esGif(m.text)}<img class="gif" src={m.text.trim()} alt="GIF" loading="lazy" referrerpolicy="no-referrer" />
-          {:else if m.text}<p class="texto">{#each partirEnLinks(m.text) as parte, j (j)}{#if parte.url}{@const url = parte.url}<a href={url} onclick={(e) => { e.preventDefault(); abrirLink(url); }}>{parte.texto}</a>{:else}{parte.texto}{/if}{/each}{#if m.editado}<small class="editado" title={`Editado ${new Date(m.editado.replace(' ', 'T')).toLocaleString('es')}`}> (editado)</small>{/if}</p>{/if}
+          {:else if m.text}<p class="texto">{#each partirEnLinks(m.text) as parte, j (j)}{#if parte.url}{@const url = parte.url}<a href={url} onclick={(e) => { e.preventDefault(); abrirLink(url); }}>{parte.texto}</a>{:else}{#each partirMenciones(parte.texto, nombres) as p, k (k)}{#if p.nombre}<span class="mencion" class:yo={p.nombre === sesion.usuario?.name}>{p.texto}</span>{:else}{p.texto}{/if}{/each}{/if}{/each}{#if m.editado}<small class="editado" title={`Editado ${new Date(m.editado.replace(' ', 'T')).toLocaleString('es')}`}> (editado)</small>{/if}</p>{/if}
           {#if m.text && editando?.id !== m.id && !esGif(m.text)}{@const link = primerLink(m.text)}{#if link}<VistaPrevia url={link} />{/if}{/if}
           {#if m.file}
             {@const url = pb.files.getURL(m, m.file)}
@@ -224,7 +250,8 @@
           {/if}
           {#if reacciones(m).length}<div class="reacciones">
             {#each reacciones(m) as [emoji, quienes] (emoji)}
-              <button class="plano chip" aria-pressed={quienes.includes(sesion.usuario?.id ?? '')} onclick={() => reaccionar(m.id, emoji)}>{emoji} {quienes.length}</button>
+              <button class="plano chip" aria-pressed={quienes.includes(sesion.usuario?.id ?? '')} onclick={() => reaccionar(m.id, emoji)}
+                title="{quienes.map(nombreDe).join(', ')} reaccion{quienes.length === 1 ? 'ó' : 'aron'} con {emoji}">{emoji} {quienes.length}</button>
             {/each}
           </div>{/if}
         </div>
@@ -255,7 +282,10 @@
     <label class="clip" title="Adjuntar imagen o video"><Paperclip size={18} strokeWidth={1.75} /><input type="file" hidden accept="image/png,image/jpeg,image/gif,image/webp,video/mp4,video/webm" onchange={elegir} data-testid="adjuntar" /></label>
     <button class="plano emoji" title="Emojis" aria-label="Emojis" onclick={(e) => abrirEmojis(e, '')}><Smile size={18} strokeWidth={1.75} /></button>
     <button class="plano gif-boton" title="GIFs" aria-label="GIFs" onclick={abrirGifs}>GIF</button>
-    <textarea bind:this={caja} bind:value={texto} onkeydown={tecla} onpaste={pegar} maxlength="2000" rows="1" placeholder="Escribí un mensaje" title="Enter envía, Shift+Enter hace una línea nueva"></textarea>
+    {#if mencion && opciones.length}<ul class="sugerencias" role="listbox" aria-label="Mencionar a">
+      {#each opciones as n, i (n)}<li><button type="button" class="plano" role="option" aria-selected={i === elegida} onmousedown={(e) => { e.preventDefault(); elegirMencion(n); }}>@{n}</button></li>{/each}
+    </ul>{/if}
+    <textarea bind:this={caja} bind:value={texto} onkeydown={tecla} oninput={revisarMencion} onclick={revisarMencion} onblur={() => (mencion = null)} onpaste={pegar} maxlength="2000" rows="1" placeholder="Escribí un mensaje" title="Enter envía, Shift+Enter hace una línea nueva"></textarea>
     <button class="primario" onclick={enviarMensaje} disabled={enviando}>Enviar</button>
   </div>{/if}
   {#if aBorrar}{@const m = aBorrar}<Confirmar texto="¿Borrar este mensaje?" cancelar={() => (aBorrar = null)} confirmar={() => quitar(m)} />{/if}
@@ -336,6 +366,13 @@
   .marco.agarrado { cursor: grabbing; }
   .marco.agarrado img { transition: none; }
   .composer { display: flex; align-items: center; gap: 8px; margin: 8px 16px 16px; background: var(--panel); border: 1px solid var(--borde); border-radius: 8px; padding: 6px 8px; }
+  .composer { position: relative; }
+  .sugerencias { position: absolute; left: 8px; bottom: calc(100% + 4px); z-index: 5; margin: 0; padding: 4px; list-style: none; min-width: 200px; background: var(--panel); border: 1px solid var(--borde); border-radius: var(--radio-menu); }
+  .sugerencias button { width: 100%; text-align: left; padding: 6px 8px; }
+  .sugerencias button[aria-selected='true'] { background: var(--acento-suave); }
+  .mencion { padding: 0 2px; border-radius: 4px; background: var(--acento-suave); color: var(--acento-texto, var(--acento)); font-weight: 600; }
+  .mencion.yo { background: var(--acento); color: #fff; }
+  .msg.mencionado { box-shadow: inset 2px 0 var(--acento); }
   .composer textarea { flex: 1; min-width: 0; resize: none; field-sizing: content; max-height: 120px; background: none; border: 0; padding: 6px 4px; }
   .clip { cursor: pointer; flex-direction: row; color: var(--icono); padding: 4px; }
   .clip:hover { color: var(--texto); }

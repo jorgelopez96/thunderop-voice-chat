@@ -54,9 +54,10 @@ function ding() {
   o.stop(t + 0.32);
 }
 
-export async function avisar(chat: string, titulo: string, texto: string) {
+/** `aunSilenciado`: te mencionaron con @, avisa aunque el chat esté silenciado. */
+export async function avisar(chat: string, titulo: string, texto: string, aunSilenciado = false) {
   const aLaVista = document.visibilityState === 'visible' && document.hasFocus();
-  if (silenciadoHasta(chat) || (aLaVista && viendo.has(chat))) return;
+  if ((silenciadoHasta(chat) && !aunSilenciado) || (aLaVista && viendo.has(chat))) return;
   const p = leerPrefs();
   if (p.sonidoMensajes) ding();
   if (aLaVista || !p.notificaciones || !isTauri()) return;

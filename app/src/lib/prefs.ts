@@ -1,12 +1,13 @@
 // Preferencias locales de voz (dispositivos, supresión, ganancia, volúmenes por usuario, transmisión) en `localStorage['dm.voz']`.
 export type Calidad = '720p30' | '720p60' | '1080p30' | '1080p60';
 // Límites de transmisión de pantalla (Global Constraints de la etapa 4).
-// Tope alto a propósito (prueba 2026-10-20): el límite real lo pone la conexión de cada uno. Sin maxBitrate, LiveKit usaría su preset bajo.
-export const CALIDADES: Record<Calidad, { ancho: number; alto: number; fps: number; mbps: number }> = {
-  '720p30': { ancho: 1280, alto: 720, fps: 30, mbps: 50 },
-  '720p60': { ancho: 1280, alto: 720, fps: 60, mbps: 50 },
-  '1080p30': { ancho: 1920, alto: 1080, fps: 30, mbps: 50 },
-  '1080p60': { ancho: 1920, alto: 1080, fps: 60, mbps: 50 },
+// `mbps`: tope alto a propósito (prueba 2026-10-20): el límite real lo pone la conexión de cada uno. Sin maxBitrate, LiveKit usaría su preset bajo.
+// `mbpsNativo`: el del transmisor nativo, que sí llega al tope (prueba 2026-10-23: 1080p60 a 20 Mbps se vio fluido).
+export const CALIDADES: Record<Calidad, { ancho: number; alto: number; fps: number; mbps: number; mbpsNativo: number }> = {
+  '720p30': { ancho: 1280, alto: 720, fps: 30, mbps: 50, mbpsNativo: 6 },
+  '720p60': { ancho: 1280, alto: 720, fps: 60, mbps: 50, mbpsNativo: 10 },
+  '1080p30': { ancho: 1920, alto: 1080, fps: 30, mbps: 50, mbpsNativo: 12 },
+  '1080p60': { ancho: 1920, alto: 1080, fps: 60, mbps: 50, mbpsNativo: 20 },
 };
 export type PrefsVoz = { entrada?: string; salida?: string; supresion: boolean; volumenes: Record<string, number>; calidad: Calidad; gpu: boolean; vistaPrevia: boolean; volBotonera: number; volMusica: number; gananciaDb: number; sonidoMensajes: boolean; notificaciones: boolean };
 

@@ -1,4 +1,5 @@
 import { pb } from './pb';
+import { menciona } from './menciones';
 import { avisar, ver, silenciadoHasta, resumen } from './notificaciones.svelte';
 
 // Mensajes sin leer por sala (chats y chats de salas de voz). Lo leído se guarda en este dispositivo:
@@ -52,8 +53,9 @@ export function iniciarNoLeidos() {
     if (e.action !== 'create' || e.record.author === yo) return;
     const s = e.record.room as string;
     if (!noLeidos.grupoDe[s]) pb.collection('rooms').getOne(s, { fields: 'id,group' }).then((r) => (noLeidos.grupoDe[s] = r.group), () => {});
-    if (!silenciadoHasta(s)) pb.collection('messages').getOne(e.record.id, { expand: 'author,room' })
-      .then((m) => avisar(s, `${m.expand?.author?.name ?? 'Alguien'} · ${m.expand?.room?.name ?? ''}`, resumen(m)), () => {});
+    const meNombran = menciona(e.record.text, pb.authStore.record?.name);
+    if (!silenciadoHasta(s) || meNombran) pb.collection('messages').getOne(e.record.id, { expand: 'author,room' })
+      .then((m) => avisar(s, `${m.expand?.author?.name ?? 'Alguien'} ${meNombran ? 'te mencionó en' : '·'} ${m.expand?.room?.name ?? ''}`, resumen(m), meNombran), () => {});
     if (mirando.has(s)) return marcarLeida(s);
     noLeidos.salas[s] = (noLeidos.salas[s] ?? 0) + 1;
   });

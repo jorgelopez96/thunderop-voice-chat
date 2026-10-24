@@ -1,0 +1,7 @@
+# libwebrtc de LiveKit viene compilada con /MT: todo el programa tiene que usar el CRT estático
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]
+
+# la ruta del proyecto es larga y los headers de libwebrtc pasan los 260 caracteres de Windows
+[build]
+target-dir = "D:/lkt"

@@ -1,4 +1,5 @@
 mod audio;
+mod transmisor;
 
 use tauri::webview::{NewWindowResponse, PageLoadEvent, PermissionKind, PermissionResponse};
 use tauri::menu::{Menu, MenuItem};
@@ -80,7 +81,8 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(audio::Captura::default())
-        .invoke_handler(tauri::generate_handler![audio::iniciar_audio, audio::detener_audio, memoria_baja, salir])
+        .manage(transmisor::Transmisor::default())
+        .invoke_handler(tauri::generate_handler![audio::iniciar_audio, audio::detener_audio, transmisor::ventanas_transmisor, transmisor::iniciar_transmisor, transmisor::calidad_transmisor, transmisor::detener_transmisor, memoria_baja, salir])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

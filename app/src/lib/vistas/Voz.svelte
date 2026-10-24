@@ -4,7 +4,7 @@
   import { MicOff, Users, Link, ChevronRight, MessageSquare, User } from '@lucide/svelte';
   import { foto } from '../foto';
   import { mensajeError, sesion } from '../sesion.svelte';
-  import { crearInvitacion } from '../grupos.svelte';
+  import { crearInvitacion, grupos } from '../grupos.svelte';
   import { abrirChat, enviar, borrar } from '../chat.svelte';
   import AhoraSuena from './AhoraSuena.svelte';
   import Chat from './Chat.svelte';
@@ -120,7 +120,7 @@
     {@const id = voz.salaId}
     <aside class="chatSala">
       <button class="icono plegar" onclick={() => plegarChat(false)} aria-label="Plegar chat de la sala" title="Plegar"><ChevronRight size={16} strokeWidth={1.75} /></button>
-      {#key id}<Chat titulo="Chat de la sala" abrir={() => abrirChat(id)} enviar={(t, f, r) => enviar(id, t, f, r)} {borrar} silencio={id}
+      {#key id}<Chat titulo="Chat de la sala" miembros={grupos.lista.find((g) => g.id === voz.grupoId)?.expand?.members ?? []} abrir={() => abrirChat(id)} enviar={(t, f, r) => enviar(id, t, f, r)} {borrar} silencio={id}
         puedeBorrar={(m) => m.author === sesion.usuario?.id || soyDueno} />{/key}
     </aside>
   {/if}

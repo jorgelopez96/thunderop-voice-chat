@@ -1,8 +1,9 @@
 <script lang="ts">
   import { Mic, MicOff, Headphones, HeadphoneOff, ChevronDown, Monitor, AudioWaveform, Music, PhoneOff } from '@lucide/svelte';
-  import { voz, alternarMute, ensordecer, cambiarSupresion, salirVoz, transmitir, dejarDeTransmitir, dispositivos, elegirEntrada, elegirSalida } from '../voz.svelte';
+  import { voz, alternarMute, ensordecer, cambiarSupresion, salirVoz, transmitir, dejarDeTransmitir, cambiarCalidad, dispositivos, elegirEntrada, elegirSalida } from '../voz.svelte';
   import { grupos } from '../grupos.svelte';
   import { CALIDADES, leerPrefs, type Calidad } from '../prefs';
+  import { hayNativo, ventanas, type Ventana } from '../transmisorNativo';
   import Botonera from './Botonera.svelte';
   import Musica from './Musica.svelte';
   import { sesion } from '../sesion.svelte';
@@ -41,9 +42,27 @@
 
   let d = $state<HTMLDialogElement>();
   let calidad = $state<Calidad>('1080p60');
-  const abrirTransmision = () => { calidad = leerPrefs().calidad; d?.showModal(); };
-  const empezar = () => { d?.close(); transmitir(calidad); };
+  // Con el transmisor nativo se elige acá qué compartir; sin él (navegador, o placa sin compresor) lo elige el selector de WebView2.
+  const nativo = hayNativo();
+  let que = $state('pantalla');
+  let listaVentanas = $state<Ventana[]>([]);
+  const abrirTransmision = async () => {
+    calidad = leerPrefs().calidad;
+    d?.showModal();
+    if (nativo) { listaVentanas = await ventanas(); if (que !== 'pantalla' && !listaVentanas.some((v) => v.titulo === que)) que = 'pantalla'; }
+  };
+  // Con una ventana va solo el sonido de su programa; con la pantalla completa, todo menos Thunderop.
+  const empezar = () => { d?.close(); transmitir(calidad, nativo ? que : undefined, listaVentanas.find((v) => v.titulo === que)?.pid); };
   const nombreCalidad = (c: Calidad) => `${CALIDADES[c].alto}p · ${CALIDADES[c].fps} fps`;
+
+  // Menú de calidad mientras se transmite (solo con el transmisor nativo: el de WebView2 no la cambia en vivo).
+  let menuCalidad = $state<HTMLElement>();
+  let posCalidad = $state({ x: 0, y: 0 });
+  function abrirCalidad(e: MouseEvent) {
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    posCalidad = { x: r.left, y: innerHeight - r.top + 8 };
+    menuCalidad?.showPopover();
+  }
 </script>
 
 <footer class="dock">
@@ -62,7 +81,14 @@
     </div>
     <span class="separador"></span>
     {#if voz.transmitiendo}
-      <button class="icono vivo" onclick={dejarDeTransmitir} aria-label="Dejar de transmitir" title="Dejar de transmitir"><Monitor size={20} strokeWidth={1.75} /></button>
+      {#if voz.calidadEnVivo}
+        <div class="doble">
+          <button class="icono vivo" onclick={dejarDeTransmitir} aria-label="Dejar de transmitir" title="Dejar de transmitir"><Monitor size={20} strokeWidth={1.75} /></button>
+          <button class="icono flecha" aria-label="Calidad de la transmisión" title="Cambiar la calidad" onclick={abrirCalidad}><ChevronDown size={14} strokeWidth={1.75} /></button>
+        </div>
+      {:else}
+        <button class="icono vivo" onclick={dejarDeTransmitir} aria-label="Dejar de transmitir" title="Dejar de transmitir"><Monitor size={20} strokeWidth={1.75} /></button>
+      {/if}
     {:else}
       <button class="icono cian" onclick={abrirTransmision} disabled={voz.conectando} aria-label="Transmitir" title="Transmitir pantalla"><Monitor size={20} strokeWidth={1.75} /></button>
     {/if}
@@ -91,8 +117,23 @@
   {/if}
 </div>
 
+<div popover bind:this={menuCalidad} class="menu" style="left:{posCalidad.x}px;bottom:{posCalidad.y}px">
+  <h3>Calidad</h3>
+  {#each Object.keys(CALIDADES) as c (c)}
+    <button class="plano" aria-pressed={c === voz.calidadEnVivo} onclick={() => { menuCalidad?.hidePopover(); cambiarCalidad(c as Calidad); }}>{nombreCalidad(c as Calidad)}</button>
+  {/each}
+</div>
+
 <dialog bind:this={d}>
   <h3>Transmitir pantalla</h3>
+  {#if nativo}
+    <label>Qué compartir
+      <select bind:value={que}>
+        <option value="pantalla">Pantalla completa</option>
+        {#each listaVentanas as v (v.pid + v.titulo)}<option value={v.titulo}>{v.titulo}</option>{/each}
+      </select>
+    </label>
+  {/if}
   <label>Calidad
     <select bind:value={calidad}>{#each Object.keys(CALIDADES) as c (c)}<option value={c}>{nombreCalidad(c as Calidad)}</option>{/each}</select>
   </label>

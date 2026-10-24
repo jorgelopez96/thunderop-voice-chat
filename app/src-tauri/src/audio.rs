@@ -1,5 +1,5 @@
 // Captura del sonido de la PC sin las voces de la llamada: loopback de WASAPI
-// excluyendo el árbol del navegador de WebView2. Excluir app.exe no alcanza: aunque
+// excluyendo el árbol del navegador de WebView2 (o, al transmitir una ventana, solo el del programa de esa ventana). Excluir app.exe no alcanza: aunque
 // msedgewebview2.exe figure como hijo, Windows no lo cuenta dentro de su árbol (medido).
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc, Mutex};
@@ -11,7 +11,8 @@ pub struct Captura(Mutex<Option<(Arc<AtomicBool>, JoinHandle<()>)>>);
 
 #[cfg(windows)]
 fn capturar_con(
-    excluir: u32,
+    pid: u32,
+    incluir: bool,
     activa: Arc<AtomicBool>,
     mut enviar: impl FnMut(Vec<u8>) -> bool,
     listo: impl FnOnce(Result<(), String>),
@@ -21,8 +22,8 @@ fn capturar_con(
     // abre todo; un fallo se avisa por `listo` antes de empezar el lazo
     let abrir = || -> Result<_, String> {
         wasapi::initialize_mta().ok().map_err(|e| e.to_string())?;
-        // include_tree=false => EXCLUDE_TARGET_PROCESS_TREE (el comentario del crate dice lo contrario)
-        let mut ac = AudioClient::new_application_loopback_client(excluir, false)
+        // include_tree=false => EXCLUDE_TARGET_PROCESS_TREE, true => INCLUDE (el comentario del crate dice lo contrario)
+        let mut ac = AudioClient::new_application_loopback_client(pid, incluir)
             .map_err(|e| e.to_string())?;
         // este cliente no soporta get_mixformat: el formato lo ponemos nosotros
         let fmt = WaveFormat::new(32, 32, &SampleType::Float, 48000, 2, None);
@@ -78,6 +79,7 @@ fn capturar_con(
 #[cfg(not(windows))]
 fn capturar_con(
     _: u32,
+    _: bool,
     _: Arc<AtomicBool>,
     _: impl FnMut(Vec<u8>) -> bool,
     listo: impl FnOnce(Result<(), String>),
@@ -89,7 +91,7 @@ fn capturar_con(
 /// Captura mientras `activa` sea true y `enviar` devuelva true.
 #[cfg_attr(not(test), allow(dead_code))] // la usan los tests; la app va por capturar_con
 pub fn capturar(activa: Arc<AtomicBool>, enviar: impl FnMut(Vec<u8>) -> bool) -> Result<(), String> {
-    capturar_con(std::process::id(), activa, enviar, |_| {})
+    capturar_con(std::process::id(), false, activa, enviar, |_| {})
 }
 
 /// PID del proceso navegador de WebView2 (el que reproduce el audio de la app); si no se puede, el propio.
@@ -118,15 +120,16 @@ impl Captura {
     }
 }
 
+/// `incluir`: pid del programa cuya ventana se transmite (solo su sonido); sin él, todo menos la app.
 #[tauri::command]
-pub async fn iniciar_audio(webview: tauri::Webview, canal: Channel<InvokeResponseBody>, estado: tauri::State<'_, Captura>) -> Result<(), String> {
+pub async fn iniciar_audio(webview: tauri::Webview, canal: Channel<InvokeResponseBody>, incluir: Option<u32>, estado: tauri::State<'_, Captura>) -> Result<(), String> {
     estado.detener();
-    let excluir = pid_navegador(&webview);
+    let (pid, solo) = match incluir { Some(p) => (p, true), None => (pid_navegador(&webview), false) };
     let activa = Arc::new(AtomicBool::new(true));
     let (tx, rx) = mpsc::channel();
     let p = activa.clone();
     let h = std::thread::spawn(move || {
-        let _ = capturar_con(excluir, p,|b| canal.send(InvokeResponseBody::Raw(b)).is_ok(), |r| {
+        let _ = capturar_con(pid, solo, p, |b| canal.send(InvokeResponseBody::Raw(b)).is_ok(), |r| {
             let _ = tx.send(r);
         });
     });

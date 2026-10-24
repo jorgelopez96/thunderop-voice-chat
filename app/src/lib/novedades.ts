@@ -4,14 +4,14 @@ export type Novedad = { version: string; fecha: string; cambios: { tipo: 'nuevo'
 
 export const NOVEDADES: Novedad[] = [
   {
-    version: '0.4.0', fecha: '2026-10-22', cambios: [
-      { tipo: 'nuevo', texto: 'GIFs en el chat: tocá "GIF" al lado de los emojis, buscá y mandalo.' },
-      { tipo: 'nuevo', texto: 'Colores de la app: elegí entre 6 temas en Configuración → Apariencia.' },
-      { tipo: 'nuevo', texto: 'Dueño del grupo: con clic derecho en la sala de voz podés mover a alguien a otra sala o desconectarlo sin dejarlo volver (se lo vuelve a dejar desde Participantes).' },
-      { tipo: 'nuevo', texto: 'Dueño del grupo: cambiá el nombre o borrá una sala de chat desde sus tres puntitos.' },
-      { tipo: 'nuevo', texto: 'Fotos en grande: con zoom podés arrastrar la imagen con el mouse.' },
-      { tipo: 'nuevo', texto: 'Las salas nuevas se crean desde el menú del nombre del grupo, con un cartel que se puede cancelar.' },
-      { tipo: 'arreglo', texto: 'Al alejar la foto ya no se achica más que su tamaño entero, y los botones de descargar y cerrar son nuevos.' },
+    version: '0.5.1', fecha: '2026-10-23', cambios: [
+      { tipo: 'nuevo', texto: 'Botonera: cada sonido puede llevar su emoji adelante del nombre (tocá la carita al subirlo o con clic derecho para editarlo).' },
+      { tipo: 'nuevo', texto: 'Botonera: los sonidos aparecen en el orden en que se subieron.' },
+      { tipo: 'nuevo', texto: 'Mientras transmitís podés cambiar la calidad sin cortar: tocá la flechita al lado del botón de transmitir.' },
+      { tipo: 'nuevo', texto: 'Menciones: escribí @ en el chat y elegí a alguien del grupo. Al mencionado le llega el aviso aunque tenga ese chat silenciado.' },
+      { tipo: 'nuevo', texto: 'Reacciones: pasá el mouse por arriba de una reacción para ver quién reaccionó.' },
+      { tipo: 'arreglo', texto: 'Si transmitís una ventana, se escucha solo el sonido de ese programa (antes se escuchaba toda la PC).' },
+      { tipo: 'arreglo', texto: 'Volvió la vista previa de tu transmisión y el contador de cuántos te están mirando.' },
     ],
   },
 ];

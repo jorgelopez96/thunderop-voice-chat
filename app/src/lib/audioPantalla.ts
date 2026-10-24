@@ -7,8 +7,8 @@ const registrados = new WeakMap<AudioContext, Promise<void>>();
 let nodos: AudioNode[] = [];
 let pista: MediaStreamTrack | null = null;
 
-/** Audio del sistema (Rust) → pista WebRTC. `null` si no es Tauri o el comando falla. */
-export async function iniciarAudioPantalla(ctx: AudioContext): Promise<MediaStreamTrack | null> {
+/** Audio del sistema (Rust) → pista WebRTC: todo menos la app o, con `pid`, solo el de ese programa. `null` si no es Tauri o el comando falla. */
+export async function iniciarAudioPantalla(ctx: AudioContext, pid?: number): Promise<MediaStreamTrack | null> {
   if (!('__TAURI_INTERNALS__' in globalThis)) return null;
   await detenerAudioPantalla();
   try {
@@ -24,7 +24,7 @@ export async function iniciarAudioPantalla(ctx: AudioContext): Promise<MediaStre
     canal.onmessage = (m) => {
       try { const f = aMuestras(m); if (f) worklet.port.postMessage(f, [f.buffer]); } catch { /* se pierde el lote */ }
     };
-    await invoke('iniciar_audio', { canal });
+    await invoke('iniciar_audio', { canal, incluir: pid ?? null });
     return pista;
   } catch (e) {
     console.warn('audio de pantalla no disponible', e);

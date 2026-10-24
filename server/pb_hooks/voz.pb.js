@@ -16,6 +16,19 @@ routerAdd("POST", "/api/rooms/{id}/token", (e) => {
   return e.json(200, { token, url: c.url });
 }, $apis.requireAuth("users"));
 
+// Token del transmisor nativo de la app: otra identidad (`<usuario>.pantalla`, LiveKit no deja dos conexiones con la
+// misma) que solo publica la pantalla. La app la muestra como la transmisión de su dueño.
+routerAdd("POST", "/api/rooms/{id}/token-pantalla", (e) => {
+  const lk = require(`${__hooks}/livekit.js`);
+  const c = lk.config();
+  const { room, group } = lk.salaDeVoz(e.app, e.request.pathValue("id"), e.auth.id);
+  if (group.getStringSlice("bloqueados").includes(e.auth.id)) throw new ForbiddenError("El dueño no te deja entrar a la voz por ahora.");
+
+  const video = { room: room.id, roomJoin: true, canSubscribe: false, canPublish: true, canPublishData: false, canPublishSources: ["screen_share"] };
+  const token = lk.token(c, { sub: `${e.auth.id}.pantalla`, name: `${e.auth.getString("name")} (pantalla)`, video }, 600);
+  return e.json(200, { token, url: c.url });
+}, $apis.requireAuth("users"));
+
 routerAdd("GET", "/api/groups/{id}/voz", (e) => {
   const lk = require(`${__hooks}/livekit.js`);
   const c = lk.config();
@@ -26,7 +39,7 @@ routerAdd("GET", "/api/groups/{id}/voz", (e) => {
   salas.forEach((r) => {
     // LiveKit responde 200 { participants: [] } (o sin el campo) para una sala que no existe
     const participantes = lk.roomService(c, "ListParticipants", { room: r.id }, r.id).participants || [];
-    res[r.id] = participantes.map((p) => ({ id: p.identity, name: p.name, silenciado: lk.silenciado(p, silenciados) }));
+    res[r.id] = participantes.filter((p) => !p.identity.endsWith(".pantalla")).map((p) => ({ id: p.identity, name: p.name, silenciado: lk.silenciado(p, silenciados) }));
   });
   return e.json(200, res);
 }, $apis.requireAuth("users"));
@@ -99,7 +112,10 @@ routerAdd("POST", "/api/groups/{id}/bloquear-voz", (e) => {
   const otros = group.getStringSlice("bloqueados").filter((u) => u !== user);
   group.set("bloqueados", si ? otros.concat(user) : otros);
   e.app.save(group);
-  if (si) lk.enSalasDeVoz(e.app, group.id, "RemoveParticipant", { identity: user });
+  if (si) {
+    lk.enSalasDeVoz(e.app, group.id, "RemoveParticipant", { identity: user });
+    lk.enSalasDeVoz(e.app, group.id, "RemoveParticipant", { identity: `${user}.pantalla` });
+  }
   return e.json(200, { ok: true });
 }, $apis.requireAuth("users"));
 

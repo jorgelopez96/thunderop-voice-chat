@@ -62,6 +62,16 @@ describe('voz', () => {
     expect(c.exp - c.nbf).toBeGreaterThan(590);
   });
 
+  it('token de pantalla: otra identidad que solo publica la pantalla', async () => {
+    const { b, c: otro, voz } = await setup();
+    const res = await b.send(`/api/rooms/${voz.id}/token-pantalla`, { method: 'POST' });
+    const c = verificar(res.token, lk.secret);
+    expect(c.sub).toBe(`${b.authStore.record!.id}.pantalla`);
+    expect(c.name).toBe(`${b.authStore.record!.name} (pantalla)`);
+    expect(c.video).toEqual({ room: voz.id, roomJoin: true, canSubscribe: false, canPublish: true, canPublishData: false, canPublishSources: ['screen_share'] });
+    await expect(otro.send(`/api/rooms/${voz.id}/token-pantalla`, { method: 'POST' })).rejects.toMatchObject({ status: 403 });
+  });
+
   it('no miembro → 403', async () => {
     const { c, voz } = await setup();
     await expect(token(c, voz.id)).rejects.toMatchObject({ status: 403 });

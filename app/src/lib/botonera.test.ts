@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { validarSonido, Limite, mensajeSubida } from './botoneraLogica';
+import { validarSonido, Limite, mensajeSubida, separarEmoji, unirEmoji } from './botoneraLogica';
 
 const ok = { duracion: 3, tamaño: 1000, tipo: 'audio/mpeg' };
 
@@ -41,5 +41,21 @@ describe('mensajeSubida', () => {
   it('lo demás cae a un genérico en español', () => {
     expect(mensajeSubida({ message: 'Failed to create record.' })).toBe('No se pudo subir el sonido.');
     expect(mensajeSubida(undefined)).toBe('No se pudo subir el sonido.');
+  });
+});
+
+describe('emoji del botón', () => {
+  it('separa el emoji del principio', () => {
+    expect(separarEmoji('🔥 Bruh')).toEqual({ emoji: '🔥', texto: 'Bruh' });
+    expect(separarEmoji('❤️Amor')).toEqual({ emoji: '❤️', texto: 'Amor' });
+    expect(separarEmoji('👨‍👩‍👧 Familia')).toEqual({ emoji: '👨‍👩‍👧', texto: 'Familia' });
+  });
+  it('sin emoji adelante queda todo como texto', () => {
+    expect(separarEmoji('Bruh 🔥')).toEqual({ emoji: '', texto: 'Bruh 🔥' });
+    expect(separarEmoji('123')).toEqual({ emoji: '', texto: '123' });
+  });
+  it('une con un espacio', () => {
+    expect(unirEmoji('🔥', ' Bruh ')).toBe('🔥 Bruh');
+    expect(unirEmoji('', 'Bruh')).toBe('Bruh');
   });
 });

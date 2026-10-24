@@ -14,7 +14,7 @@ const codificar = (o: unknown) => new TextEncoder().encode(JSON.stringify(o));
 export function sonidos(grupoId: string) {
   const estado = $state<{ lista: RecordModel[] }>({ lista: [] });
   const cargar = async () => {
-    try { estado.lista = await pb.collection('sonidos').getFullList({ filter: pb.filter('group = {:g}', { g: grupoId }), sort: 'name' }); }
+    try { estado.lista = await pb.collection('sonidos').getFullList({ filter: pb.filter('group = {:g}', { g: grupoId }), sort: '@rowid' }); }
     catch { /* se conserva la lista anterior */ }
   };
   cargar();

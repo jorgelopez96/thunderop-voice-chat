@@ -42,6 +42,13 @@ describe('sonidos', () => {
     expect((await fetch(b.files.getURL(s, s.file))).status).toBe(200);
   });
 
+  it('la botonera los lista en el orden en que se subieron (@rowid: la colección no tiene "created")', async () => {
+    const { b, g } = await setup();
+    for (const n of ['zeta', 'alfa', 'medio']) await b.collection('sonidos').create(fd(g.id, uid(b), wav(100), n));
+    const lista = await b.collection('sonidos').getFullList({ filter: `group = "${g.id}"`, sort: '@rowid' });
+    expect(lista.map((x: { name: string }) => x.name)).toEqual(['zeta', 'alfa', 'medio']);
+  });
+
   it('alguien de afuera no puede subir ni ver', async () => {
     const { b, c, g } = await setup();
     const s = await b.collection('sonidos').create(fd(g.id, uid(b)));
