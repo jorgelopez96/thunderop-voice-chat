@@ -150,7 +150,6 @@ pub struct InfoVentana {
     pub titulo: String,
     pub clase: String,
     pub visible: bool,
-    pub minimizada: bool,
     /// oculta por DWM (p. ej. en otro escritorio virtual)
     pub oculta: bool,
     pub herramienta: bool,
@@ -158,9 +157,10 @@ pub struct InfoVentana {
     pub pid: u32,
 }
 
+/// Las minimizadas se ofrecen igual: muchos juegos se minimizan al pasar a Thunderop y vuelven a dar
+/// cuadros apenas se restauran.
 pub fn candidata(v: &InfoVentana, excluir: u32) -> bool {
     v.visible
-        && !v.minimizada
         && !v.oculta
         && !v.herramienta
         && !v.con_dueno
@@ -186,7 +186,6 @@ pub fn ventanas(excluir: u32) -> Vec<(HWND, String, u32)> {
                 titulo: String::from_utf16_lossy(&buf[..n]),
                 clase: String::from_utf16_lossy(&clase[..c]),
                 visible: IsWindowVisible(h).as_bool(),
-                minimizada: IsIconic(h).as_bool(),
                 oculta: oculta != 0,
                 herramienta: GetWindowLongPtrW(h, GWL_EXSTYLE) as u32 & WS_EX_TOOLWINDOW.0 != 0,
                 con_dueno: GetWindow(h, GW_OWNER).is_ok_and(|d| !d.is_invalid()),
@@ -202,12 +201,17 @@ pub fn ventanas(excluir: u32) -> Vec<(HWND, String, u32)> {
     lista.into_iter().filter(|(_, v)| candidata(v, excluir)).map(|(h, v)| (h, v.titulo, v.pid)).collect()
 }
 
+pub fn minimizada(h: HWND) -> bool {
+    unsafe { IsIconic(h).as_bool() }
+}
+
 /// Una imagen de la ventana con `PrintWindow`, para las que WGC no capturó: `entregar(bgra, pitch, ancho, alto)`.
 pub fn imprimir_ventana(n: isize, entregar: impl FnOnce(&[u8], usize, usize, usize)) {
     let h = HWND(n as _);
     let mut r = RECT::default();
     unsafe {
-        if GetWindowRect(h, &mut r).is_err() {
+        // minimizada solo daría la barrita de 160×28
+        if minimizada(h) || GetWindowRect(h, &mut r).is_err() {
             return;
         }
         let (w, alto) = (r.right - r.left, r.bottom - r.top);
@@ -250,7 +254,11 @@ pub fn pid_de(h: HWND) -> u32 {
 }
 
 /// Tamaño de salida: el de la captura achicado para entrar en `max` (par, como pide NV12).
-pub fn tamano_salida(item: &GraphicsCaptureItem, max: (u32, u32)) -> Result<(u32, u32)> {
+pub fn tamano_salida(item: &GraphicsCaptureItem, ventana: Option<HWND>, max: (u32, u32)) -> Result<(u32, u32)> {
+    // ponytail: minimizada no se sabe su tamaño real; va `max` y el conversor pone bandas si no es 16:9
+    if ventana.is_some_and(minimizada) {
+        return Ok((max.0 & !1, max.1 & !1));
+    }
     let s = item.Size()?;
     let (w, h) = (s.Width as f64, s.Height as f64);
     let k = (max.0 as f64 / w).min(max.1 as f64 / h).min(1.0);
@@ -489,11 +497,10 @@ mod tests {
 
     #[test]
     fn filtra_ventanas() {
-        let buena = || InfoVentana { titulo: "Juego".into(), clase: "UnrealWindow".into(), visible: true, minimizada: false, oculta: false, herramienta: false, con_dueno: false, pid: 10 };
+        let buena = || InfoVentana { titulo: "Juego".into(), clase: "UnrealWindow".into(), visible: true, oculta: false, herramienta: false, con_dueno: false, pid: 10 };
         assert!(candidata(&buena(), 99));
-        let malas: [fn(&mut InfoVentana); 9] = [
+        let malas: [fn(&mut InfoVentana); 8] = [
             |v| v.visible = false,
-            |v| v.minimizada = true,
             |v| v.oculta = true,
             |v| v.herramienta = true,
             |v| v.con_dueno = true,

@@ -36,7 +36,11 @@ export async function crearGrupo(page: Page, nombre: string) {
   await page.getByRole('button', { name: 'Crear grupo' }).click();
   await page.getByRole('button', { name: nombre, exact: true }).click(); // menú del nombre del grupo
   await page.getByRole('button', { name: 'Invitar al grupo' }).click();
-  return (await page.getByTestId('link-invitacion').textContent())!.trim();
+  const campo = page.getByTestId('link-invitacion');
+  await expect(campo).toHaveValue(/invite/);
+  const link = await campo.inputValue();
+  await page.getByRole('button', { name: 'Cerrar' }).click();
+  return link;
 }
 
 export async function unirse(page: Page, link: string) {

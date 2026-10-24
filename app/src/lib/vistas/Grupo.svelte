@@ -3,7 +3,7 @@
   import { untrack } from 'svelte';
   import { sesion, mensajeError } from '../sesion.svelte';
   import { pb } from '../pb';
-  import { salas, enVoz, presencia, crearInvitacion, crearSala, renombrarSala, borrarSala } from '../grupos.svelte';
+  import { salas, enVoz, presencia, crearSala, renombrarSala, borrarSala } from '../grupos.svelte';
   import Chat from './Chat.svelte';
   import { abrirChat, enviar, borrar } from '../chat.svelte';
   import Participantes from './Participantes.svelte';
@@ -13,6 +13,7 @@
   import { ChevronDown, Hash, UserPlus, Pencil, Trash2, Settings, Volume2 } from '@lucide/svelte';
   import { abrirEnPunto } from '../menu';
   import ConfigGrupo from './ConfigGrupo.svelte';
+  import Invitar from './Invitar.svelte';
   import { foto } from '../foto';
   import { grupos, grupoActual } from '../grupos.svelte';
   import { noLeidos, mirar } from '../noLeidos.svelte';
@@ -36,7 +37,6 @@
   const enSalaVoz = $derived(centroVoz && !!salaVoz);
   const salaAbierta = $derived(chat.find((r) => r.id === salaId));
   $effect(() => { if (salaAbierta && !centroVoz) return mirar(salaAbierta.id); });
-  let link = $state('');
   let error = $state('');
   let nueva = $state('');
   let editando = $state<{ id: string; name: string } | null>(null);
@@ -45,10 +45,6 @@
   async function hacer(f: () => Promise<void>) {
     error = '';
     try { await f(); } catch (e) { error = mensajeError(e); }
-  }
-  async function invitar() {
-    link = await crearInvitacion(grupo.id);
-    try { await navigator.clipboard.writeText(link); } catch { /* sin permiso: el link queda visible */ }
   }
   async function agregar(kind: 'chat' | 'voz') {
     const name = nueva.trim();
@@ -73,6 +69,7 @@
   let dlgNueva = $state<HTMLDialogElement>();
   $effect(() => { if (creando) { nueva = ''; dlgNueva?.showModal(); } });
   let config = $state(false);
+  let invitando = $state(false);
   // Clic derecho en una sala (solo el dueño): cambiar nombre o borrar. El nombre se cambia en un modal.
   let menuSala = $state<RecordModel | null>(null);
   let menuSalaEl = $state<HTMLElement>();
@@ -119,7 +116,6 @@
     <button class="plano cabecera" bind:this={cabecera} popovertarget="menu-grupo">
       <h2>{grupo.name}</h2><ChevronDown size={16} strokeWidth={1.75} />
     </button>
-    {#if link}<p role="status" class="link">Link copiado: <code data-testid="link-invitacion">{link}</code></p>{/if}
     {#if error}<p role="alert">{error}</p>{/if}
 
     {@render titulo('Salas de voz')}
@@ -133,7 +129,7 @@
   <!-- Menú del nombre del grupo: invitar, configuraciones y cambiar de grupo. Borrar va adentro de Configuraciones (a propósito, lejos). -->
   <div popover id="menu-grupo" class="menu" bind:this={menuGrupo}
     onbeforetoggle={(e) => { if (e.newState !== 'open' || !cabecera) return; const r = cabecera.getBoundingClientRect(); menuGrupo!.style.left = `${r.left}px`; menuGrupo!.style.top = `${r.bottom + 4}px`; }}>
-    <button class="plano" onclick={() => { menuGrupo?.hidePopover(); hacer(invitar); }}><UserPlus size={16} strokeWidth={1.75} /> Invitar al grupo</button>
+    <button class="plano" onclick={() => { menuGrupo?.hidePopover(); invitando = true; }}><UserPlus size={16} strokeWidth={1.75} /> Invitar al grupo</button>
     {#if soyDueno}
       <button class="plano" onclick={() => { menuGrupo?.hidePopover(); creando = 'voz'; }}><Volume2 size={16} strokeWidth={1.75} /> Nueva sala de voz</button>
       <button class="plano" onclick={() => { menuGrupo?.hidePopover(); creando = 'chat'; }}><Hash size={16} strokeWidth={1.75} /> Nueva sala de chat</button>
@@ -147,6 +143,7 @@
     {/if}
   </div>
   {#if config}<ConfigGrupo {grupo} cerrar={() => (config = false)} />{/if}
+  {#if invitando}<Invitar {grupo} cerrar={() => (invitando = false)} />{/if}
 
   {#if enSalaVoz && salaVoz}<Voz {grupo} {soyDueno} {salasVoz} sala={salaVoz.name} verParticipantes={() => capaParticipantes?.showPopover()} />
   {:else if salaAbierta}{#key salaAbierta.id}<Chat titulo={`# ${salaAbierta.name}`} miembros={grupo.expand?.members ?? []} abrir={() => abrirChat(salaAbierta.id)} enviar={(t, f, r) => enviar(salaAbierta.id, t, f, r)} {borrar} silencio={salaAbierta.id} acciones={soyDueno ? accionesSala : undefined}
@@ -210,7 +207,6 @@
   .quienes img { width: 100%; height: 100%; object-fit: cover; }
   .renombrar { display: flex; flex-direction: column; gap: 8px; width: min(320px, 80vw); }
   .renombrar h3 { margin: 0; }
-  .link { font-size: 12px; margin: 0 0 8px; }
   .otros { padding: 4px 8px 0; font-size: 11px; }
   .vacio { display: grid; place-items: center; color: var(--tenue); }
   .menu { position: fixed; inset: auto; margin: 0; padding: 8px; min-width: 220px; flex-direction: column; gap: 2px;

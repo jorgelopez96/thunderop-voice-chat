@@ -129,7 +129,7 @@ impl Tuberia {
             let (alto, fps) = if mft.software { (c.alto.min(720), c.fps.min(30)) } else { (c.alto, c.fps) };
             let salida = match salida {
                 Some(s) if s.1 <= alto => s,
-                _ => captura::tamano_salida(&item, (alto * 16 / 9, alto)).map_err(otra)?,
+                _ => captura::tamano_salida(&item, ventana, (alto * 16 / 9, alto)).map_err(otra)?,
             };
             let (software, nombre) = (mft.software, mft.nombre.clone());
             match mf::Codificador::new(&d, mft, salida, fps, c.mbps * 1_000_000) {

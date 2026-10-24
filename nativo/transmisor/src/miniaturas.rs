@@ -62,7 +62,7 @@ pub fn correr(args: &[String]) -> ! {
         fuentes.push(Fuente {
             tipo: "ventana",
             id: (h.0 as isize).to_string(),
-            titulo,
+            titulo: if captura::minimizada(h) { format!("{titulo} (minimizada)") } else { titulo },
             pid,
             item: interop.as_ref().and_then(|x| unsafe { x.CreateForWindow(h) }.ok()),
             ventana: Some(h.0 as isize),

@@ -16,6 +16,8 @@
   import VistaPrevia from './VistaPrevia.svelte';
   import Gifs from './Gifs.svelte';
   import { partirEnLinks, primerLink, abrirLink, esGif } from '../links';
+  import { extraerCodigo } from '../invitacion';
+  import { unirse } from '../grupos.svelte';
   import { mencionEnCurso, sugerencias, completar, partirMenciones, menciona } from '../menciones';
   import type { Snippet } from 'svelte';
 
@@ -247,6 +249,7 @@
           {:else if m.text && esGif(m.text)}<img class="gif" src={m.text.trim()} alt="GIF" loading="lazy" referrerpolicy="no-referrer" />
           {:else if m.text}<p class="texto">{#each partirEnLinks(m.text) as parte, j (j)}{#if parte.url}{@const url = parte.url}<a href={url} onclick={(e) => { e.preventDefault(); abrirLink(url); }}>{parte.texto}</a>{:else}{#each partirMenciones(parte.texto, nombres) as p, k (k)}{#if p.nombre}<span class="mencion" class:yo={p.nombre === sesion.usuario?.name}>{p.texto}</span>{:else}{p.texto}{/if}{/each}{/if}{/each}{#if m.editado}<small class="editado" title={`Editado ${new Date(m.editado.replace(' ', 'T')).toLocaleString('es')}`}> (editado)</small>{/if}</p>{/if}
           {#if m.text && editando?.id !== m.id && !esGif(m.text)}{@const link = primerLink(m.text)}{#if link}<VistaPrevia url={link} />{/if}{/if}
+          {#if m.text && m.author !== sesion.usuario?.id && m.text.trim().startsWith('thunderop://invite/') && extraerCodigo(m.text)}{@const t = m.text}<button class="primario unirse" onclick={() => unirse(t).catch((e) => (error = mensajeError(e)))}>Unirme al grupo</button>{/if}
           {#if m.file}
             {@const url = pb.files.getURL(m, m.file)}
             {#if esVideo(m)}<video class="adjunto" controls src={url}><track kind="captions" /></video>
@@ -380,4 +383,5 @@
   .composer textarea { flex: 1; min-width: 0; resize: none; field-sizing: content; max-height: 120px; background: none; border: 0; padding: 6px 4px; }
   .clip { cursor: pointer; flex-direction: row; color: var(--icono); padding: 4px; }
   .clip:hover { color: var(--texto); }
+  .unirse { align-self: flex-start; margin-top: 4px; }
 </style>
