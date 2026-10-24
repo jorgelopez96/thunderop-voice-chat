@@ -103,4 +103,30 @@ describe('grupos', () => {
     await expect(h.admin.collection('messages').getOne(m2.id)).rejects.toMatchObject({ status: 404 });
     await expect(h.admin.collection('invites').getOne(inv.id)).rejects.toMatchObject({ status: 404 });
   });
+
+  it('anota cuándo entra cada uno; el baneado sale y no puede volver hasta que lo desbaneen', async () => {
+    const a = await h.nuevoUsuario('ana');
+    const b = await h.nuevoUsuario('beto');
+    const bid = b.authStore.record!.id;
+    const g = await a.collection('groups').create({ name: 'g', descripcion: 'hola' });
+    const inv = await a.collection('invites').create({ group: g.id });
+    const unirse = () => b.send('/api/invites/join', { method: 'POST', body: { code: inv.code } });
+    await unirse();
+    const g1 = await a.collection('groups').getOne(g.id);
+    expect(g1.descripcion).toBe('hola');
+    expect(Object.keys(g1.ingresos).sort()).toEqual([a.authStore.record!.id, bid].sort());
+    await expect(a.collection('groups').update(g.id, { ingresos: {} })).rejects.toMatchObject({ status: 403 });
+    await expect(b.send(`/api/groups/${g.id}/banear`, { method: 'POST', body: { user: a.authStore.record!.id, baneado: true } })).rejects.toMatchObject({ status: 403 });
+
+    await a.send(`/api/groups/${g.id}/banear`, { method: 'POST', body: { user: bid, baneado: true } });
+    const g2 = await a.collection('groups').getOne(g.id);
+    expect(g2.members).not.toContain(bid);
+    expect(g2.baneados).toMatchObject([{ id: bid, name: b.authStore.record!.name }]);
+    await expect(unirse()).rejects.toMatchObject({ status: 403 });
+
+    await a.send(`/api/groups/${g.id}/banear`, { method: 'POST', body: { user: bid, baneado: false } });
+    expect((await a.collection('groups').getOne(g.id)).baneados).toEqual([]);
+    await unirse();
+    expect((await a.collection('groups').getOne(g.id)).members).toContain(bid);
+  });
 });

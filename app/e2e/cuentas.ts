@@ -1,17 +1,31 @@
 import { expect, type Browser, type Page } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
+import PocketBase from 'pocketbase';
 
 /** El nombre es único en el servidor: se le suma un sufijo al azar ("Ana3f2a"; un contador se reinicia si Playwright cambia de worker); los specs buscan "Ana" por subcadena. */
 /** Lo de `nombre` en un registro por nombre de usuario (que lleva el sufijo de `crearCuenta`). */
 export const de = <T>(r: Record<string, T>, nombre: string) => Object.entries(r).find(([k]) => k.startsWith(nombre))?.[1];
 
+const PB = `http://127.0.0.1:${process.env.E2E_PB_PORT ?? 8091}`;
+let admin: PocketBase | undefined;
+
+/** Cuenta completa (confirmada, invitada, términos y perfil al día) creada como superusuario: la pública queda frenada por la guarda de cuentas. */
 export async function crearCuenta(page: Page, nombre: string) {
+  if (!admin) {
+    admin = new PocketBase(PB);
+    admin.autoCancellation(false);
+    await admin.collection('_superusers').authWithPassword('admin@test.local', 'admin-pass-1234');
+  }
+  const sufijo = randomUUID().slice(0, 4);
+  const email = `${nombre}-${randomUUID()}@test.local`;
+  await admin.collection('users').create({
+    email, password: 'clave-segura-123', passwordConfirm: 'clave-segura-123', name: `${nombre}${sufijo}`,
+    username: `${nombre.toLowerCase()}${sufijo}`, terminos: 1, perfilCompleto: true, nacimiento: '1996-01-01', verified: true, invitado: true,
+  });
   await page.goto('/');
-  await page.getByRole('tab', { name: 'Crear cuenta' }).click();
-  await page.getByLabel('Nombre').fill(`${nombre}${randomUUID().slice(0, 4)}`);
-  await page.getByLabel('Email').fill(`${nombre}-${randomUUID()}@test.local`);
+  await page.getByLabel('Usuario o email').fill(email);
   await page.getByLabel('Contraseña').fill('clave-segura-123');
-  await page.getByRole('button', { name: 'Crear cuenta', exact: true }).click();
+  await page.getByRole('button', { name: 'Entrar', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Mis grupos' })).toBeVisible();
 }
 

@@ -13,27 +13,12 @@ let h: Harness;
 beforeAll(async () => { h = await startPocketBase(); });
 afterAll(async () => { await h.stop(); });
 
-const noUnico = { status: 400, response: { data: { name: { code: 'validation_not_unique' } } } };
-
-describe('nombre único', () => {
-  it('no distingue mayúsculas al registrarse ni al renombrarse', async () => {
-    const a = await h.nuevoUsuario('ana');
-    const b = await h.nuevoUsuario('beto');
-    const nombre = a.authStore.record!.name as string;
-    const password = randomBytes(8).toString('hex');
-    await expect(h.admin.collection('users').create({ email: `x-${randomBytes(4).toString('hex')}@test.local`, password, passwordConfirm: password, name: nombre.toUpperCase() }))
-      .rejects.toMatchObject(noUnico);
-    await expect(b.collection('users').update(b.authStore.record!.id, { name: nombre.toUpperCase() }))
-      .rejects.toMatchObject(noUnico);
-  });
-});
-
 describe('fundador', () => {
   it('no se lo pone uno mismo, sí un superuser', async () => {
-    const password = randomBytes(8).toString('hex');
+    const password = `Aa1!${randomBytes(8).toString('hex')}`;
     const email = `f-${randomBytes(4).toString('hex')}@test.local`;
     const u = await h.nuevoUsuario('fede');
-    const creado = await u.collection('users').create({ email, password, passwordConfirm: password, name: `f${randomBytes(3).toString('hex')}`, fundador: true });
+    const creado = await u.collection('users').create({ email, password, passwordConfirm: password, name: `f${randomBytes(3).toString('hex')}`, username: `f${randomBytes(3).toString('hex')}`, nacimiento: '2000-01-01', terminos: 1, fundador: true });
     expect((await h.admin.collection('users').getOne(creado.id)).fundador).toBe(false);
     const id = u.authStore.record!.id;
     await u.collection('users').update(id, { fundador: true });

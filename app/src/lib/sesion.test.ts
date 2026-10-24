@@ -3,6 +3,7 @@ import { ClientResponseError } from 'pocketbase';
 import { mensajeError, validarSesionAlIniciar } from './sesion.svelte';
 import { grupos, grupoActual } from './grupos.svelte';
 import { pb } from './pb';
+import { cuenta, cargarEstado } from './cuenta.svelte';
 
 const err = (data: object) => new ClientResponseError({ status: 400, response: { message: 'Failed to create record.', data } });
 
@@ -13,8 +14,17 @@ describe('mensajeError', () => {
   it('avatar inválido en español', () => {
     expect(mensajeError(err({ avatar: { code: 'validation_invalid_mime_type', message: 'x' } }))).toBe('La foto no es válida (imagen, hasta 2 MB).');
   });
-  it('nombre repetido', () => {
-    expect(mensajeError(err({ name: { code: 'validation_not_unique', message: 'x' } }))).toBe('Ese nombre ya existe, probá con otro.');
+  it('usuario repetido', () => {
+    expect(mensajeError(err({ username: { code: 'validation_not_unique', message: 'x' } }))).toBe('Ese usuario ya existe, probá con otro.');
+  });
+  it('credenciales incorrectas', () => {
+    const e = new ClientResponseError({ status: 400, response: { message: 'Failed to authenticate.' } });
+    expect(mensajeError(e)).toBe('Usuario, email o contraseña incorrectos.');
+  });
+  it('403 de cuenta incompleta actualiza cuenta.falta', () => {
+    const e = new ClientResponseError({ status: 403, response: { message: 'Tu cuenta no está completa.', falta: ['verificar', 'perfil'] } });
+    expect(mensajeError(e)).toBe('Completá tu cuenta para seguir.');
+    expect(cuenta.falta).toEqual(['verificar', 'perfil']);
   });
 });
 
@@ -54,5 +64,29 @@ describe('recordar mi cuenta', () => {
     localStorage.setItem('dm.recordar', '1');
     await validarSesionAlIniciar();
     expect(pb.authStore.token).toBe('token');
+  });
+});
+
+describe('estado de la cuenta', () => {
+  afterEach(() => { vi.restoreAllMocks(); cuenta.falta = null; cuenta.error = ''; });
+
+  it('un 403 con `falta` de cualquier pedido vuelve a completar', async () => {
+    cuenta.falta = [];
+    const data = await pb.afterSend!(new Response(null, { status: 403 }), { falta: ['terminos'] }, {});
+    expect(data).toEqual({ falta: ['terminos'] });
+    expect(cuenta.falta).toEqual(['terminos']);
+  });
+  it('si falla y ya había estado, lo conserva', async () => {
+    vi.spyOn(pb, 'send').mockRejectedValue(new ClientResponseError({ status: 0 }));
+    cuenta.falta = [];
+    await cargarEstado();
+    expect(cuenta.falta).toEqual([]);
+    expect(cuenta.error).toBe('');
+  });
+  it('si falla sin estado previo, muestra el error', async () => {
+    vi.spyOn(pb, 'send').mockRejectedValue(new ClientResponseError({ status: 0 }));
+    await cargarEstado();
+    expect(cuenta.falta).toBeNull();
+    expect(cuenta.error).toBe('No se pudo conectar con el servidor.');
   });
 });

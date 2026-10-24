@@ -22,12 +22,12 @@ writeFileSync(extra, JSON.stringify({
   plugins: { updater: { endpoints: [`https://${dominio}/descargas/latest.json`] } },
 }));
 
-// Transmisor nativo: se compila y se copia donde lo busca `bundle.externalBin` (el target-dir D:/lkt sale de nativo/.cargo/config.toml).
+// Transmisor nativo: se compila y se copia donde lo busca `bundle.externalBin` (el target-dir .lkt de la raíz sale de nativo/transmisor/.cargo/config.toml).
 const transmisor = fileURLToPath(new URL('../../nativo/transmisor/', import.meta.url));
 execFileSync('cargo', ['build', '--release', '-j', '4'], { cwd: transmisor, stdio: 'inherit' });
 const binarios = fileURLToPath(new URL('../src-tauri/binaries/', import.meta.url));
 mkdirSync(binarios, { recursive: true });
-copyFileSync('D:/lkt/release/transmisor.exe', join(binarios, 'transmisor-x86_64-pc-windows-msvc.exe'));
+copyFileSync(fileURLToPath(new URL('../../.lkt/release/transmisor.exe', import.meta.url)), join(binarios, 'transmisor-x86_64-pc-windows-msvc.exe'));
 
 const tauri = fileURLToPath(new URL('../node_modules/@tauri-apps/cli/tauri.js', import.meta.url));
 execFileSync(process.execPath, [tauri, 'build', '--bundles', 'nsis', '--config', extra], {

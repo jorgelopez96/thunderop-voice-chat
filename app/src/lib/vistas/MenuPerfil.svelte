@@ -29,6 +29,7 @@
   <span style="color:{u?.color || 'inherit'}">{u?.name}</span><Insignia usuario={u ?? undefined} />
 </button>
 <div id="menu-perfil" popover bind:this={menu}>
+  {#if u?.username}<span class="usuario" title="Tu usuario: pasalo para que te agreguen">@{u.username}</span><hr />{/if}
   {#each ESTADOS as [valor, texto] (valor)}
     <button class="plano estado" aria-pressed={actual === valor} onclick={() => cambiarEstado(valor)}><span class="punto {valor}"></span>{texto}</button>
   {/each}
@@ -48,8 +49,9 @@
   [popover] { position: fixed; inset: 48px 12px auto auto; margin: 0; padding: 6px; display: none; flex-direction: column; gap: 2px;
     background: var(--panel); color: var(--texto); border: 1px solid var(--borde); border-radius: 10px; }
   [popover]:popover-open { display: flex; }
-  [popover] button { text-align: left; }
+  [popover] button { justify-content: flex-start; text-align: left; }
   [popover] hr { border: 0; border-top: 1px solid var(--borde); margin: 4px 0; }
+  .usuario { padding: 4px 8px; color: var(--tenue); user-select: text; }
   .estado { display: flex; align-items: center; gap: 8px; }
   .punto { width: 10px; height: 10px; border-radius: 50%; flex: none; }
   .disponible { background: var(--ok); }

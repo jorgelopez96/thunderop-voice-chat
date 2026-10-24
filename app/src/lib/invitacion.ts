@@ -5,5 +5,5 @@ export function extraerCodigo(entrada: string): string | null {
 }
 
 export function linkInvitacion(code: string): string {
-  return `discordmejorado://invite/${code}`;
+  return `thunderop://invite/${code}`;
 }

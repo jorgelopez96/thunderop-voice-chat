@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
   import { EllipsisVertical, BellOff } from '@lucide/svelte';
-  import { abrirEnPunto } from '../menu';
+  import { abrirEnPunto, alTocar, estabaAbierto } from '../menu';
   import { DURACIONES, silenciar, silenciadoHasta, esParaSiempre } from '../notificaciones.svelte';
 
   // Tres puntitos arriba del chat: silenciar sus avisos y, si quien lo usa las pasa, más acciones (`acciones` recibe cerrar).
@@ -15,7 +15,7 @@
 
 <span class="lado">
   {#if hasta}<span class="silenciado" title={estado} aria-label={estado}><BellOff size={14} strokeWidth={1.75} /></span>{/if}
-  <button class="icono" title="Opciones del chat" aria-label="Opciones del chat" onclick={(e) => { const r = e.currentTarget.getBoundingClientRect(); abrirEnPunto(menu, r.right - 220, r.bottom + 4); }}>
+  <button class="icono" title="Opciones del chat" aria-label="Opciones del chat" onpointerdown={() => alTocar(menu)} onclick={(e) => { if (estabaAbierto(menu)) return; const r = e.currentTarget.getBoundingClientRect(); abrirEnPunto(menu, r.right - 220, r.bottom + 4); }}>
     <EllipsisVertical size={16} strokeWidth={1.75} />
   </button>
 </span>

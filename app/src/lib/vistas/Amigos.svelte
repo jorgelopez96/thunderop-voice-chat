@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { RecordModel } from 'pocketbase';
   import { sesion } from '../sesion.svelte';
-  import { amigos, solicitarPorNombre, quitar } from '../amigos.svelte';
+  import { amigos, solicitarPorUsuario, quitar } from '../amigos.svelte';
   import { noLeidos, abrirPrivado, enviarPrivado, borrarPrivado, marcarLeido } from '../privados.svelte';
   import Avatar from './Avatar.svelte';
   import Insignia from './Insignia.svelte';
@@ -14,7 +14,7 @@
   let { enVoz = () => undefined }: { enVoz?: (id: string) => string | undefined } = $props();
   let agregando = $state(false);
 
-  let nombre = $state('');
+  let usuario = $state('');
   let error = $state('');
   let ok = $state('');
   let abierto = $state<RecordModel | null>(null);
@@ -26,8 +26,8 @@
   async function agregar(e: SubmitEvent) {
     e.preventDefault();
     ok = '';
-    error = await solicitarPorNombre(nombre);
-    if (!error) { ok = `Le mandaste una solicitud a ${nombre.trim()}.`; nombre = ''; }
+    error = await solicitarPorUsuario(usuario);
+    if (!error) { ok = `Le mandaste una solicitud a ${usuario.trim()}.`; usuario = ''; }
   }
   function abrir(u: RecordModel) { abierto = u; queueMicrotask(() => d?.showModal()); }
 </script>
@@ -46,12 +46,12 @@
         {:else if grupo}<small class="verde">En voz · {grupo}</small>{/if}
       </button></li>
     {:else}
-      {#if amigos.cargado}<li class="vacio"><p>Todavía no tenés amigos. Agregalos por su nombre para hablarles por privado y ver cuándo están conectados.</p>
+      {#if amigos.cargado}<li class="vacio"><p>Todavía no tenés amigos. Agregalos por su usuario para hablarles por privado y ver cuándo están conectados.</p>
         {#if !agregando}<button onclick={() => (agregando = true)}><UserPlus size={16} strokeWidth={1.75} /> Agregar amigo</button>{/if}</li>{/if}
     {/each}
   </ul>
   {#if agregando}<form class="fila" onsubmit={agregar}>
-    <input bind:value={nombre} required maxlength="32" placeholder="Nombre exacto" aria-label="Nombre del amigo" />
+    <input bind:value={usuario} required maxlength="20" placeholder="Usuario exacto" aria-label="Usuario del amigo" />
     <button type="submit">Agregar amigo</button>
   </form>{/if}
   {#if error}<p role="alert">{error}</p>{/if}

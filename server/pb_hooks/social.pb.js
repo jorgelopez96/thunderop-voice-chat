@@ -17,13 +17,13 @@ onRecordUpdateRequest((e) => {
 
 routerAdd("POST", "/api/latido", (e) => {
   const u = e.app.findRecordById("users", e.auth.id);
-  if (u.getString("disponibilidad") === "invisible") return e.json(200, { visto: "" });
+  if (u.getString("disponibilidad") === "invisible" || u.getBool("desactivada")) return e.json(200, { visto: "" });
   u.set("visto", new DateTime());
   e.app.saveNoValidate(u);
   return e.json(200, { visto: u.getString("visto") });
 }, $apis.requireAuth("users"));
 
-// Solicitud de amistad por nombre (sin distinguir mayúsculas) o id. Si el otro ya me la había pedido, la acepta.
+// Solicitud de amistad por usuario (normalizado) o id. Si el otro ya me la había pedido, la acepta.
 // En una transacción: dos solicitudes cruzadas a la vez dejan una sola amistad.
 routerAdd("POST", "/api/amigos/solicitar", (e) => {
   const body = e.requestInfo().body;
@@ -31,14 +31,14 @@ routerAdd("POST", "/api/amigos/solicitar", (e) => {
   let otro = null;
   try {
     if (typeof body.usuario === "string" && body.usuario) otro = e.app.findRecordById("users", body.usuario);
-    else if (typeof body.nombre === "string" && body.nombre.trim()) {
-      // Mismo criterio que el índice único (NOCASE): el `=` del filtro distingue mayúsculas.
-      otro = new Record();
-      e.app.recordQuery("users").andWhere($dbx.exp("name = {:n} COLLATE NOCASE", { n: body.nombre.trim() })).limit(1).one(otro);
+    else if (typeof body.username === "string" && body.username.trim()) {
+      const { normalizarUsuario } = require(`${__hooks}/reglas.js`);
+      otro = e.app.findFirstRecordByData("users", "username", normalizarUsuario(body.username));
     }
   } catch { otro = null; } // no existe
-  if (!otro) throw new NotFoundError("No hay nadie con ese nombre.");
+  if (!otro) throw new NotFoundError("No hay nadie con ese usuario.");
   if (otro.id === yo) throw new BadRequestError("No te podés agregar a vos mismo.");
+  if (otro.getBool("desactivada")) throw new BadRequestError("Esa cuenta está desactivada.");
 
   let amistad = null;
   e.app.runInTransaction((tx) => {

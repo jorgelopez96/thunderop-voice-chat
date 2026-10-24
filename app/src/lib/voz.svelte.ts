@@ -1,13 +1,12 @@
 import type { ProcesadorMic } from './ruido';
-import type { LocalAudioTrack, LocalVideoTrack, Participant, RemoteTrack, Room, Track } from 'livekit-client';
-import { getCurrentWindow, LogicalSize } from '@tauri-apps/api/window';
+import type { LocalAudioTrack, Participant, RemoteTrack, Room, Track } from 'livekit-client';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import { pb } from './pb';
 import { mensajeError } from './sesion.svelte';
 import { leerPrefs, guardarPrefs, CALIDADES, type Calidad } from './prefs';
-import { installBaselineH264Patch } from './sdp';
 import { iniciarAudioPantalla, detenerAudioPantalla } from './audioPantalla';
 import { mensajeTransmision } from './transmision';
-import { duenio, esPantallaNativa, hayNativo, sinNativo, iniciarNativo, detenerNativo, calidadNativo, SUFIJO_PANTALLA } from './transmisorNativo';
+import { duenio, esPantallaNativa, iniciarNativo, detenerNativo, calidadNativo, cortarSimulado, SUFIJO_PANTALLA } from './transmisorNativo';
 
 /** `silenciado`: no está mandando audio (muteado, sin permiso del dueño o sin micrófono publicado). */
 /** `pantalla`: sid de la pantalla que comparte. `espectadores`: cuántos lo están mirando. */
@@ -122,8 +121,7 @@ export async function entrarVoz(roomId: string, salaNombre = '', grupoId: string
   ctx = c;
   Object.assign(voz, { salaId: roomId, salaNombre, grupoId, conectando: true, error: '' });
   const vigente = () => mio === intento;
-  // El parche SDP se instala una sola vez (no es idempotente), junto con la primera carga de LiveKit.
-  try { if (!lk) { lk = await import('livekit-client'); installBaselineH264Patch(() => leerPrefs().gpu); } }
+  try { if (!lk) lk = await import('livekit-client'); }
   catch { if (vigente()) { voz.error = 'No se pudo conectar a la voz.'; salirVoz(); } return; }
   if (!vigente()) return;
   const { Room, RoomEvent, Track } = lk;
@@ -175,14 +173,6 @@ export async function entrarVoz(roomId: string, salaNombre = '', grupoId: string
   const revisar = setInterval(() => (room === r ? asegurarSuscripciones(r) : clearInterval(revisar)), 10_000);
   r.on(RoomEvent.TrackUnpublished, (pub) => { if (voz.viendo.includes(pub.trackSid)) aplicarVista(voz.viendo.filter((s) => s !== pub.trackSid)); });
   r.on(RoomEvent.ParticipantDisconnected, () => aplicarVista(voz.viendo.filter((s) => pubPantalla(s))));
-  // Fin de la transmisión propia, por el botón o porque Windows cortó la captura: todo pasa por acá.
-  r.on(RoomEvent.LocalTrackUnpublished, (pub) => {
-    if (pub.source !== Track.Source.ScreenShare || room !== r) return; // una sala vieja no toca la transmisión actual
-    tx++;
-    voz.transmitiendo = false;
-    void detenerAudioPantalla();
-    void despublicarAudio(r);
-  });
   r.on(RoomEvent.DataReceived, (payload, part, _kind, topic) => {
     // El dueño nos movió a otra sala: el aviso lo manda el servidor (sin participante), nunca otro usuario.
     if (topic === 'mover' && !part) {
@@ -346,45 +336,33 @@ if ('__TAURI_INTERNALS__' in globalThis) {
   });
 }
 
-/** El selector de WebView2 se dibuja adentro de la ventana y se corta si es chica: se lleva a 1280×800 lógicos como mínimo. */
-async function agrandarVentana() {
-  if (!('__TAURI_INTERNALS__' in globalThis)) return;
-  const w = getCurrentWindow();
-  const t = (await w.innerSize()).toLogical(await w.scaleFactor());
-  if (t.width < 1280 || t.height < 800) await w.setSize(new LogicalSize(Math.max(t.width, 1280), Math.max(t.height, 800)));
-}
-
-// `tx` invalida un `transmitir` en curso (cortar, salir de la sala o que Windows corte la captura).
-// `arrancando` rechaza un segundo `transmitir` (doble clic con el selector abierto) hasta que termine el primero:
+// `tx` invalida un `transmitir` en curso (cortar, salir de la sala o que el transmisor termine).
+// `arrancando` rechaza un segundo `transmitir` (doble clic) hasta que termine el primero:
 // el audio nativo es uno solo y una llamada vieja no puede publicar otra pista ni frenar la captura de una nueva.
 let tx = 0;
 let arrancando = false;
-let nativo = false; // la transmisión actual es la del transmisor nativo (y no la de WebView2)
+let nativo = false; // hay una transmisión andando
 
-/** `que`: "pantalla" o el título de una ventana, para el transmisor nativo; sin `que`, el selector de WebView2.
- *  `pid`: el programa de esa ventana, para mandar solo su sonido. Si el nativo no arranca (placa sin compresor,
- *  no conecta), se usa el de WebView2. */
-export async function transmitir(calidad: Calidad, que?: string, pid?: number) {
+/** `fuente`: un monitor o una ventana (ids de `fuentes_transmisor`); `id: 'pantalla'` es el monitor principal.
+ *  `pid`: el programa de la ventana, para mandar solo su sonido. */
+export async function transmitir(calidad: Calidad, fuente: { tipo: 'monitor' | 'ventana'; id: string; pid: number }) {
   const r = room, c = ctx;
   if (!r || !c || voz.transmitiendo || arrancando) return;
   arrancando = true;
-  try {
-    const mio = ++tx;
-    if (que && hayNativo() && await arrancarNativo(r, c, mio, calidad, que, pid)) return;
-    if (room === r && mio === tx) await arrancar(r, c, mio, calidad);
-  } finally { arrancando = false; }
+  try { await arrancarNativo(r, c, ++tx, calidad, fuente); }
+  finally { arrancando = false; }
 }
 
-/** true si quedó transmitiendo, o si no hay que seguir con WebView2 (se salió, o la ventana no está). */
-async function arrancarNativo(r: Room, c: AudioContext, mio: number, calidad: Calidad, que: string, pid?: number): Promise<boolean> {
+async function arrancarNativo(r: Room, c: AudioContext, mio: number, calidad: Calidad, fuente: { tipo: 'monitor' | 'ventana'; id: string; pid: number }) {
   const vigente = () => room === r && mio === tx;
-  const { alto, fps, mbpsNativo } = CALIDADES[calidad];
+  const { alto, fps, mbps } = CALIDADES[calidad];
+  const que = fuente.id === 'pantalla' ? 'pantalla' : `${fuente.tipo}:${fuente.id}`;
   voz.error = '';
   let url: string, token: string;
   try { ({ token, url } = await pb.send(`/api/rooms/${voz.salaId}/token-pantalla`, { method: 'POST' })); }
-  catch { return !vigente(); }
-  if (!vigente()) return true;
-  const res = await iniciarNativo({ url, token, que, fps, mbps: mbpsNativo, alto }, (codigo) => {
+  catch { if (vigente()) voz.error = mensajeTransmision(5); return; }
+  if (!vigente()) return;
+  const res = await iniciarNativo({ url, token, que, fps, mbps, alto }, (codigo) => {
     // Terminó después de arrancar: se cerró la ventana (0), se rindió (4) o se cayó.
     if (!vigente() || !nativo) return;
     tx++;
@@ -394,56 +372,29 @@ async function arrancarNativo(r: Room, c: AudioContext, mio: number, calidad: Ca
     void detenerAudioPantalla();
     void despublicarAudio(r);
     actualizar();
-    if (codigo !== 0) voz.error = 'Se cortó la transmisión. Probá de nuevo.';
+    voz.error = mensajeTransmision(codigo);
   });
-  if (res !== 'ok') {
-    if (res === 3) sinNativo();
-    if (res === 2 && vigente()) { voz.error = 'No se encontró esa ventana. ¿Se cerró?'; return true; }
-    return !vigente();
-  }
-  if (!vigente()) { void detenerNativo(); return true; }
+  if (res !== 'ok') { if (vigente()) voz.error = mensajeTransmision(res); return; }
+  if (!vigente()) { void detenerNativo(); return; }
   nativo = true;
   voz.calidadEnVivo = calidad;
   voz.transmitiendo = true;
   guardarPrefs({ calidad });
   actualizar();
-  await compartirSonido(r, c, vigente, pid);
-  return true;
+  await compartirSonido(r, c, vigente, fuente.tipo === 'ventana' ? fuente.pid : undefined);
 }
 
 /** Cambia la calidad de la transmisión nativa sin cortarla (`voz.calidadEnVivo` dice si se puede). */
 export async function cambiarCalidad(calidad: Calidad) {
   if (!nativo || calidad === voz.calidadEnVivo) return;
-  const { alto, fps, mbpsNativo } = CALIDADES[calidad];
-  if (!await calidadNativo(fps, mbpsNativo, alto)) { voz.error = 'No se pudo cambiar la calidad.'; return; }
+  const { alto, fps, mbps } = CALIDADES[calidad];
+  if (!await calidadNativo(fps, mbps, alto)) { voz.error = 'No se pudo cambiar la calidad.'; return; }
+  // ponytail: por software el transmisor topea en 720p30 y el rótulo puede decir más; el frontend recién ve el registro al terminar (Estado 'fin'), no en vivo. Si molesta, que el transmisor emita un evento con el codificador.
   voz.calidadEnVivo = calidad;
   guardarPrefs({ calidad });
 }
 
-async function arrancar(r: Room, c: AudioContext, mio: number, calidad: Calidad) {
-  const vigente = () => room === r && mio === tx;
-  const { ancho, alto, fps, mbps } = CALIDADES[calidad];
-  voz.error = '';
-  await agrandarVentana().catch(() => {});
-  // 'motion' y no 'detail': con 'detail' WebRTC usa el modo pantalla del codificador (pensado para texto)
-  // y en juegos, al girar la cámara rápido, se pixelea. Sin simulcast: con dos capas el emisor bajaba a
-  // ~2 Mbps y se cuadriculaba todo; al espectador con mala conexión lo cubre el servidor (livekit.yaml).
-  try {
-    await r.localParticipant.setScreenShareEnabled(true,
-      { audio: false, contentHint: 'motion', resolution: { width: ancho, height: alto, frameRate: fps } },
-      { videoCodec: 'h264', simulcast: false, screenShareEncoding: { maxBitrate: mbps * 1e6, maxFramerate: fps } });
-  } catch (e) {
-    if (vigente()) voz.error = mensajeTransmision(e);
-    return;
-  }
-  if (room !== r) return;
-  if (!vigente()) { await r.localParticipant.setScreenShareEnabled(false).catch(() => {}); return; }
-  voz.transmitiendo = true;
-  guardarPrefs({ calidad });
-  await compartirSonido(r, c, vigente);
-}
-
-/** Sonido de la PC (captura nativa de audio.rs), publicado desde la identidad del usuario en las dos transmisiones. */
+/** Sonido de la PC (captura nativa de audio.rs), publicado desde la identidad del usuario. */
 async function compartirSonido(r: Room, c: AudioContext, vigente: () => boolean, pid?: number) {
   const t = await iniciarAudioPantalla(c, pid);
   // Mientras arrancaba el audio se pudo salir de la sala o cortar la transmisión: no queda captura huérfana.
@@ -463,18 +414,14 @@ export async function dejarDeTransmitir() {
   const r = room;
   if (!r) return;
   tx++;
-  if (nativo) {
-    nativo = false;
-    voz.calidadEnVivo = null;
-    voz.transmitiendo = false;
-    void detenerNativo();
-    void detenerAudioPantalla();
-    await despublicarAudio(r);
-    actualizar();
-    return;
-  }
+  if (!nativo) return;
+  nativo = false;
+  voz.calidadEnVivo = null;
+  voz.transmitiendo = false;
+  void detenerNativo();
+  void detenerAudioPantalla();
   await despublicarAudio(r);
-  await r.localParticipant.setScreenShareEnabled(false).catch(() => {}); // el resto lo hace LocalTrackUnpublished
+  actualizar();
 }
 
 const pubPantalla = (sid: string) => {
@@ -508,9 +455,8 @@ export function pistaPantalla(sid: string): { pista: RemoteTrack | undefined; id
 }
 
 /** Pista de video de nuestra propia transmisión, para la vista previa. */
-export function pistaPantallaPropia(): LocalVideoTrack | RemoteTrack | undefined {
-  if (room && nativo) return previaNativa(room)?.track as RemoteTrack | undefined;
-  return room?.localParticipant.getTrackPublication(lk.Track.Source.ScreenShare)?.track as LocalVideoTrack | undefined;
+export function pistaPantallaPropia(): RemoteTrack | undefined {
+  return room && nativo ? previaNativa(room)?.track as RemoteTrack | undefined : undefined;
 }
 
 /** Muestra u oculta la vista previa de nuestra transmisión (se guarda). */
@@ -531,9 +477,9 @@ export async function dispositivos(): Promise<{ entradas: MediaDeviceInfo[]; sal
 
 // Solo para los E2E (en el build de producción no existe): micrófono local y, por nombre de cada
 // remoto, si publica micrófono y los bytes de audio recibidos de él; frames de cada pantalla y si transmitimos.
-// `terminarCaptura` hace lo que Windows al cortar la captura.
 if (import.meta.env.DEV) {
   (globalThis as unknown as { __voz: unknown }).__voz = {
+    terminarCaptura: cortarSimulado,
     async stats() {
       const remotos: Record<string, { mic: boolean; bytes: number }> = {};
       for (const p of room?.remoteParticipants.values() ?? []) {
@@ -551,10 +497,6 @@ if (import.meta.env.DEV) {
         pantallas[p.name || p.identity] = { frames };
       }
       return { mic: room?.localParticipant.isMicrophoneEnabled ?? false, remotos, pantallas, transmitiendo: voz.transmitiendo };
-    },
-    terminarCaptura() {
-      const t = room?.localParticipant.getTrackPublication(lk.Track.Source.ScreenShare)?.track?.mediaStreamTrack;
-      t?.stop(); t?.dispatchEvent(new Event('ended'));
     },
   };
 }

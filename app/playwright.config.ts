@@ -28,9 +28,8 @@ export default defineConfig({
     baseURL: 'http://127.0.0.1:1430',
     permissions: ['microphone'],
     // `--mute-audio`: nada de lo que suena en los tests sale por los parlantes/auriculares.
-    // Edge en inglés: `--auto-select-desktop-capture-source=Entire screen` hace que getDisplayMedia resuelva sin selector (probado solo, anda).
     launchOptions: {
-      args: ['--mute-audio', '--use-fake-ui-for-media-stream', '--auto-select-desktop-capture-source=Entire screen', '--use-fake-device-for-media-stream', `--use-file-for-fake-audio-capture=${tono}`],
+      args: ['--mute-audio', '--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', `--use-file-for-fake-audio-capture=${tono}`],
     },
   },
   webServer: {

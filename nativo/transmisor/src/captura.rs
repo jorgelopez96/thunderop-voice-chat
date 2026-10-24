@@ -11,20 +11,33 @@ use windows::Graphics::Capture::{Direct3D11CaptureFramePool, GraphicsCaptureItem
 use windows::Graphics::DirectX::Direct3D11::IDirect3DDevice;
 use windows::Graphics::DirectX::DirectXPixelFormat;
 use windows::Graphics::SizeInt32;
-use windows::Win32::Foundation::{HMODULE, HWND, LPARAM, POINT, RECT};
+use windows::Win32::Foundation::{HMODULE, HWND, LPARAM, RECT};
 use windows::Win32::Graphics::Direct3D::D3D_DRIVER_TYPE_HARDWARE;
 use windows::Win32::Graphics::Direct3D11::*;
 use windows::Win32::Graphics::Dxgi::Common::{DXGI_FORMAT_NV12, DXGI_RATIONAL, DXGI_SAMPLE_DESC};
 use windows::Win32::Graphics::Dxgi::IDXGIDevice;
-use windows::Win32::Graphics::Gdi::{MonitorFromPoint, MONITOR_DEFAULTTOPRIMARY};
+use windows::Win32::Graphics::Gdi::{
+    CreateCompatibleDC, CreateDIBSection, DeleteDC, DeleteObject, EnumDisplayMonitors, GdiFlush, GetMonitorInfoW, SelectObject, BITMAPINFO, BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS, HDC, HMONITOR, MONITORINFOEXW,
+};
+use windows::Win32::Storage::Xps::{PrintWindow, PRINT_WINDOW_FLAGS};
 use windows::Win32::System::WinRT::Direct3D11::{CreateDirect3D11DeviceFromDXGIDevice, IDirect3DDxgiInterfaceAccess};
 use windows::Win32::System::WinRT::Graphics::Capture::IGraphicsCaptureItemInterop;
-use windows::Win32::UI::WindowsAndMessaging::{EnumWindows, GetWindowTextW, GetWindowThreadProcessId, IsWindow, IsWindowVisible};
+use windows::Win32::Graphics::Dwm::{DwmGetWindowAttribute, DWMWA_CLOAKED};
+use windows::Win32::UI::WindowsAndMessaging::{
+    EnumWindows, GetClassNameW, GetWindow, GetWindowLongPtrW, GetWindowRect, GetWindowTextW, GetWindowThreadProcessId, IsIconic, IsWindow, IsWindowVisible, GWL_EXSTYLE, GW_OWNER, MONITORINFOF_PRIMARY, PW_RENDERFULLCONTENT, WS_EX_TOOLWINDOW,
+};
 
 /// Textura NV12 y su momento de captura en µs (reloj del sistema).
 pub type Cuadro = (ID3D11Texture2D, i64);
 
 pub fn dispositivo() -> Result<ID3D11Device> {
+    let d = dispositivo_sin_prioridad()?;
+    subir_prioridad_gpu(&d);
+    Ok(d)
+}
+
+/// Para las miniaturas: sin pedir prioridad en la placa (y sin escribir nada en la salida).
+pub fn dispositivo_sin_prioridad() -> Result<ID3D11Device> {
     let mut d = None;
     unsafe {
         D3D11CreateDevice(
@@ -41,7 +54,6 @@ pub fn dispositivo() -> Result<ID3D11Device> {
         let d = d.unwrap();
         // lo usan a la vez el hilo de captura y el codificador
         let _ = d.cast::<ID3D11Multithread>()?.SetMultithreadProtected(true);
-        subir_prioridad_gpu(&d);
         Ok(d)
     }
 }
@@ -60,37 +72,174 @@ fn subir_prioridad_gpu(d: &ID3D11Device) {
     }
 }
 
-/// "pantalla" = monitor principal; cualquier otro texto = primera ventana visible cuyo título lo contenga.
-pub fn elegir(que: &str) -> Result<(GraphicsCaptureItem, Option<HWND>)> {
+/// Qué se transmite: `pantalla` (monitor principal), `monitor:<dispositivo>` (p. ej. `monitor:\\.\DISPLAY2`)
+/// o `ventana:<hwnd>`.
+pub enum Objetivo {
+    Principal,
+    Monitor(String),
+    Ventana(isize),
+}
+
+pub fn objetivo(que: &str) -> Option<Objetivo> {
+    if que == "pantalla" {
+        return Some(Objetivo::Principal);
+    }
+    if let Some(x) = que.strip_prefix("monitor:").filter(|x| !x.is_empty()) {
+        return Some(Objetivo::Monitor(x.into()));
+    }
+    que.strip_prefix("ventana:").and_then(|n| n.parse().ok()).filter(|&n| n > 0).map(Objetivo::Ventana)
+}
+
+pub struct Monitor {
+    pub hmon: HMONITOR,
+    /// nombre del dispositivo, p. ej. `\\.\DISPLAY2`: es el id que se pide
+    pub dispositivo: String,
+    pub principal: bool,
+    pub ancho: i32,
+    pub alto: i32,
+}
+
+pub fn monitores() -> Vec<Monitor> {
+    unsafe extern "system" fn uno(h: HMONITOR, _: HDC, _: *mut RECT, l: LPARAM) -> BOOL {
+        let lista = &mut *(l.0 as *mut Vec<Monitor>);
+        let mut info = MONITORINFOEXW::default();
+        info.monitorInfo.cbSize = std::mem::size_of::<MONITORINFOEXW>() as u32;
+        if GetMonitorInfoW(h, &mut info.monitorInfo).as_bool() {
+            let n = info.szDevice.iter().position(|&c| c == 0).unwrap_or(info.szDevice.len());
+            let r = info.monitorInfo.rcMonitor;
+            lista.push(Monitor {
+                hmon: h,
+                dispositivo: String::from_utf16_lossy(&info.szDevice[..n]),
+                principal: info.monitorInfo.dwFlags & MONITORINFOF_PRIMARY != 0,
+                ancho: r.right - r.left,
+                alto: r.bottom - r.top,
+            });
+        }
+        true.into()
+    }
+    let mut lista = Vec::new();
+    unsafe {
+        let _ = EnumDisplayMonitors(None, None, Some(uno), LPARAM(&mut lista as *mut _ as isize));
+    }
+    lista
+}
+
+/// La fuente pedida, la ventana (si es una) y cómo nombrarla en el registro (nunca el título de la ventana).
+pub fn elegir(que: &str) -> Result<(GraphicsCaptureItem, Option<HWND>, String)> {
+    let no_esta = || windows::core::Error::new(windows::Win32::Foundation::E_INVALIDARG, "no está la fuente pedida");
     let interop = windows::core::factory::<GraphicsCaptureItem, IGraphicsCaptureItemInterop>()?;
     unsafe {
-        if que == "pantalla" {
-            return Ok((interop.CreateForMonitor(MonitorFromPoint(POINT::default(), MONITOR_DEFAULTTOPRIMARY))?, None));
+        let m = match objetivo(que).ok_or_else(no_esta)? {
+            Objetivo::Ventana(n) => {
+                let hwnd = HWND(n as _);
+                if !IsWindow(Some(hwnd)).as_bool() {
+                    return Err(no_esta());
+                }
+                return Ok((interop.CreateForWindow(hwnd)?, Some(hwnd), "ventana".into()));
+            }
+            Objetivo::Principal => monitores().into_iter().find(|m| m.principal),
+            Objetivo::Monitor(x) => monitores().into_iter().find(|m| m.dispositivo.eq_ignore_ascii_case(&x)),
         }
-        let hwnd = ventanas()
-            .into_iter()
-            .find(|(_, t)| t.to_lowercase().contains(&que.to_lowercase()))
-            .map(|(h, _)| h)
-            .ok_or_else(|| windows::core::Error::new(windows::Win32::Foundation::E_INVALIDARG, format!("no hay ventana con \"{que}\"")))?;
-        Ok((interop.CreateForWindow(hwnd)?, Some(hwnd)))
+        .ok_or_else(no_esta)?;
+        Ok((interop.CreateForMonitor(m.hmon)?, None, format!("monitor {}", m.dispositivo)))
     }
 }
 
-pub fn ventanas() -> Vec<(HWND, String)> {
+/// Lo que hace falta de una ventana para decidir si se ofrece en el selector.
+pub struct InfoVentana {
+    pub titulo: String,
+    pub clase: String,
+    pub visible: bool,
+    pub minimizada: bool,
+    /// oculta por DWM (p. ej. en otro escritorio virtual)
+    pub oculta: bool,
+    pub herramienta: bool,
+    pub con_dueno: bool,
+    pub pid: u32,
+}
+
+pub fn candidata(v: &InfoVentana, excluir: u32) -> bool {
+    v.visible
+        && !v.minimizada
+        && !v.oculta
+        && !v.herramienta
+        && !v.con_dueno
+        && !v.titulo.trim().is_empty()
+        && v.clase != "Progman"
+        && v.clase != "WorkerW"
+        && v.pid != excluir
+}
+
+/// Ventanas que se pueden transmitir (de adelante hacia atrás): hwnd, título y pid.
+pub fn ventanas(excluir: u32) -> Vec<(HWND, String, u32)> {
     unsafe extern "system" fn una(h: HWND, l: LPARAM) -> BOOL {
-        let lista = &mut *(l.0 as *mut Vec<(HWND, String)>);
+        let lista = &mut *(l.0 as *mut Vec<(HWND, InfoVentana)>);
         let mut buf = [0u16; 256];
-        let n = GetWindowTextW(h, &mut buf);
-        if n > 0 && IsWindowVisible(h).as_bool() {
-            lista.push((h, String::from_utf16_lossy(&buf[..n as usize])));
-        }
+        let n = GetWindowTextW(h, &mut buf) as usize;
+        let mut clase = [0u16; 64];
+        let c = GetClassNameW(h, &mut clase) as usize;
+        let mut oculta = 0u32;
+        let _ = DwmGetWindowAttribute(h, DWMWA_CLOAKED, &mut oculta as *mut _ as _, 4);
+        lista.push((
+            h,
+            InfoVentana {
+                titulo: String::from_utf16_lossy(&buf[..n]),
+                clase: String::from_utf16_lossy(&clase[..c]),
+                visible: IsWindowVisible(h).as_bool(),
+                minimizada: IsIconic(h).as_bool(),
+                oculta: oculta != 0,
+                herramienta: GetWindowLongPtrW(h, GWL_EXSTYLE) as u32 & WS_EX_TOOLWINDOW.0 != 0,
+                con_dueno: GetWindow(h, GW_OWNER).is_ok_and(|d| !d.is_invalid()),
+                pid: pid_de(h),
+            },
+        ));
         true.into()
     }
     let mut lista = Vec::new();
     unsafe {
         let _ = EnumWindows(Some(una), LPARAM(&mut lista as *mut _ as isize));
     }
-    lista
+    lista.into_iter().filter(|(_, v)| candidata(v, excluir)).map(|(h, v)| (h, v.titulo, v.pid)).collect()
+}
+
+/// Una imagen de la ventana con `PrintWindow`, para las que WGC no capturó: `entregar(bgra, pitch, ancho, alto)`.
+pub fn imprimir_ventana(n: isize, entregar: impl FnOnce(&[u8], usize, usize, usize)) {
+    let h = HWND(n as _);
+    let mut r = RECT::default();
+    unsafe {
+        if GetWindowRect(h, &mut r).is_err() {
+            return;
+        }
+        let (w, alto) = (r.right - r.left, r.bottom - r.top);
+        if w <= 0 || alto <= 0 {
+            return;
+        }
+        let dc = CreateCompatibleDC(None);
+        let bi = BITMAPINFO {
+            bmiHeader: BITMAPINFOHEADER {
+                biSize: std::mem::size_of::<BITMAPINFOHEADER>() as u32,
+                biWidth: w,
+                biHeight: -alto, // de arriba hacia abajo
+                biPlanes: 1,
+                biBitCount: 32,
+                biCompression: BI_RGB.0,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let mut bits = std::ptr::null_mut();
+        if let Ok(bmp) = CreateDIBSection(Some(dc), &bi, DIB_RGB_COLORS, &mut bits, None, 0) {
+            let antes = SelectObject(dc, bmp.into());
+            if PrintWindow(h, dc, PRINT_WINDOW_FLAGS(PW_RENDERFULLCONTENT)).as_bool() {
+                let _ = GdiFlush();
+                let (w, alto) = (w as usize, alto as usize);
+                entregar(std::slice::from_raw_parts(bits as *const u8, w * 4 * alto), w * 4, w, alto);
+            }
+            SelectObject(dc, antes);
+            let _ = DeleteObject(bmp.into());
+        }
+        let _ = DeleteDC(dc);
+    }
 }
 
 /// Proceso dueño de la ventana.
@@ -127,6 +276,57 @@ impl Drop for Captura {
         let _ = self.sesion.Close();
         let _ = self.pool.Close();
     }
+}
+
+/// Un solo cuadro de la fuente, para las miniaturas: `entregar(bgra, pitch, ancho, alto)` se llama una vez,
+/// desde otro hilo, cuando llega. Soltar la `Captura` la cierra.
+pub fn un_cuadro(d: &ID3D11Device, item: &GraphicsCaptureItem, entregar: impl Fn(&[u8], usize, usize, usize) + Send + 'static) -> Result<Captura> {
+    let winrt: IDirect3DDevice = unsafe { CreateDirect3D11DeviceFromDXGIDevice(&d.cast::<IDXGIDevice>()?)? }.cast()?;
+    let pool = Direct3D11CaptureFramePool::CreateFreeThreaded(&winrt, DirectXPixelFormat::B8G8R8A8UIntNormalized, 1, item.Size()?)?;
+    let sesion = pool.CreateCaptureSession(item)?;
+    let _ = sesion.SetIsBorderRequired(false);
+    let _ = sesion.SetIsCursorCaptureEnabled(false);
+    let d = d.clone();
+    let hecho = AtomicBool::new(false);
+    pool.FrameArrived(&TypedEventHandler::<Direct3D11CaptureFramePool, IInspectable>::new(move |p, _| {
+        if let Some(p) = p.as_ref() {
+            if !hecho.swap(true, Ordering::Relaxed) {
+                let _ = bajar_cuadro(&d, p, &entregar);
+            }
+        }
+        Ok(())
+    }))?;
+    sesion.StartCapture()?;
+    Ok(Captura { pool, sesion, ventana: None })
+}
+
+fn bajar_cuadro(d: &ID3D11Device, p: &Direct3D11CaptureFramePool, entregar: &impl Fn(&[u8], usize, usize, usize)) -> Result<()> {
+    let cuadro = p.TryGetNextFrame()?;
+    let tam = cuadro.ContentSize()?;
+    let tex: ID3D11Texture2D = unsafe { cuadro.Surface()?.cast::<IDirect3DDxgiInterfaceAccess>()?.GetInterface()? };
+    unsafe {
+        let mut desc = D3D11_TEXTURE2D_DESC::default();
+        tex.GetDesc(&mut desc);
+        let (w, h) = ((tam.Width.max(0) as u32).min(desc.Width) as usize, (tam.Height.max(0) as u32).min(desc.Height) as usize);
+        if w == 0 || h == 0 {
+            return Ok(());
+        }
+        desc.Usage = D3D11_USAGE_STAGING;
+        desc.BindFlags = 0;
+        desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ.0 as u32;
+        desc.MiscFlags = 0;
+        let mut copia = None;
+        d.CreateTexture2D(&desc, None, Some(&mut copia))?;
+        let copia = copia.unwrap();
+        let ctx = d.GetImmediateContext()?;
+        ctx.CopyResource(&copia, &tex);
+        let mut m = D3D11_MAPPED_SUBRESOURCE::default();
+        ctx.Map(&copia, 0, D3D11_MAP_READ, 0, Some(&mut m))?;
+        let pitch = m.RowPitch as usize;
+        entregar(std::slice::from_raw_parts(m.pData as *const u8, pitch * h), pitch, w, h);
+        ctx.Unmap(&copia, 0);
+    }
+    Ok(())
 }
 
 /// Lo que la captura le avisa al supervisor.
@@ -185,7 +385,8 @@ impl Agil {
 
 pub fn empezar(
     d: &ID3D11Device,
-    (item, ventana): &(GraphicsCaptureItem, Option<HWND>),
+    item: &GraphicsCaptureItem,
+    ventana: Option<HWND>,
     salida: (u32, u32),
     fps: u32,
     tx: SyncSender<Cuadro>,
@@ -270,4 +471,41 @@ pub fn empezar(
     }))?;
     sesion.StartCapture()?;
     Ok(Captura { pool, sesion, ventana: ventana.map(|h| h.0 as isize) })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parsea_objetivo() {
+        assert!(matches!(objetivo("pantalla"), Some(Objetivo::Principal)));
+        assert!(matches!(objetivo(r"monitor:\\.\DISPLAY2"), Some(Objetivo::Monitor(x)) if x == r"\\.\DISPLAY2"));
+        assert!(matches!(objetivo("ventana:1234"), Some(Objetivo::Ventana(1234))));
+        for malo in ["monitor:", "ventana:0", "ventana:abc", "Chrome"] {
+            assert!(objetivo(malo).is_none(), "{malo}");
+        }
+    }
+
+    #[test]
+    fn filtra_ventanas() {
+        let buena = || InfoVentana { titulo: "Juego".into(), clase: "UnrealWindow".into(), visible: true, minimizada: false, oculta: false, herramienta: false, con_dueno: false, pid: 10 };
+        assert!(candidata(&buena(), 99));
+        let malas: [fn(&mut InfoVentana); 9] = [
+            |v| v.visible = false,
+            |v| v.minimizada = true,
+            |v| v.oculta = true,
+            |v| v.herramienta = true,
+            |v| v.con_dueno = true,
+            |v| v.titulo = "   ".into(),
+            |v| v.clase = "Progman".into(),
+            |v| v.clase = "WorkerW".into(),
+            |v| v.pid = 99,
+        ];
+        for (i, cambiar) in malas.iter().enumerate() {
+            let mut v = buena();
+            cambiar(&mut v);
+            assert!(!candidata(&v, 99), "condición {i}");
+        }
+    }
 }

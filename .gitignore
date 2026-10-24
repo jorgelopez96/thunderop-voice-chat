@@ -10,3 +10,6 @@ server/pocketbase.exe
 server/.tmp/
 server/.env.local
 .worktrees/
+
+# compilación del transmisor (ruta corta por los headers de libwebrtc)
+.lkt/

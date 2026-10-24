@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { leerPrefs, guardarPrefs } from './prefs';
 import { volumen } from './voz.svelte';
 
-const DEFAULTS = { supresion: true, volumenes: {}, calidad: '1080p60', gpu: true, vistaPrevia: true, volBotonera: 0.8, volMusica: 50, gananciaDb: 0, sonidoMensajes: true, notificaciones: true };
+const DEFAULTS = { supresion: true, volumenes: {}, calidad: '1080p60', vistaPrevia: true, volBotonera: 0.8, volMusica: 50, gananciaDb: 0, sonidoMensajes: true, notificaciones: true, avisoMensajes: true, avisoMenciones: true, hora24: true };
 
 describe('prefs de voz', () => {
   // Vitest corre en Node (sin localStorage): uno en memoria por test.
@@ -43,8 +43,9 @@ describe('prefs de voz', () => {
     expect(leerPrefs()).toEqual({ ...DEFAULTS, entrada: 'mic1', supresion: true, volumenes: { a: 0.5, b: 2 } });
   });
 
-  it('calidad y gpu tienen defaults', () => {
-    expect(leerPrefs()).toMatchObject({ calidad: '1080p60', gpu: true });
+  it('calidad tiene default y no hay gpu', () => {
+    expect(leerPrefs()).toMatchObject({ calidad: '1080p60' });
+    expect(leerPrefs()).not.toHaveProperty('gpu');
   });
 
   it('calidad inválida cae al default', () => {
@@ -52,9 +53,9 @@ describe('prefs de voz', () => {
     expect(leerPrefs().calidad).toBe('1080p60');
   });
 
-  it('gpu false se respeta', () => {
+  it('gpu guardada se ignora', () => {
     localStorage.setItem('dm.voz', JSON.stringify({ gpu: false }));
-    expect(leerPrefs().gpu).toBe(false);
+    expect(leerPrefs()).not.toHaveProperty('gpu');
   });
 
   it('vistaPrevia: default true y false se respeta', () => {

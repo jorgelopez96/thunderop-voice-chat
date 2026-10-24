@@ -2,7 +2,7 @@
   import type { RecordModel } from 'pocketbase';
   import { MicOff, HeadphoneOff, Monitor } from '@lucide/svelte';
   import { sesion, mensajeError } from '../sesion.svelte';
-  import { echar, salirDe, enVoz } from '../grupos.svelte';
+  import { echar, banear, salirDe, enVoz } from '../grupos.svelte';
   import { voz, volumen, bloquearVoz } from '../voz.svelte';
   import { leerPrefs } from '../prefs';
   import { abrirEnPunto } from '../menu';
@@ -23,6 +23,7 @@
   let viendo = $state<RecordModel | null>(null);
   const soyDueno = $derived(grupo.owner === sesion.usuario?.id);
   let aEchar = $state<RecordModel | null>(null);
+  let aBanear = $state<RecordModel | null>(null);
   let error = $state('');
   let menu = $state<HTMLElement>();
   let elegido = $state<RecordModel | null>(null);
@@ -90,7 +91,8 @@
     {#if puedoEchar(m.id) && ((grupo.bloqueados ?? []) as string[]).includes(m.id)}
       <hr /><button class="plano" onclick={() => { menu?.hidePopover(); hacer(() => bloquearVoz(grupo.id, m.id, false)); }}>Permitir volver a la voz</button>
     {/if}
-    {#if puedoEchar(m.id)}<hr /><button class="plano peligro" onclick={() => { menu?.hidePopover(); aEchar = m; }}>Expulsar del grupo</button>{/if}
+    {#if puedoEchar(m.id)}<hr /><button class="plano peligro" onclick={() => { menu?.hidePopover(); aEchar = m; }}>Expulsar del grupo</button>
+      <button class="plano peligro" onclick={() => { menu?.hidePopover(); aBanear = m; }}>Banear del grupo</button>{/if}
   {/if}
 </div>
 
@@ -104,6 +106,10 @@
   {/if}
 </dialog>
 
+{#if aBanear}
+  <Confirmar texto={`¿Banear a ${aBanear.name}? Sale del grupo y no puede volver hasta que lo desbanees.`} cancelar={() => (aBanear = null)}
+    confirmar={() => { const m = aBanear!; aBanear = null; hacer(() => banear(grupo.id, m.id, true)); }} />
+{/if}
 {#if aEchar}
   <Confirmar texto={`¿Expulsar a ${aEchar.name} del grupo?`} cancelar={() => (aEchar = null)}
     confirmar={() => { const m = aEchar!; aEchar = null; hacer(() => echar(grupo.id, m.id)); }} />

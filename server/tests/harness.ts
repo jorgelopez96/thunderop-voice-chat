@@ -10,7 +10,7 @@ import PocketBase from 'pocketbase';
 export type Harness = {
   url: string;
   admin: PocketBase;
-  nuevoUsuario(nombre: string): Promise<PocketBase>;
+  nuevoUsuario(nombre: string, opts?: { incompleta?: boolean }): Promise<PocketBase>;
   stop(): Promise<void>;
 };
 
@@ -89,7 +89,7 @@ export async function startPocketBase(opts: { rateLimits?: boolean; port?: numbe
   const proc: ChildProcess = spawn(
     exe,
     ['serve', `--http=127.0.0.1:${puerto}`, '--dir', dir, '--migrationsDir', 'pb_migrations', '--hooksDir', 'pb_hooks'],
-    { cwd: raiz, stdio: 'ignore', env: { ...process.env, ...opts.env } },
+    { cwd: raiz, stdio: 'ignore', env: { ...process.env, TERMINOS_VERSION: '1', THUNDEROP_CODIGO: 'PRUEBA26', THUNDEROP_MAIL: 'log', ...opts.env } },
   );
   const salida = new Promise<never>((_, fail) => proc.once('exit', (c) => fail(new Error(`pocketbase salió (${c})`))));
   const limpiar = async () => {
@@ -118,12 +118,19 @@ export async function startPocketBase(opts: { rateLimits?: boolean; port?: numbe
     return {
       url,
       admin,
-      async nuevoUsuario(nombre) {
+      async nuevoUsuario(nombre, o = {}) {
         const pb = new PocketBase(url);
         pb.autoCancellation(false);
-        const email = `${nombre}-${randomBytes(4).toString('hex')}@test.local`;
+        const sufijo = randomBytes(4).toString('hex');
+        const email = `${nombre}-${sufijo}@test.local`;
         const password = randomBytes(8).toString('hex');
-        await pb.collection('users').create({ email, password, passwordConfirm: password, name: `${nombre}-${randomBytes(2).toString('hex')}` });
+        // el usuario es único y fijo: se arma con el nombre en minúsculas más un sufijo (máx. 20)
+        const username = `${nombre.toLowerCase().replace(/[^a-z0-9._]/g, '').slice(0, 11)}${sufijo}`;
+        await admin.collection('users').create({
+          email, password, passwordConfirm: password, username, name: `${nombre}-${randomBytes(2).toString('hex')}`,
+          // incompleta = recién registrada con contraseña: perfil y términos al día, sin confirmar ni invitación
+          terminos: 1, perfilCompleto: true, nacimiento: '1996-01-01', ...(o.incompleta ? {} : { verified: true, invitado: true }),
+        });
         await pb.collection('users').authWithPassword(email, password);
         return pb;
       },

@@ -84,6 +84,11 @@ export async function echar(groupId: string, userId: string) {
   await pb.collection('groups').update(groupId, { 'members-': userId });
 }
 
+/** Solo el dueño: banear lo echa y no lo deja volver con invitaciones; desbanear lo vuelve a dejar. */
+export async function banear(groupId: string, userId: string, baneado: boolean) {
+  await pb.send(`/api/groups/${groupId}/banear`, { method: 'POST', body: { user: userId, baneado } });
+}
+
 export async function salirDe(groupId: string) {
   await pb.send(`/api/groups/${groupId}/leave`, { method: 'POST' });
   grupoActual.id = null;

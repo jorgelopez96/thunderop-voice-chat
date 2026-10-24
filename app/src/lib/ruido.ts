@@ -15,7 +15,13 @@ async function crearRnnoise(ctx: AudioContext): Promise<RnnoiseWorkletNode> {
   wasm ??= loadRnnoise({ url: wasmUrl, simdUrl }).catch((e) => { wasm = null; throw e; });
   if (!registrados.has(ctx)) registrados.set(ctx, ctx.audioWorklet.addModule(workletUrl));
   try { await registrados.get(ctx); } catch (e) { registrados.delete(ctx); throw e; }
-  return new RnnoiseWorkletNode(ctx, { maxChannels: 1, wasmBinary: await wasm });
+  const nodo = new RnnoiseWorkletNode(ctx, { maxChannels: 1, wasmBinary: await wasm });
+  // RNNoise procesa solo el primer canal: con un micrófono estéreo el derecho salía en silencio y a los demás
+  // se los escuchaba de un solo lado. Se mezcla a mono antes de entrar (y sale mono, que se oye en los dos lados).
+  nodo.channelCount = 1;
+  nodo.channelCountMode = 'explicit';
+  nodo.channelInterpretation = 'speakers';
+  return nodo;
 }
 
 export type OpcionesMic = { supresion: boolean; gananciaDb: number };

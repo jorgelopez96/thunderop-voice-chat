@@ -6,6 +6,8 @@ onRecordCreateRequest((e) => {
   if (e.auth && e.auth.collection().name === "users") {
     e.record.set("owner", e.auth.id);
     e.record.set("members", [e.auth.id]);
+    e.record.set("ingresos", { [e.auth.id]: new Date().toISOString() });
+    e.record.set("baneados", []);
   }
   e.next();
 
@@ -38,12 +40,15 @@ onRecordUpdateRequest((e) => {
     if (e.auth.id !== e.record.original().getString("owner") && bloqueados(e.record) !== bloqueados(e.record.original())) {
       throw new ForbiddenError("Solo el dueño puede bloquear la voz.");
     }
+    if (["ingresos", "baneados"].some((c) => e.record.getString(c) !== e.record.original().getString(c))) {
+      throw new ForbiddenError("Eso lo maneja el servidor.");
+    }
   }
   e.next();
 }, "groups");
 
 // Quien sale o es echado (update del dueño o /leave) pierde sus invitaciones de ese grupo,
-// sale de `silenciados` y es sacado de las salas de voz en LiveKit.
+// sale de `silenciados` y es sacado de las salas de voz en LiveKit (él y su transmisión).
 onRecordAfterUpdateSuccess((e) => {
   const lk = require(`${__hooks}/livekit.js`);
   const antes = e.record.original().getStringSlice("members");
@@ -53,6 +58,7 @@ onRecordAfterUpdateSuccess((e) => {
     e.app.findRecordsByFilter("invites", "group = {:g} && created_by = {:u}", "", 0, 0, { g: e.record.id, u })
       .forEach((inv) => e.app.delete(inv));
     lk.enSalasDeVoz(e.app, e.record.id, "RemoveParticipant", { identity: u });
+    lk.enSalasDeVoz(e.app, e.record.id, "RemoveParticipant", { identity: `${u}.pantalla` });
   });
   const silenciados = e.record.getStringSlice("silenciados");
   if (silenciados.some((u) => fuera.includes(u))) {
@@ -63,3 +69,26 @@ onRecordAfterUpdateSuccess((e) => {
   }
   e.next();
 }, "groups");
+
+// Dueño banea (lo echa y no puede volver a entrar con invitaciones) o desbanea.
+routerAdd("POST", "/api/groups/{id}/banear", (e) => {
+  const lk = require(`${__hooks}/livekit.js`);
+  const body = e.requestInfo().body;
+  if (typeof body.baneado !== "boolean") throw new BadRequestError("Falta baneado.");
+  let group, user;
+  if (body.baneado) ({ group, user } = lk.moderar(e));
+  else {
+    group = lk.grupoDeMiembro(e.app, e.request.pathValue("id"), e.auth.id);
+    if (group.getString("owner") !== e.auth.id) throw new ForbiddenError("Solo el dueño puede hacer esto.");
+    user = String(body.user || "");
+  }
+  const lista = (JSON.parse(group.getString("baneados") || "null") || []).filter((b) => b.id !== user);
+  if (body.baneado) {
+    const u = e.app.findRecordById("users", user);
+    lista.push({ id: user, name: u.getString("name"), username: u.getString("username"), fecha: new Date().toISOString() });
+    group.set("members", group.getStringSlice("members").filter((m) => m !== user));
+  }
+  group.set("baneados", lista);
+  e.app.save(group);
+  return e.json(200, { ok: true });
+}, $apis.requireAuth("users"));

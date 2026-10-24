@@ -1,5 +1,6 @@
 import { ClientResponseError, type RecordModel } from 'pocketbase';
 import { pb } from './pb';
+import { cuenta, pedirCodigo, type Falta } from './cuenta.svelte';
 
 // Svelte no permite reasignar un $state exportado: se expone como propiedad de un objeto.
 export const sesion = $state<{ usuario: RecordModel | null }>({ usuario: pb.authStore.isValid ? pb.authStore.record : null });
@@ -10,7 +11,7 @@ pb.authStore.onChange(() => { sesion.usuario = pb.authStore.record; });
 // al reabrir la app no está y la sesión guardada se descarta.
 const RECORDAR = 'dm.recordar', EN_CURSO = 'dm.sesion', EMAIL = 'dm.email';
 
-function anotar(recordar: boolean, email: string) {
+export function anotar(recordar: boolean, email: string) {
   try {
     localStorage.setItem(RECORDAR, recordar ? '1' : '0');
     sessionStorage.setItem(EN_CURSO, '1');
@@ -35,14 +36,17 @@ export async function validarSesionAlIniciar() {
   }
 }
 
-export async function entrar(email: string, pass: string, recordar = true) {
-  await pb.collection('users').authWithPassword(email, pass);
-  anotar(recordar, email);
+/** `identidad` es el usuario o el mail. */
+export async function entrar(identidad: string, pass: string, recordar = true) {
+  await pb.collection('users').authWithPassword(identidad, pass);
+  anotar(recordar, identidad);
 }
 
-export async function registrarse(email: string, pass: string, name: string, recordar = true) {
-  await pb.collection('users').create({ email, password: pass, passwordConfirm: pass, name });
-  await entrar(email, pass, recordar);
+/** Crea la cuenta y manda el código por mail; no entra hasta confirmarlo (después: `verificar` y `entrar`). */
+export async function registrarse(datos: { email: string; username: string; name: string; password: string; nacimiento: string; terminos: number }, _recordar = true) {
+  const { password, ...resto } = datos;
+  await pb.collection('users').create({ ...resto, password, passwordConfirm: password });
+  await pedirCodigo(datos.email, 'verificar');
 }
 
 export function salir() { pb.authStore.clear(); }
@@ -51,18 +55,19 @@ export function salir() { pb.authStore.clear(); }
 export function mensajeError(e: unknown): string {
   if (!(e instanceof ClientResponseError)) return 'No se pudo conectar con el servidor.';
   if (e.status === 0) return 'No se pudo conectar con el servidor.';
+  if (e.status === 403 && Array.isArray(e.response?.falta)) { cuenta.falta = e.response.falta as Falta[]; return 'Completá tu cuenta para seguir.'; }
   const campos = Object.entries(e.response?.data ?? {}) as [string, { code?: string; message?: string }][];
   const en = (c: string) => campos.find(([k]) => k === c)?.[1];
+  if (en('username')?.code === 'validation_not_unique') return 'Ese usuario ya existe, probá con otro.';
   if (en('email')?.code === 'validation_not_unique') return 'Ese email ya está registrado.';
   if (en('email')) return 'El email no es válido.';
-  if (en('password')) return 'La contraseña debe tener al menos 8 caracteres.';
-  if (en('name')?.code === 'validation_not_unique') return 'Ese nombre ya existe, probá con otro.';
+  if (en('password')) return 'La contraseña necesita 8 caracteres, una mayúscula, un número y un carácter especial.';
   if (en('name')) return 'El nombre debe tener entre 1 y 32 caracteres.';
   if (en('color')) return 'El color no es válido.';
   if (en('status')) return 'El estado puede tener hasta 80 caracteres.';
   if (en('avatar')) return 'La foto no es válida (imagen, hasta 2 MB).';
   if (en('file')) return 'El archivo no es válido (imagen o video, hasta 25 MB).';
-  if (e.status === 400 && /authenticate/i.test(e.message)) return 'Email o contraseña incorrectos.';
+  if (e.status === 400 && /authenticate/i.test(e.message)) return 'Usuario, email o contraseña incorrectos.';
   if (e.status === 429) return 'Demasiados intentos, esperá un momento.';
   return e.message;
 }

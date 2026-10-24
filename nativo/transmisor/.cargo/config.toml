@@ -4,4 +4,5 @@ rustflags = ["-C", "target-feature=+crt-static"]
 
 # la ruta del proyecto es larga y los headers de libwebrtc pasan los 260 caracteres de Windows
 [build]
-target-dir = "D:/lkt"
+# relativa a nativo/transmisor: queda en la raíz del proyecto, con ruta corta
+target-dir = "../../.lkt"

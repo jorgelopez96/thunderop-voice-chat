@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { alTocar, estabaAbierto } from '../menu';
+  import { horaDe } from '../hora.svelte';
   import Insignia from './Insignia.svelte';
   import { Paperclip, Smile, SmilePlus, Reply, Trash2, X, Pencil, Download } from '@lucide/svelte';
   import { EMOJIS } from '../emojis';
@@ -65,7 +67,7 @@
   });
 
   const autor = (m: RecordModel) => m.expand?.author as RecordModel | undefined;
-  const hora = (m: RecordModel) => new Date(m.created.replace(' ', 'T')).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' });
+  const hora = (m: RecordModel) => horaDe(m.created);
   const esVideo = (m: RecordModel) => /\.(mp4|webm)$/i.test(m.file);
   const fecha = (m: RecordModel) => new Date(m.created.replace(' ', 'T')).getTime();
   /** Seguido: mismo autor que el anterior y menos de 5 min después (sin repetir nombre y foto). Una respuesta siempre muestra el nombre. */
@@ -152,6 +154,7 @@
   let destino = $state('');
   let posMenu = $state('');
   function abrirEmojis(e: MouseEvent, para: string) {
+    if (estabaAbierto(menuEmojis) && destino === para) return;
     const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
     destino = para;
     // Arriba del botón si entra (~310 px de menú); si no (mensaje pegado arriba), abajo.
@@ -164,6 +167,7 @@
   let gifsAbierto = $state(false);
   let posGifs = $state('');
   function abrirGifs(e: MouseEvent) {
+    if (estabaAbierto(panelGifs)) return;
     const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
     posGifs = `left:${Math.max(8, Math.min(r.left, innerWidth - 392))}px;bottom:${innerHeight - r.top + 4}px`;
     panelGifs?.showPopover();
@@ -257,7 +261,7 @@
         </div>
         <div class="herramientas">
           <button class="icono" title="Responder" aria-label="Responder" onclick={() => responder(m)}><Reply size={16} strokeWidth={1.75} /></button>
-          <button class="icono" title="Reaccionar" aria-label="Reaccionar" onclick={(e) => abrirEmojis(e, m.id)}><SmilePlus size={16} strokeWidth={1.75} /></button>
+          <button class="icono" title="Reaccionar" aria-label="Reaccionar" onpointerdown={() => alTocar(menuEmojis)} onclick={(e) => abrirEmojis(e, m.id)}><SmilePlus size={16} strokeWidth={1.75} /></button>
           {#if m.author === sesion.usuario?.id && !soloLectura && !esGif(m.text ?? '')}<button class="icono" title="Editar" aria-label="Editar" onclick={() => (editando = { id: m.id, texto: m.text, original: m.text })}><Pencil size={16} strokeWidth={1.75} /></button>{/if}
           {#if puedeBorrar(m)}<button class="icono borrar" title="Borrar" aria-label="Borrar" onclick={() => (aBorrar = m)}><Trash2 size={16} strokeWidth={1.75} /></button>{/if}
         </div>
@@ -280,8 +284,8 @@
   {#if soloLectura}<p class="pie tenue">{soloLectura}</p>
   {:else}<div class="composer">
     <label class="clip" title="Adjuntar imagen o video"><Paperclip size={18} strokeWidth={1.75} /><input type="file" hidden accept="image/png,image/jpeg,image/gif,image/webp,video/mp4,video/webm" onchange={elegir} data-testid="adjuntar" /></label>
-    <button class="plano emoji" title="Emojis" aria-label="Emojis" onclick={(e) => abrirEmojis(e, '')}><Smile size={18} strokeWidth={1.75} /></button>
-    <button class="plano gif-boton" title="GIFs" aria-label="GIFs" onclick={abrirGifs}>GIF</button>
+    <button class="plano emoji" title="Emojis" aria-label="Emojis" onpointerdown={() => alTocar(menuEmojis)} onclick={(e) => abrirEmojis(e, '')}><Smile size={18} strokeWidth={1.75} /></button>
+    <button class="plano gif-boton" title="GIFs" aria-label="GIFs" onpointerdown={() => alTocar(panelGifs)} onclick={abrirGifs}>GIF</button>
     {#if mencion && opciones.length}<ul class="sugerencias" role="listbox" aria-label="Mencionar a">
       {#each opciones as n, i (n)}<li><button type="button" class="plano" role="option" aria-selected={i === elegida} onmousedown={(e) => { e.preventDefault(); elegirMencion(n); }}>@{n}</button></li>{/each}
     </ul>{/if}

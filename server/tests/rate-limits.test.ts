@@ -15,4 +15,13 @@ describe('rate limits', () => {
     expect(estados.slice(0, 5)).toEqual([404, 404, 404, 404, 404]);
     expect(estados[5]).toBe(429);
   });
+
+  it('diagnósticos: 3 por minuto', async () => {
+    const b = await h.nuevoUsuario('diagrl');
+    const estados: number[] = [];
+    for (let i = 0; i < 4; i++) {
+      await b.collection('diagnosticos').create({ user: b.authStore.record!.id, version: '0.6.0', codigo: 4, contenido: 'x' }).catch((e) => estados.push(e.status));
+    }
+    expect(estados).toEqual([429]);
+  });
 });

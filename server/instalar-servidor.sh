@@ -2,6 +2,8 @@
 # Instala Thunderop en Ubuntu (Oracle Always Free u otro VPS): PocketBase + LiveKit + Caddy con TLS.
 # Uso: sudo bash instalar-servidor.sh midominio.duckdns.org
 # Al lado de este script tienen que estar pb_hooks/ y pb_migrations/. Se puede repetir: no pisa claves ni datos.
+# Las variables de cuentas, SMTP y Google/Microsoft van en /opt/thunderop/cuentas.env (a mano); este script
+# nunca lo toca. thunderop.env es solo de las claves de LiveKit y se reescribe en cada corrida (con las mismas claves).
 set -euo pipefail
 DOMINIO=${1:?Uso: sudo bash instalar-servidor.sh midominio.duckdns.org}
 PB=0.40.5
@@ -64,6 +66,7 @@ Wants=network-online.target
 User=thunderop
 WorkingDirectory=$DEST
 EnvironmentFile=$ENV
+EnvironmentFile=-$DEST/cuentas.env
 ExecStart=$2
 Restart=always
 

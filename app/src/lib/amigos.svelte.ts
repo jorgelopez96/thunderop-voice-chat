@@ -46,7 +46,7 @@ async function hacer(f: () => Promise<unknown>): Promise<string> {
 }
 
 const solicitar = (body: object) => hacer(() => pb.send('/api/amigos/solicitar', { method: 'POST', body }));
-export const solicitarPorNombre = (nombre: string) => solicitar({ nombre: nombre.trim() });
+export const solicitarPorUsuario = (username: string) => solicitar({ username });
 export const solicitarA = (usuario: string) => solicitar({ usuario });
 export const aceptar = (id: string) => hacer(() => pb.collection('amistades').update(id, { estado: 'aceptada' }));
 /** Rechazar, cancelar y eliminar amigo son lo mismo: borrar la amistad. */

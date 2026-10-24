@@ -6,13 +6,14 @@ const stats = (p: Page) => p.evaluate(() => (window as unknown as { __voz: { sta
 const framesDe = async (p: Page, nombre: string) => de((await stats(p)).pantallas, nombre)?.frames ?? 0;
 const tarjeta = (p: Page, nombre: string) => p.locator('section.voz li', { hasText: nombre });
 const entrar = (p: Page) => p.getByRole('button', { name: 'Sala de voz General' }).click();
-// Lo que hace Windows al cortar la captura (cerrar la ventana compartida, Win+L...): la pista termina sola.
+// Lo que pasa cuando el transmisor se cierra solo (cerrar la ventana compartida, Win+L...): sale con código 0.
 const terminarCaptura = (p: Page) => p.evaluate(() => (window as unknown as { __voz: { terminarCaptura(): void } }).__voz.terminarCaptura());
 const mismoVideo = (p: Page) => p.getByLabel('Pantalla de Ana').evaluate((v: HTMLVideoElement) => {
   const w = window as unknown as { __src?: MediaProvider | null };
   const igual = w.__src === v.srcObject; w.__src = v.srcObject; return igual;
 });
 
+// El transmisor es el simulado de desarrollo (transmisorSimulado.ts): publica como `<id>.pantalla`, igual que el nativo.
 test('transmitir y ver una pantalla', async ({ browser }) => {
   const [a, b, c] = await Promise.all([0, 1, 2].map(async () => (await browser.newContext()).newPage()));
 
@@ -27,9 +28,9 @@ test('transmitir y ver una pantalla', async ({ browser }) => {
   await entrar(b);
   await expect(b.locator('section.voz li')).toHaveCount(2, { timeout: 10_000 });
 
-  // Ana transmite en 720p: su tarjeta muestra "En vivo" y no hay avisos (fuera de Tauri no hay aviso de sonido).
+  // Ana transmite: su tarjeta muestra "En vivo" y no hay avisos (fuera de Tauri no hay aviso de sonido).
   await a.getByRole('button', { name: 'Transmitir' }).click();
-  await a.getByLabel('Calidad').selectOption({ label: '720p · 30 fps' });
+  await a.getByRole('button', { name: 'Pantalla 1 (principal)' }).click();
   await a.getByRole('button', { name: 'Empezar' }).click();
   await expect(tarjeta(a, 'Ana').getByText('EN VIVO')).toBeVisible({ timeout: 10_000 });
   await expect(a.getByRole('button', { name: 'Dejar de transmitir' })).toBeVisible();
@@ -85,8 +86,9 @@ test('transmitir y ver una pantalla', async ({ browser }) => {
   await expect(b.getByLabel('Pantalla de Ana')).toHaveCount(0, { timeout: 5000 });
   await expect(tarjeta(b, 'Ana').getByRole('button', { name: /^(Ver|Dejar de ver)$/ })).toHaveCount(0, { timeout: 5000 });
 
-  // Ana transmite otra vez, Beto mira y Windows corta la captura: se despublica sola, sin avisos.
+  // Ana transmite otra vez, Beto mira y el transmisor se cierra solo: se despublica sola, sin avisos.
   await a.getByRole('button', { name: 'Transmitir' }).click();
+  await a.getByRole('button', { name: 'Pantalla 1 (principal)' }).click();
   await a.getByRole('button', { name: 'Empezar' }).click();
   await tarjeta(b, 'Ana').getByRole('button', { name: 'Ver' }).click({ timeout: 10_000 });
   await expect.poll(() => framesDe(b, 'Ana'), { timeout: 10_000 }).toBeGreaterThan(0);
@@ -99,6 +101,7 @@ test('transmitir y ver una pantalla', async ({ browser }) => {
 
   // Ana transmite otra vez y se desconecta: el "En vivo" desaparece en Beto en menos de 10 s.
   await a.getByRole('button', { name: 'Transmitir' }).click();
+  await a.getByRole('button', { name: 'Pantalla 1 (principal)' }).click();
   await a.getByRole('button', { name: 'Empezar' }).click();
   await expect(tarjeta(b, 'Ana').getByText('EN VIVO')).toBeVisible({ timeout: 10_000 });
   await a.getByRole('button', { name: 'Desconectarse', exact: true }).click();
@@ -120,7 +123,7 @@ test('mirar dos transmisiones a la vez', async ({ browser }) => {
 
   for (const p of [a, b]) {
     await p.getByRole('button', { name: 'Transmitir' }).click();
-    await p.getByLabel('Calidad').selectOption({ label: '720p · 30 fps' });
+    await p.getByRole('button', { name: 'Pantalla 1 (principal)' }).click();
     await p.getByRole('button', { name: 'Empezar' }).click();
   }
 

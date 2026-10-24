@@ -9,11 +9,12 @@ afterAll(async () => { await h.stop(); });
 const solicitar = (pb: PocketBase, body: object) => pb.send('/api/amigos/solicitar', { method: 'POST', body });
 const id = (pb: PocketBase) => pb.authStore.record!.id;
 const nombre = (pb: PocketBase) => pb.authStore.record!.name as string;
+const usuario = (pb: PocketBase) => pb.authStore.record!.username as string;
 
 describe('amistades', () => {
-  it('solicitar por nombre sin distinguir mayúsculas: pendiente visible para ambos y perfil visible', async () => {
+  it('solicitar por usuario sin distinguir mayúsculas: pendiente visible para ambos y perfil visible', async () => {
     const [a, b, c] = await Promise.all(['ana', 'beto', 'carla'].map((n) => h.nuevoUsuario(n)));
-    const { amistad } = await solicitar(a, { nombre: nombre(b).toUpperCase() });
+    const { amistad } = await solicitar(a, { username: ' ' + usuario(b).toUpperCase() + ' ' });
     expect(amistad).toMatchObject({ de: id(a), para: id(b), estado: 'pendiente' });
     for (const p of [a, b]) expect((await p.collection('amistades').getFullList()).map((x) => x.id)).toEqual([amistad.id]);
     expect((await c.collection('amistades').getFullList())).toEqual([]);
@@ -29,7 +30,10 @@ describe('amistades', () => {
 
   it('errores con texto', async () => {
     const [a, b] = await Promise.all(['ana', 'beto'].map((n) => h.nuevoUsuario(n)));
-    await expect(solicitar(a, { nombre: 'nadie-asi' })).rejects.toMatchObject({ status: 404, message: 'No hay nadie con ese nombre.' });
+    await expect(solicitar(a, { username: 'nadie-asi' })).rejects.toMatchObject({ status: 404, message: 'No hay nadie con ese usuario.' });
+    // el apodo ya no sirve para buscar
+    await expect(solicitar(a, { username: nombre(b) })).rejects.toMatchObject({ status: 404 });
+    await expect(solicitar(a, { nombre: nombre(b) })).rejects.toMatchObject({ status: 404 });
     await expect(solicitar(a, { usuario: 'noexiste123456' })).rejects.toMatchObject({ status: 404 });
     await expect(solicitar(a, { usuario: id(a) })).rejects.toMatchObject({ status: 400, message: 'No te podés agregar a vos mismo.' });
     await solicitar(a, { usuario: id(b) });

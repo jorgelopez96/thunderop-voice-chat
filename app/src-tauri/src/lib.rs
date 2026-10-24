@@ -82,7 +82,7 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(audio::Captura::default())
         .manage(transmisor::Transmisor::default())
-        .invoke_handler(tauri::generate_handler![audio::iniciar_audio, audio::detener_audio, transmisor::ventanas_transmisor, transmisor::iniciar_transmisor, transmisor::calidad_transmisor, transmisor::detener_transmisor, memoria_baja, salir])
+        .invoke_handler(tauri::generate_handler![audio::iniciar_audio, audio::detener_audio, transmisor::fuentes_transmisor, transmisor::iniciar_transmisor, transmisor::calidad_transmisor, transmisor::detener_transmisor, memoria_baja, salir])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

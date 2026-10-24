@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { RecordModel } from 'pocketbase';
+  import { Upload, X } from '@lucide/svelte';
   import { subir, editar } from '../botonera.svelte';
   import { mensajeError } from '../sesion.svelte';
   import BotonEmoji from './BotonEmoji.svelte';
@@ -37,28 +38,53 @@
 
 <dialog bind:this={dlg} onclose={cerrar}>
   <form onsubmit={enviar}>
-    <h3>{sonido ? 'Editar sonido' : 'Subir un sonido'}</h3>
-    <div class="nombre">
-      <BotonEmoji actual={emoji} elegir={(e) => (emoji = e)} />
-      <input bind:value={nombre} required maxlength="24" placeholder="Nombre del sonido" aria-label="Nombre del sonido" />
-      {#if emoji}<button type="button" class="plano" title="Sacar el emoji" onclick={() => (emoji = '')}>Sin emoji</button>{/if}
+    <header>
+      <h3>{sonido ? 'Editar sonido' : 'Subí un sonido'}</h3>
+      <button type="button" class="plano icono" aria-label="Cerrar" onclick={() => dlg?.close()}><X size={20} strokeWidth={1.75} /></button>
+    </header>
+    {#if !sonido}
+      <div class="campo">
+        <span class="etiqueta">Archivo <b>*</b></span>
+        <label class="archivo">
+          <Upload size={18} strokeWidth={1.75} />
+          <span class="nombre-archivo" class:tenue={!archivo}>{archivo?.name ?? 'Elegí un archivo'}</span>
+          <span class="explorar">Explorar</span>
+          <input type="file" accept="audio/*" hidden aria-label="Archivo de audio" onchange={(e) => (archivo = e.currentTarget.files?.[0])} />
+        </label>
+      </div>
+    {/if}
+    <div class="dos">
+      <label class="campo"><span class="etiqueta">Nombre del sonido <b>*</b></span>
+        <input bind:value={nombre} required maxlength="24" placeholder="Nombre del sonido" /></label>
+      <div class="campo"><span class="etiqueta">Emoji</span>
+        <BotonEmoji actual={emoji} texto={emoji ? 'Tocá para cambiarlo' : 'Tocá para elegir'} elegir={(e) => (emoji = e)} /></div>
     </div>
-    {#if !sonido}<input type="file" accept="audio/*" required aria-label="Archivo de audio" onchange={(e) => (archivo = e.currentTarget.files?.[0])} />{/if}
-    <label>Volumen para todos: {volumen}%
-      <input type="range" min="5" max="200" step="5" bind:value={volumen} aria-label="Volumen del sonido" /></label>
+    <label class="campo"><span class="etiqueta">Volumen del sonido <small>{volumen}%</small></span>
+      <input type="range" min="5" max="200" step="5" bind:value={volumen} /></label>
     {#if error}<p role="alert">{error}</p>{/if}
-    <div class="fila">
-      <button type="submit" class="primario" disabled={subiendo}>{sonido ? 'Guardar' : 'Subir'}</button>
+    <div class="botones">
       <button type="button" onclick={() => dlg?.close()}>Cancelar</button>
+      <button type="submit" class="primario" disabled={subiendo || !nombre.trim() || (!sonido && !archivo)}>{sonido ? 'Guardar' : 'Subir'}</button>
     </div>
   </form>
 </dialog>
 
 <style>
-  form { display: flex; flex-direction: column; gap: 8px; }
-  form h3 { margin: 0 0 4px; }
-  .nombre { display: flex; align-items: center; gap: 4px; }
-  .nombre input { flex: 1; }
-  label input { padding: 0; border: 0; background: none; }
-  .fila { display: flex; gap: 8px; align-items: center; }
+  dialog { width: min(520px, 92vw); max-width: none; padding: 24px; }
+  form { display: flex; flex-direction: column; gap: 18px; }
+  header { display: flex; align-items: center; justify-content: space-between; }
+  h3 { margin: 0; font-size: 20px; }
+  .campo { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+  .etiqueta { display: flex; font-weight: 600; color: var(--texto); }
+  .etiqueta b { color: var(--peligro); font-weight: 600; margin-left: 4px; }
+  .etiqueta small { margin-left: auto; color: var(--tenue); font-weight: 400; }
+  .archivo { display: flex; flex-direction: row; align-items: center; gap: 10px; padding: 5px 5px 5px 12px; border: 1px solid var(--borde);
+    border-radius: var(--radio); background: var(--hondo); cursor: pointer; color: var(--icono); }
+  .nombre-archivo { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--texto); }
+  .nombre-archivo.tenue { color: var(--apagado); }
+  .explorar { padding: 6px 12px; border-radius: var(--radio); background: var(--panel); border: 1px solid var(--borde); color: var(--texto); font-weight: 600; font-size: 14px; }
+  .dos { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  input[type='range'] { padding: 0; border: 0; background: none; accent-color: var(--acento); }
+  .botones { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .botones button { height: 42px; justify-content: center; }
 </style>

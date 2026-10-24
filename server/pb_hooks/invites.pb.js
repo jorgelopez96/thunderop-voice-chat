@@ -22,10 +22,16 @@ routerAdd("POST", "/api/invites/join", (e) => {
     throw new NotFoundError("Invitación inválida o vencida.");
   }
   const group = e.app.findRecordById("groups", invite.getString("group"));
+  if ((JSON.parse(group.getString("baneados") || "null") || []).some((b) => b.id === e.auth.id)) {
+    throw new ForbiddenError("No podés entrar a este grupo.");
+  }
   const members = group.getStringSlice("members");
   if (!members.includes(e.auth.id)) {
     if (members.length >= 50) throw new BadRequestError("El grupo está lleno.");
+    const ingresos = JSON.parse(group.getString("ingresos") || "null") || {};
+    ingresos[e.auth.id] = new Date().toISOString();
     group.set("members", [...members, e.auth.id]);
+    group.set("ingresos", ingresos);
     e.app.save(group);
   }
   return e.json(200, { group: group.id });

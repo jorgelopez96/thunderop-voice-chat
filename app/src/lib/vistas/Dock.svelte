@@ -1,12 +1,14 @@
 <script lang="ts">
+  import { alTocar, estabaAbierto } from '../menu';
   import { Mic, MicOff, Headphones, HeadphoneOff, ChevronDown, Monitor, AudioWaveform, Music, PhoneOff } from '@lucide/svelte';
   import { voz, alternarMute, ensordecer, cambiarSupresion, salirVoz, transmitir, dejarDeTransmitir, cambiarCalidad, dispositivos, elegirEntrada, elegirSalida } from '../voz.svelte';
   import { grupos } from '../grupos.svelte';
   import { CALIDADES, leerPrefs, type Calidad } from '../prefs';
-  import { hayNativo, ventanas, type Ventana } from '../transmisorNativo';
   import Botonera from './Botonera.svelte';
   import Musica from './Musica.svelte';
   import { sesion } from '../sesion.svelte';
+  import { fuentes, type Fuente } from '../transmisorNativo';
+  import { elegirFuente } from '../transmision';
 
   const g = $derived(grupos.lista.find((x) => x.id === voz.grupoId));
 
@@ -27,6 +29,7 @@
   let elegido = $state('');
   let pos = $state({ x: 0, y: 0 });
   async function abrirMenu(e: MouseEvent, t: 'entrada' | 'salida') {
+    if (estabaAbierto(menu) && tipo === t) return;
     const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
     pos = { x: r.left, y: innerHeight - r.top + 8 };
     tipo = t;
@@ -42,23 +45,70 @@
 
   let d = $state<HTMLDialogElement>();
   let calidad = $state<Calidad>('1080p60');
-  // Con el transmisor nativo se elige acá qué compartir; sin él (navegador, o placa sin compresor) lo elige el selector de WebView2.
-  const nativo = hayNativo();
-  let que = $state('pantalla');
-  let listaVentanas = $state<Ventana[]>([]);
-  const abrirTransmision = async () => {
+  let fuentesLista = $state<Fuente[] | null>(null); // null: todavía no llegó el primer pedido
+  let elegida = $state<Fuente | null>(null);
+  let perdida = $state(false); // la elegida desapareció: hay que elegir de nuevo, no se cambia sola
+  let comprobando = $state(false); // Empezar está mirando que lo elegido siga ahí
+  let aviso = $state('');
+  let gen = 0, pidiendo = -1; // gen cambia al abrir y al cerrar: una respuesta de otra vuelta se descarta
+  let enVuelo: Promise<Fuente[] | null> = Promise.resolve(null);
+  const monitores = $derived((fuentesLista ?? []).filter((x) => x.tipo === 'monitor'));
+  const ventanas = $derived((fuentesLista ?? []).filter((x) => x.tipo === 'ventana'));
+  // Un pedido a la vez por vuelta; quien pide mientras hay uno en vuelo recibe ese mismo. null: la vuelta cambió.
+  function refrescar(): Promise<Fuente[] | null> {
+    const mia = gen;
+    if (pidiendo === mia) return enVuelo;
+    pidiendo = mia;
+    enVuelo = (async () => {
+      try {
+        const r = await fuentes();
+        if (mia !== gen) return null;
+        // Una lista vacía es "no se pudo mirar" (o no hay nada): no pisa lo que ya se veía ni da por perdida la elección.
+        if (r.length || fuentesLista === null) fuentesLista = r;
+        if (r.length) {
+          const ant = elegida;
+          elegida = perdida ? null : elegirFuente(r, ant);
+          if (ant && !elegida) perdida = true;
+        }
+        return r;
+      } finally { if (pidiendo === mia) pidiendo = -1; }
+    })();
+    return enVuelo;
+  }
+  let reloj: ReturnType<typeof setInterval> | undefined;
+  function abrirTransmision() {
+    clearInterval(reloj);
+    gen++;
     calidad = leerPrefs().calidad;
+    fuentesLista = null; elegida = null; perdida = false; aviso = ''; comprobando = false;
     d?.showModal();
-    if (nativo) { listaVentanas = await ventanas(); if (que !== 'pantalla' && !listaVentanas.some((v) => v.titulo === que)) que = 'pantalla'; }
-  };
-  // Con una ventana va solo el sonido de su programa; con la pantalla completa, todo menos Thunderop.
-  const empezar = () => { d?.close(); transmitir(calidad, nativo ? que : undefined, listaVentanas.find((v) => v.titulo === que)?.pid); };
+    void refrescar();
+    reloj = setInterval(refrescar, 3000);
+  }
+  function alCerrar() { gen++; clearInterval(reloj); }
+  // El Dock se desmonta con el diálogo abierto (salir de la sala): no hay `close`.
+  $effect(() => alCerrar);
+  // Antes de empezar se vuelve a mirar: la ventana pudo cerrarse o ser otra.
+  async function empezar() {
+    const f = elegida;
+    if (!f || comprobando) return;
+    comprobando = true; aviso = '';
+    try {
+      const r = await refrescar();
+      if (!d?.open || !r) return;
+      if (!r.length) { aviso = 'No se pudo comprobar. Probá de nuevo.'; return; }
+      if (!elegirFuente(r, f)) { fuentesLista = r; elegida = null; perdida = true; return; }
+      d.close();
+      transmitir(calidad, f);
+    } finally { comprobando = false; }
+  }
   const nombreCalidad = (c: Calidad) => `${CALIDADES[c].alto}p · ${CALIDADES[c].fps} fps`;
 
-  // Menú de calidad mientras se transmite (solo con el transmisor nativo: el de WebView2 no la cambia en vivo).
+  // Menú de calidad mientras se transmite.
   let menuCalidad = $state<HTMLElement>();
   let posCalidad = $state({ x: 0, y: 0 });
   function abrirCalidad(e: MouseEvent) {
+    if (estabaAbierto(menuCalidad)) return;
     const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
     posCalidad = { x: r.left, y: innerHeight - r.top + 8 };
     menuCalidad?.showPopover();
@@ -71,24 +121,20 @@
       <button class="icono" onclick={alternarMute} disabled={voz.sinPermiso} aria-label={voz.muteado ? 'Activar micrófono' : 'Silenciarme'} title={voz.sinPermiso ? 'El dueño te silenció' : voz.muteado ? 'Activar micrófono' : 'Silenciarme'}>
         {#if voz.muteado || voz.sinPermiso}<MicOff size={20} strokeWidth={1.75} />{:else}<Mic size={20} strokeWidth={1.75} />{/if}
       </button>
-      <button class="icono flecha" aria-label="Opciones del micrófono" title="Micrófono y supresión" onclick={(e) => abrirMenu(e, 'entrada')}><ChevronDown size={14} strokeWidth={1.75} /></button>
+      <button class="icono flecha" aria-label="Opciones del micrófono" title="Micrófono y supresión" onpointerdown={() => alTocar(menu)} onclick={(e) => abrirMenu(e, 'entrada')}><ChevronDown size={14} strokeWidth={1.75} /></button>
     </div>
     <div class="doble" class:apagado={voz.ensordecido}>
       <button class="icono" onclick={() => ensordecer(!voz.ensordecido)} aria-label={voz.ensordecido ? 'Activar sonido' : 'Ensordecerme'} title={voz.ensordecido ? 'Activar sonido' : 'Ensordecerme'}>
         {#if voz.ensordecido}<HeadphoneOff size={20} strokeWidth={1.75} />{:else}<Headphones size={20} strokeWidth={1.75} />{/if}
       </button>
-      <button class="icono flecha" aria-label="Opciones del sonido" title="Salida de audio" onclick={(e) => abrirMenu(e, 'salida')}><ChevronDown size={14} strokeWidth={1.75} /></button>
+      <button class="icono flecha" aria-label="Opciones del sonido" title="Salida de audio" onpointerdown={() => alTocar(menu)} onclick={(e) => abrirMenu(e, 'salida')}><ChevronDown size={14} strokeWidth={1.75} /></button>
     </div>
     <span class="separador"></span>
     {#if voz.transmitiendo}
-      {#if voz.calidadEnVivo}
-        <div class="doble">
-          <button class="icono vivo" onclick={dejarDeTransmitir} aria-label="Dejar de transmitir" title="Dejar de transmitir"><Monitor size={20} strokeWidth={1.75} /></button>
-          <button class="icono flecha" aria-label="Calidad de la transmisión" title="Cambiar la calidad" onclick={abrirCalidad}><ChevronDown size={14} strokeWidth={1.75} /></button>
-        </div>
-      {:else}
+      <div class="doble">
         <button class="icono vivo" onclick={dejarDeTransmitir} aria-label="Dejar de transmitir" title="Dejar de transmitir"><Monitor size={20} strokeWidth={1.75} /></button>
-      {/if}
+        <button class="icono flecha" aria-label="Calidad de la transmisión" title="Cambiar la calidad" onpointerdown={() => alTocar(menuCalidad)} onclick={abrirCalidad}><ChevronDown size={14} strokeWidth={1.75} /></button>
+      </div>
     {:else}
       <button class="icono cian" onclick={abrirTransmision} disabled={voz.conectando} aria-label="Transmitir" title="Transmitir pantalla"><Monitor size={20} strokeWidth={1.75} /></button>
     {/if}
@@ -124,24 +170,41 @@
   {/each}
 </div>
 
-<dialog bind:this={d}>
-  <h3>Transmitir pantalla</h3>
-  {#if nativo}
-    <label>Qué compartir
-      <select bind:value={que}>
-        <option value="pantalla">Pantalla completa</option>
-        {#each listaVentanas as v (v.pid + v.titulo)}<option value={v.titulo}>{v.titulo}</option>{/each}
-      </select>
-    </label>
+{#snippet grilla(titulo: string, items: Fuente[])}
+  {#if items.length}
+    <h4>{titulo}</h4>
+    <div class="grilla">
+      {#each items as f (f.tipo + f.id)}
+        <button class="tarjeta" aria-pressed={elegida?.tipo === f.tipo && elegida?.id === f.id} onclick={() => { elegida = f; perdida = false; aviso = ''; }}>
+          {#if f.png_base64}<img src="data:image/png;base64,{f.png_base64}" alt="" />{:else}<span class="vacio" aria-hidden="true"></span>{/if}
+          <span class="nombre">
+            {#if f.icono_base64}<img class="ico" src="data:image/png;base64,{f.icono_base64}" alt="" />{/if}
+            <span title={f.titulo}>{f.titulo}</span>
+          </span>
+        </button>
+      {/each}
+    </div>
   {/if}
+{/snippet}
+
+<dialog bind:this={d} class="fuentes" onclose={alCerrar}>
+  <h3>Transmitir pantalla</h3>
+  <div class="scroll" aria-live="polite">
+    {#if fuentesLista === null}<small>Buscando pantallas y ventanas…</small>
+    {:else if perdida}<small>Lo que elegiste ya no está disponible. Elegí otra opción.</small>{@render grilla('Pantallas', monitores)}{@render grilla('Ventanas', ventanas)}
+    {:else if !fuentesLista.length}<small>No se encontró nada para transmitir.</small>
+    {:else}{@render grilla('Pantallas', monitores)}{@render grilla('Ventanas', ventanas)}{/if}
+    {#if aviso}<small role="alert">{aviso}</small>{/if}
+  </div>
   <label>Calidad
     <select bind:value={calidad}>{#each Object.keys(CALIDADES) as c (c)}<option value={c}>{nombreCalidad(c as Calidad)}</option>{/each}</select>
   </label>
   <div class="fila" style="justify-content:flex-end">
     <button class="plano" onclick={() => d?.close()}>Cancelar</button>
-    <button class="primario" onclick={empezar}>Empezar</button>
+    <button class="primario" onclick={empezar} disabled={!elegida || comprobando}>{comprobando ? 'Comprobando…' : 'Empezar'}</button>
   </div>
 </dialog>
+
 
 <style>
   .dock { flex: none; height: 56px; display: flex; align-items: center; justify-content: center; gap: 16px; padding: 0 16px; background: var(--panel); border-top: 1px solid var(--borde); }
@@ -171,5 +234,15 @@
   .menu small { padding: 4px 8px; }
   dialog { flex-direction: column; gap: 12px; min-width: 300px; }
   dialog[open] { display: flex; }
+  dialog.fuentes { width: min(760px, 94vw); max-width: none; max-height: 85vh; }
+  .scroll { overflow-y: auto; min-height: 120px; display: flex; flex-direction: column; gap: 8px; }
+  h4 { margin: 4px 0 0; font-size: 13px; }
+  .grilla { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; }
+  .tarjeta { flex-direction: column; align-items: stretch; gap: 6px; padding: 6px; height: auto; border: 1px solid var(--borde); border-radius: var(--radio); background: var(--hondo); }
+  .tarjeta[aria-pressed='true'] { border-color: var(--acento); box-shadow: 0 0 0 1px var(--acento); }
+  .tarjeta img:not(.ico), .vacio { width: 100%; aspect-ratio: 16 / 9; object-fit: contain; background: var(--hover); border-radius: 4px; display: block; }
+  .nombre { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 13px; text-align: left; }
+  .nombre span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ico { width: 16px; height: 16px; flex: none; }
   select { font: inherit; color: var(--texto); background: var(--hondo); border: 1px solid var(--borde); border-radius: var(--radio); padding: 8px 12px; }
 </style>

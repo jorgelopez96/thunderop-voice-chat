@@ -1,15 +1,17 @@
-// Prueba de transmisión nativa: Windows Graphics Capture + codificador de la GPU (Media Foundation),
-// y el H.264 que sale se manda a LiveKit tal cual, sin volver a comprimir.
-// Uso: transmisor <sala> [pantalla|parte del título] [fps] [mbps]
-//      transmisor --ventanas
-//      transmisor --probar   (sin LiveKit: captura y comprime 3 s y dice si la placa puede)
+// Prueba de transmisión nativa: Windows Graphics Capture + codificador de la GPU (Media Foundation; si la
+// placa no tiene, el de Microsoft por software), y el H.264 que sale se manda a LiveKit tal cual.
+// Uso: transmisor <sala> [fuente] [fps] [mbps] [alto]
+//      fuente: pantalla (monitor principal) | monitor:<dispositivo> (p. ej. monitor:\\.\DISPLAY2) | ventana:<hwnd>
+//      transmisor --miniaturas <ancho> [pid a excluir]   (una línea JSON por monitor y por ventana)
+//      transmisor --probar [fuente] [fps] [mbps]   (sin LiveKit: captura y comprime 3 s y dice si la placa puede)
 // (LIVEKIT_URL, LIVEKIT_API_KEY y LIVEKIT_API_SECRET en el entorno)
 //
 // Códigos de salida, para que la app sepa qué hacer:
-//   0 terminó bien (Ctrl+C o se cerró la ventana)   2 no está la ventana pedida
-//   3 la placa no tiene codificador por hardware → usar la transmisión de la app
+//   0 terminó bien (Ctrl+C o se cerró la ventana)   2 no está la fuente pedida
+//   3 no hay ningún compresor H.264 (¿Windows N sin Media Feature Pack?)
 //   4 falló varias veces seguidas y se rindió       5 no conecta a LiveKit
 mod captura;
+mod miniaturas;
 mod mf;
 
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -19,6 +21,8 @@ use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
 use captura::Aviso;
+use windows::core::Interface;
+use windows::Win32::Graphics::Dxgi::IDXGIDevice;
 use livekit::options::{TrackPublishOptions, VideoEncoding};
 use livekit::prelude::*;
 use livekit::webrtc::video_source::EncodedRateControl;
@@ -105,6 +109,8 @@ struct Tuberia {
     parar: Arc<AtomicBool>,
     hilo: JoinHandle<()>,
     salida: (u32, u32),
+    /// los que salen de verdad (por software, como mucho 30)
+    fps: u32,
 }
 
 impl Tuberia {
@@ -112,13 +118,36 @@ impl Tuberia {
     fn armar(c: &Config, salida: Option<(u32, u32)>, tx: SyncSender<mf::Salida>, pedidos: Arc<mf::Pedidos>, avisos: Sender<Aviso>) -> Result<Self, Falla> {
         let otra = |e: windows::core::Error| Falla::Otra(e.message());
         let d = captura::dispositivo().map_err(otra)?;
-        let item = captura::elegir(&c.que).map_err(|e| Falla::SinVentana(e.message()))?;
-        let salida = match salida {
-            Some(s) => s,
-            None => captura::tamano_salida(&item.0, (c.alto * 16 / 9, c.alto)).map_err(otra)?,
+        let placa = unsafe { d.cast::<IDXGIDevice>().and_then(|x| x.GetAdapter()).and_then(|a| a.GetDesc()) }.map_err(otra)?;
+        let n = placa.Description.iter().position(|&c| c == 0).unwrap_or(placa.Description.len());
+        println!("placa: {}", String::from_utf16_lossy(&placa.Description[..n]));
+        let (item, ventana, nombre) = captura::elegir(&c.que).map_err(|e| Falla::SinVentana(e.message()))?;
+        let sin = |e: windows::core::Error| Falla::SinCodificador(e.message());
+        let mut mft = mf::buscar(&d).map_err(sin)?;
+        let (cod, salida, fps) = loop {
+            // por software la CPU no da para más que 720p30 (también al rearmar y al cambiar la calidad en vivo)
+            let (alto, fps) = if mft.software { (c.alto.min(720), c.fps.min(30)) } else { (c.alto, c.fps) };
+            let salida = match salida {
+                Some(s) if s.1 <= alto => s,
+                _ => captura::tamano_salida(&item, (alto * 16 / 9, alto)).map_err(otra)?,
+            };
+            let (software, nombre) = (mft.software, mft.nombre.clone());
+            match mf::Codificador::new(&d, mft, salida, fps, c.mbps * 1_000_000) {
+                Ok(cod) => break (cod, salida, fps),
+                // la placa tiene uno pero no se deja configurar (p. ej. límite de sesiones NVENC): se prueba el de software
+                Err(e) if !software => {
+                    println!("{nombre} (hardware) falló: {}; uso software", e.message());
+                    mft = mf::buscar_software().map_err(|s| Falla::SinCodificador(format!("{}; por software: {}", e.message(), s.message())))?;
+                }
+                Err(e) => return Err(sin(e)),
+            }
         };
-        let cod = mf::Codificador::new(&d, salida, c.fps, c.mbps * 1_000_000).map_err(|e| Falla::SinCodificador(e.message()))?;
-        println!("capturando \"{}\" a {}x{}, {} fps, {} Mbps con {}", c.que, salida.0, salida.1, c.fps, c.mbps, cod.nombre);
+        if cod.software {
+            println!("codificador: {} (software, máx. 720p30)", cod.nombre);
+        } else {
+            println!("codificador: {} (hardware)", cod.nombre);
+        }
+        println!("capturando {nombre} a {}x{}, {} fps, {} Mbps con {}", salida.0, salida.1, fps, c.mbps, cod.nombre);
         let (tx_tex, rx_tex) = sync_channel(2);
         let parar = Arc::new(AtomicBool::new(false));
         let (p, a, pd) = (parar.clone(), avisos.clone(), pedidos.clone());
@@ -128,10 +157,10 @@ impl Tuberia {
                 let _ = a.send(Aviso::Error(format!("codificador: {}", e.message())));
             }
         });
-        match captura::empezar(&d, &item, salida, c.fps, tx_tex, avisos) {
+        match captura::empezar(&d, &item, ventana, salida, fps, tx_tex, avisos) {
             Ok(captura) => {
                 pedidos.tamano.store((salida.0 as u64) << 32 | salida.1 as u64, Ordering::Relaxed);
-                Ok(Self { captura, parar, hilo, salida })
+                Ok(Self { captura, parar, hilo, salida, fps })
             }
             Err(e) => {
                 parar.store(true, Ordering::Relaxed);
@@ -179,7 +208,7 @@ fn supervisar(mut c: Config, mut t: Tuberia, tx: SyncSender<mf::Salida>, pedidos
                         }
                     }
                 };
-                println!("calidad cambiada: {}p, {} fps, {} Mbps", c.alto, c.fps, c.mbps);
+                println!("calidad cambiada: {}p, {} fps, {} Mbps", t.salida.1, t.fps, c.mbps);
             }
         }
         let aviso = match rx_av.recv_timeout(Duration::from_millis(200)) {
@@ -233,14 +262,10 @@ fn supervisar(mut c: Config, mut t: Tuberia, tx: SyncSender<mf::Salida>, pedidos
 #[tokio::main]
 async fn main() {
     let args: Vec<String> = std::env::args().collect();
-    if args.get(1).map(String::as_str) == Some("--ventanas") {
-        // "pid<TAB>título": con el pid la app captura solo el sonido de ese programa
-        for (h, t) in captura::ventanas() {
-            println!("{}\t{t}", captura::pid_de(h));
-        }
-        return;
+    if args.get(1).map(String::as_str) == Some("--miniaturas") {
+        miniaturas::correr(&args[2..]);
     }
-    let sala = args.get(1).expect("uso: transmisor <sala> [pantalla|ventana] [fps] [mbps] [alto]").clone();
+    let sala = args.get(1).expect("uso: transmisor <sala> [pantalla|monitor:<dispositivo>|ventana:<hwnd>] [fps] [mbps] [alto]").clone();
     let c = Config {
         que: args.get(2).cloned().unwrap_or_else(|| "pantalla".into()),
         fps: args.get(3).and_then(|x| x.parse().ok()).unwrap_or(60),
@@ -256,7 +281,7 @@ async fn main() {
     let t = match Tuberia::armar(&c, None, tx_h264.clone(), pedidos.clone(), tx_av.clone()) {
         Ok(t) => t,
         Err(Falla::SinVentana(e)) => salir(2, &e),
-        Err(Falla::SinCodificador(e)) => salir(3, &format!("sin codificador por hardware: {e}")),
+        Err(Falla::SinCodificador(e)) => salir(3, &format!("no hay ningún compresor H.264: {e}")),
         Err(Falla::Otra(e)) => salir(4, &e),
     };
     if sala == "--probar" {

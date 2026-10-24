@@ -256,7 +256,7 @@ describe('voz', () => {
           const logs = await h2.admin.logs.getList(1, 50, { filter: 'message = "LiveKit falló"' });
           metodos = logs.items.map((l) => l.data.method).sort();
         }
-        expect(metodos).toEqual(['DeleteRoom', 'RemoveParticipant', 'UpdateParticipant']);
+        expect(metodos).toEqual(['DeleteRoom', 'RemoveParticipant', 'RemoveParticipant', 'UpdateParticipant']);
       } finally {
         await h2.stop();
       }
