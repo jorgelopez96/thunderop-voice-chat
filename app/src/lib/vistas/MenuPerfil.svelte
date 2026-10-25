@@ -1,5 +1,6 @@
 <script lang="ts">
   import Avatar from './Avatar.svelte';
+  import { esEscritorio } from '../plataforma.svelte';
   import { X } from '@lucide/svelte';
   import { pb } from '../pb';
   import { sesion, salir } from '../sesion.svelte';
@@ -37,7 +38,7 @@
   <hr />
   <button class="plano" onclick={editar}>Editar perfil</button>
   <button class="plano" onclick={salir}>Cerrar sesión</button>
-  {#if '__TAURI_INTERNALS__' in globalThis}<button class="plano peligroso" onclick={salirDeLaApp}>Salir de Thunderop</button>{/if}
+  {#if esEscritorio}<button class="plano peligroso" onclick={salirDeLaApp}>Salir de Thunderop</button>{/if}
 </div>
 
 <dialog class="editar" bind:this={d} onclose={() => (editando = false)} onclick={(e) => e.target === d && d.close()}>
