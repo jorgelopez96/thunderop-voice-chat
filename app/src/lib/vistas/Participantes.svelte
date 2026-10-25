@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { mantener } from '../mantener';
   import { lleno } from '../rango';
   import type { RecordModel } from 'pocketbase';
   import { MicOff, HeadphoneOff, Monitor } from '@lucide/svelte';
@@ -41,6 +42,8 @@
     && ![...amigos.lista.map((a) => a.usuario), ...amigos.recibidas.map((s) => s.usuario), ...amigos.enviadas.map((s) => s.usuario)].some((u) => u.id === id);
   const puedoEchar = (id: string) => soyDueno && id !== grupo.owner;
 
+  // Mantener apretado (celular) abre el mismo menú que el clic derecho, donde está el dedo.
+  const enPunto = (clientX: number, clientY: number) => ({ clientX, clientY, preventDefault() {} }) as MouseEvent;
   function abrirMenu(e: MouseEvent, m: RecordModel) {
     e.preventDefault();
     elegido = m;
@@ -60,7 +63,7 @@
   <ul class:separada={i > 0}>
     {#each lista as m (m.id)}
       {@const p = enMiSala(m.id)}
-      <li class:apagado={!enLinea(m)} oncontextmenu={(e) => abrirMenu(e, m)}>
+      <li class:apagado={!enLinea(m)} oncontextmenu={(e) => abrirMenu(e, m)} use:mantener={(x, y) => abrirMenu(enPunto(x, y), m)}>
         <Avatar usuario={m} hablando={p?.hablando} />
         <div class="quien">
           <strong>{m.name}<Insignia usuario={m} dueno={m.id === grupo.owner} /></strong>

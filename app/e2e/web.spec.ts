@@ -199,3 +199,45 @@ test('celular: la llamada con su dock, el chat de la sala y la barrita en otras 
   await p.locator('.barra-llamada').getByRole('button', { name: 'Desconectarse' }).click();
   await expect(barrita).toHaveCount(0);
 });
+
+/** Mantener apretado con el dedo (eventos de puntero táctil) ~650 ms sobre el centro del elemento. */
+async function mantenerApretado(l: import('@playwright/test').Locator) {
+  const c = (await l.boundingBox())!;
+  const pos = { clientX: c.x + c.width / 2, clientY: c.y + c.height / 2, pointerType: 'touch', isPrimary: true, bubbles: true };
+  await l.dispatchEvent('pointerdown', pos);
+  await l.page().waitForTimeout(650);
+  await l.dispatchEvent('pointerup', pos);
+}
+
+test('celular: mantener apretado abre las acciones de mensajes, personas y salas', async ({ browser }) => {
+  const p = await (await browser.newContext({ viewport: CELULAR, hasTouch: true })).newPage();
+  await crearCuenta(p, 'Ana');
+  await p.getByRole('button', { name: 'Crear mi grupo' }).click();
+  await p.getByPlaceholder('Nombre del grupo nuevo').fill('Toques');
+  await p.getByRole('button', { name: 'Crear grupo' }).click();
+  await p.getByPlaceholder('Escribí un mensaje').fill('hola');
+  await p.getByRole('button', { name: 'Enviar' }).click();
+  // Mensaje propio: reaccionar, responder, editar y borrar.
+  await mantenerApretado(p.getByTestId('mensaje').filter({ hasText: 'hola' }));
+  const hoja = p.getByRole('menu');
+  for (const n of ['Reaccionar', 'Responder', 'Editar', 'Borrar']) await expect(hoja.getByRole('button', { name: n })).toBeVisible();
+  await p.goBack();
+  await expect(hoja).toHaveCount(0);
+  // Una persona (la propia, en Participantes): su menú con Ver perfil.
+  await p.getByRole('button', { name: 'Ver participantes' }).click();
+  await mantenerApretado(p.locator('aside.participantes li').first());
+  await expect(p.getByRole('button', { name: 'Ver perfil' })).toBeVisible();
+  await p.keyboard.press('Escape');
+  await p.goBack();
+  // Salas: el dueño crea otra y la sube con Subir.
+  await p.getByRole('button', { name: 'Abrir salas' }).click();
+  await p.getByRole('button', { name: 'Toques', exact: true }).click(); // menú del nombre del grupo
+  await p.getByRole('button', { name: 'Nueva sala de chat' }).click();
+  await p.getByPlaceholder('Nombre de la sala').fill('memes');
+  await p.getByRole('button', { name: 'Crear', exact: true }).click();
+  const orden = () => p.locator('.salas li.sala button.nombre').evaluateAll((b) => b.map((x) => x.getAttribute('aria-label')));
+  await expect.poll(orden).toContain('Sala de chat memes');
+  await mantenerApretado(p.getByRole('button', { name: 'Sala de chat memes' }));
+  await p.getByRole('button', { name: 'Subir' }).click();
+  await expect.poll(async () => { const o = await orden(); return o.indexOf('Sala de chat memes') < o.indexOf('Sala de chat General'); }).toBe(true);
+});

@@ -3,6 +3,10 @@
   import { horaDe } from '../hora.svelte';
   import Insignia from './Insignia.svelte';
   import { Paperclip, Smile, SmilePlus, Reply, Trash2, X, Pencil, Download, Menu, Users } from '@lucide/svelte';
+  import HojaAcciones from './movil/HojaAcciones.svelte';
+  import { mantener } from '../mantener';
+  import { pantalla } from '../plataforma.svelte';
+  import { conAtras, cerrarCapa } from '../navMovil.svelte';
   import { EMOJIS } from '../emojis';
   import { tick } from 'svelte';
   import type { RecordModel } from 'pocketbase';
@@ -168,6 +172,9 @@
     aBorrar = null;
     try { await borrar(m.id); } catch (e) { error = mensajeError(e); }
   }
+  // Celular: mantener apretado un mensaje abre sus acciones abajo.
+  let hojaDe = $state<RecordModel | null>(null);
+  const abrirHoja = (m: RecordModel) => { if (hojaDe) return; hojaDe = m; conAtras(() => (hojaDe = null)); };
   function alScroll() {
     if (!lista) return;
     pegado = lista.scrollHeight - lista.scrollTop - lista.clientHeight < 48;
@@ -241,7 +248,7 @@
   }
 </script>
 
-<section class="chat" aria-label="Chat {titulo}">
+<section class="chat" class:movil={pantalla.movil} aria-label="Chat {titulo}">
   <h2 class="titulo">{#if menu}<button class="icono" aria-label="Abrir salas" title="Salas" onclick={menu}><Menu size={20} strokeWidth={1.75} /></button>{/if}{#if fotoChat}<img class="avatar foto-chat" src={fotoChat} alt="" />{/if}<span class="nombre-chat">{titulo}</span>{#if silencio}<MenuChat chat={silencio} {acciones} />{/if}{#if gente}<button class="icono" aria-label="Ver participantes" title="Participantes" onclick={gente}><Users size={19} strokeWidth={1.75} /></button>{/if}{#if cerrar}<button class="icono cerrar-chat" aria-label="Cerrar chat" title="Cerrar (Esc)" onclick={cerrar}><X size={18} strokeWidth={1.75} /></button>{/if}</h2>
   <div class="lista" bind:this={lista} onscroll={alScroll} onloadcapture={() => pegado && bajar()} data-testid="mensajes">
     {#if chat.hayMas}<button class="plano" onclick={() => chat.cargarMas()}>Cargar anteriores</button>{/if}
@@ -251,7 +258,7 @@
       {@const sigue = seguido(i)}
       {@const cita = m.expand?.respondeA as RecordModel | undefined}
       {#if nuevoDia(i)}<div class="dia" role="separator"><span>{nombreDia(m)}</span></div>{/if}
-      <article class="msg" class:llegado={m.id === llegado} class:sigue class:elegido={respondiendo?.id === m.id} class:resaltado={resaltado === m.id} class:mencionado={m.author !== sesion.usuario?.id && menciona(m.text, sesion.usuario?.name)} id="msg-{m.id}" data-testid="mensaje">
+      <article use:mantener={() => abrirHoja(m)} class="msg" class:llegado={m.id === llegado} class:sigue class:elegido={respondiendo?.id === m.id} class:resaltado={resaltado === m.id} class:mencionado={m.author !== sesion.usuario?.id && menciona(m.text, sesion.usuario?.name)} id="msg-{m.id}" data-testid="mensaje">
         {#if sigue}<time class="hora-lado">{hora(m)}</time>
         {:else}<img class="avatar" src={foto(a)} alt="" />{/if}
         <div class="cuerpo">
@@ -318,6 +325,14 @@
     <textarea bind:this={caja} bind:value={texto} onkeydown={tecla} oninput={revisarMencion} onclick={revisarMencion} onblur={() => (mencion = null)} onpaste={pegar} maxlength="2000" rows="1" placeholder="Escribí un mensaje" title="Enter envía, Shift+Enter hace una línea nueva"></textarea>
     <button class="primario" onclick={enviarMensaje} disabled={enviando}>Enviar</button>
   </div>{/if}
+  <HojaAcciones abierta={!!hojaDe}>
+    {#if hojaDe}{@const m = hojaDe}
+      <button class="plano" onclick={(e) => { cerrarCapa(); abrirEmojis(e, m.id); }}><SmilePlus size={20} strokeWidth={1.75} /> Reaccionar</button>
+      <button class="plano" onclick={() => { cerrarCapa(); responder(m); }}><Reply size={20} strokeWidth={1.75} /> Responder</button>
+      {#if m.author === sesion.usuario?.id && !soloLectura && !esGif(m.text ?? '')}<button class="plano" onclick={() => { cerrarCapa(); editando = { id: m.id, texto: m.text, original: m.text }; }}><Pencil size={20} strokeWidth={1.75} /> Editar</button>{/if}
+      {#if puedeBorrar(m)}<button class="plano peligro" onclick={() => { cerrarCapa(); aBorrar = m; }}><Trash2 size={20} strokeWidth={1.75} /> Borrar</button>{/if}
+    {/if}
+  </HojaAcciones>
   {#if aBorrar}{@const m = aBorrar}<Confirmar texto="¿Borrar este mensaje?" cancelar={() => (aBorrar = null)} confirmar={() => quitar(m)} />{/if}
   <div popover class="panel-gifs" bind:this={panelGifs} style={posGifs} ontoggle={(e) => (gifsAbierto = e.newState === 'open')}>
     {#if gifsAbierto}<Gifs elegir={mandarGif} />{/if}
@@ -381,6 +396,8 @@
   .herramientas { position: absolute; top: -14px; right: 12px; display: none; gap: 2px; padding: 2px; background: var(--elevado); border: 1px solid var(--borde-fuerte);
     border-radius: var(--radio-menu); box-shadow: var(--sombra-2); }
   .msg:hover .herramientas, .herramientas:focus-within { display: flex; }
+  .chat.movil .herramientas { display: none; }
+  .chat.movil .msg { -webkit-touch-callout: none; }
   .herramientas .icono { width: 30px; min-width: 30px; height: 28px; min-height: 28px; border-radius: var(--radio); }
   .herramientas .borrar:hover { color: var(--peligro); }
   .respondiendo { display: flex; align-items: center; gap: 8px; margin: 8px 16px 0; padding: 6px 8px; font-size: 13px; color: var(--tenue);

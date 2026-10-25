@@ -4,6 +4,7 @@
   import type { RecordModel } from 'pocketbase';
   import { MicOff, Users, Link, ChevronRight, MessageSquare, Eye, Volume2, Menu } from '@lucide/svelte';
   import { pantalla } from '../plataforma.svelte';
+  import { mantener } from '../mantener';
   import { navMovil, cerrarCapa } from '../navMovil.svelte';
   import { foto } from '../foto';
   import { mensajeError, sesion } from '../sesion.svelte';
@@ -101,7 +102,7 @@
     <ul class="franja">
       {#each voz.participantes as p, i (p.id)}
         {@const m = miembro(p.id)}
-        <li style:--i={Math.min(i, 5)} class:hablando={p.hablando} class:transmite={p.transmite} style="background:{fondo(m?.color, p.nombre)}" oncontextmenu={(e) => abrirMenu(e, p)}>
+        <li style:--i={Math.min(i, 5)} class:hablando={p.hablando} class:transmite={p.transmite} style="background:{fondo(m?.color, p.nombre)}" oncontextmenu={(e) => abrirMenu(e, p)} use:mantener={(x, y) => abrirMenu({ clientX: x, clientY: y, preventDefault() {} } as MouseEvent, p)}>
           <img class="avatar" alt="" src={foto(m, '256x256')} />
           {#if p.transmite}<span class="chips-vivo"><span class="vivo"><span class="punto-vivo"></span>EN VIVO</span>{@render espectadores(p.espectadores)}</span>
             {#if !p.local && p.pantalla}{@const sid = p.pantalla}{@const viendo = voz.viendo.includes(sid)}

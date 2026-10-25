@@ -10,12 +10,13 @@
   import Voz from './Voz.svelte';
   import { voz, entrarVoz } from '../voz.svelte';
   import Confirmar from './Confirmar.svelte';
-  import { ChevronDown, Hash, UserPlus, Pencil, Trash2, Settings, Volume2, Monitor, ArrowUpDown } from '@lucide/svelte';
+  import { ChevronDown, Hash, UserPlus, Pencil, Trash2, Settings, Volume2, Monitor, ArrowUpDown, ArrowUp, ArrowDown } from '@lucide/svelte';
   import Avatar from './Avatar.svelte';
   import Cajon from './movil/Cajon.svelte';
   import { pantalla } from '../plataforma.svelte';
   import { conAtras, cerrarCapa, navMovil } from '../navMovil.svelte';
   import { deslizar } from '../deslizar';
+  import { mantener } from '../mantener';
   import { abrirEnPunto } from '../menu';
   import ConfigGrupo from './ConfigGrupo.svelte';
   import Invitar from './Invitar.svelte';
@@ -106,6 +107,14 @@
     lista.splice(lista.findIndex((x) => x.id === destino.id), 0, r);
     hacer(() => ordenarSalas(lista));
   }
+  /** Sube o baja una sala un lugar dentro de su sección. */
+  function mover(r: RecordModel, paso: -1 | 1) {
+    const lista = [...(r.kind === 'voz' ? salasVoz : chat)];
+    const i = lista.findIndex((x) => x.id === r.id);
+    lista.splice(i, 1);
+    lista.splice(i + paso, 0, r);
+    hacer(() => ordenarSalas(lista));
+  }
   async function guardarNombre() {
     const e = editando;
     dlgNombre?.close();
@@ -119,7 +128,8 @@
     ondragstart={(e) => { arrastrada = r; e.dataTransfer?.setData('text/plain', r.id); }}
     ondragover={(e) => { if (arrastrada && arrastrada.kind === r.kind) { e.preventDefault(); sobre = r.id; } }}
     ondragleave={() => sobre === r.id && (sobre = null)} ondrop={(e) => { e.preventDefault(); soltar(r); }} ondragend={() => (arrastrada = sobre = null)}
-    oncontextmenu={(e) => { if (!soyDueno) return; e.preventDefault(); menuSala = r; abrirEnPunto(menuSalaEl, e.clientX, e.clientY); }} class:activa={r.kind === 'chat' ? r.id === salaId && !centroVoz : r.id === voz.salaId && centroVoz}>
+    oncontextmenu={(e) => { if (!soyDueno) return; e.preventDefault(); menuSala = r; abrirEnPunto(menuSalaEl, e.clientX, e.clientY); }}
+    use:mantener={(x, y) => { if (!soyDueno) return; menuSala = r; abrirEnPunto(menuSalaEl, x, y); }} class:activa={r.kind === 'chat' ? r.id === salaId && !centroVoz : r.id === voz.salaId && centroVoz}>
       <button class="plano nombre" class:sin-leer={!!noLeidos.salas[r.id]} aria-label={`${r.kind === 'chat' ? 'Sala de chat' : 'Sala de voz'} ${r.name}`} onclick={() => { if (cajonIzq) cerrarCapa(); hacer(() => abrir(r)); }}>
         {#if r.kind === 'chat'}<Hash size={16} strokeWidth={1.75} />{:else}<Volume2 size={16} strokeWidth={1.75} />{/if}<span>{r.name}</span>
         {#if r.kind === 'voz'}<small class:verde={q.length}>{q.length ? `${q.length} en voz` : 'vacía'}</small>{/if}
@@ -202,6 +212,9 @@
   <div popover class="menu" bind:this={menuSalaEl}>
     {#if menuSala}{@const r = menuSala}
       <button class="plano" onclick={() => { menuSalaEl?.hidePopover(); editando = { id: r.id, name: r.name }; }}><Pencil size={16} strokeWidth={1.75} /> Cambiar nombre</button>
+      {@const hermanas = r.kind === 'voz' ? salasVoz : chat}{@const i = hermanas.findIndex((x) => x.id === r.id)}
+      {#if i > 0}<button class="plano" onclick={() => { menuSalaEl?.hidePopover(); mover(r, -1); }}><ArrowUp size={16} strokeWidth={1.75} /> Subir</button>{/if}
+      {#if i < hermanas.length - 1}<button class="plano" onclick={() => { menuSalaEl?.hidePopover(); mover(r, 1); }}><ArrowDown size={16} strokeWidth={1.75} /> Bajar</button>{/if}
       <hr /><button class="plano peligro" onclick={() => { menuSalaEl?.hidePopover(); confirmar = { texto: `¿Borrar la sala "${r.name}"?`, hacer: () => borrarSala(r.id) }; }}><Trash2 size={16} strokeWidth={1.75} /> Borrar sala</button>
     {/if}
   </div>
