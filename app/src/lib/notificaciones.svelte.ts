@@ -81,7 +81,14 @@ export async function avisar(chat: string, titulo: string, texto: string, aunSil
   if ((!porMencion && !porMensaje) || (aLaVista && viendo.has(chat))) return;
   if (guardar) anotar(titulo, texto);
   if (p.sonidoMensajes) ding();
-  if (aLaVista || !p.notificaciones || !isTauri()) return;
+  if (aLaVista || !p.notificaciones) return;
+  if (!isTauri()) {
+    // Navegador: se pide permiso una vez; si lo niegan, quedan el sonido y el contador.
+    if (typeof Notification === 'undefined' || Notification.permission === 'denied') return;
+    if (Notification.permission === 'default' && (await Notification.requestPermission()) !== 'granted') return;
+    new Notification(titulo, { body: texto });
+    return;
+  }
   try {
     const n = await import('@tauri-apps/plugin-notification');
     if (!(await n.isPermissionGranted()) && (await n.requestPermission()) !== 'granted') return;

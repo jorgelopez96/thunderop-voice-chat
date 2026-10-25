@@ -20,3 +20,18 @@ it('esGif: solo un link de media.giphy.com, nada más en el mensaje', () => {
   expect(esGif('mirá https://media1.giphy.com/media/abc/200.gif')).toBe(false);
   expect(esGif('https://evil.com/media/abc/200.gif')).toBe(false);
 });
+
+describe('abrirLink en el navegador', () => {
+  it('solo abre http/https, en pestaña nueva sin opener ni referrer', async () => {
+    const { vi } = await import('vitest');
+    const abrir = vi.fn();
+    vi.stubGlobal('window', { open: abrir });
+    const { abrirLink } = await import('./links');
+    await abrirLink('javascript:alert(1)');
+    await abrirLink('data:text/html,<b>x</b>');
+    expect(abrir).not.toHaveBeenCalled();
+    await abrirLink('https://a.com');
+    expect(abrir).toHaveBeenCalledWith('https://a.com', '_blank', 'noopener,noreferrer');
+    vi.unstubAllGlobals();
+  });
+});

@@ -22,7 +22,7 @@ export const primerLink = (texto: string) => partirEnLinks(texto).find((p) => p.
 /** En la app, el navegador de la PC (dentro del WebView no se puede navegar afuera). */
 export async function abrirLink(url: string) {
   if (!/^https?:\/\//i.test(url)) return;
-  if (!isTauri()) { window.open(url, '_blank', 'noopener'); return; }
+  if (!isTauri()) { window.open(url, '_blank', 'noopener,noreferrer'); return; }
   const { openUrl } = await import('@tauri-apps/plugin-opener');
   await openUrl(url);
 }

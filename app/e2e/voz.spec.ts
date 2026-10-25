@@ -97,5 +97,5 @@ test('tres personas en una sala de voz', async ({ browser }) => {
   await otra.goto('/');
   await otra.getByRole('button', { name: 'Voces' }).click();
   const presencia = otra.locator('li.sala', { has: otra.getByRole('button', { name: 'Sala de voz General' }) }).locator('.quienes');
-  await expect.poll(async () => (await presencia.getByRole('listitem').evaluateAll((li) => li.map((x) => (x as HTMLElement).title))).map((t) => t.slice(0, -4)).sort(), { timeout: 10_000 }).toEqual(['Ana', 'Beto']); // sin el sufijo de crearCuenta
+  await expect.poll(async () => (await presencia.getByRole('listitem').evaluateAll((li) => li.map((x) => x.querySelector(':scope > span:not(.caja)')?.textContent ?? ''))).map((t) => t.slice(0, -4)).sort(), { timeout: 10_000 }).toEqual(['Ana', 'Beto']); // sin el sufijo de crearCuenta
 });

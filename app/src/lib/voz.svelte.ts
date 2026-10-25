@@ -75,7 +75,7 @@ async function publicarMic() {
     await room.localParticipant.setMicrophoneEnabled(true, { deviceId: leerPrefs().entrada ?? 'default', noiseSuppression: false, echoCancellation: true, autoGainControl: true }, { dtx: false });
   } catch (e) {
     const n = (e as Error)?.name;
-    if (n === 'NotAllowedError') voz.error = 'No hay permiso para usar el micrófono.';
+    if (n === 'NotAllowedError') voz.error = 'No hay permiso para usar el micrófono. Habilitalo en el navegador para hablar.';
     else if (n === 'NotFoundError' || n === 'OverconstrainedError') voz.error = 'No se encontró un micrófono.';
     else if (!(n === 'PublishTrackError' && (e as { status?: number }).status === 403)) voz.error = 'No se pudo usar el micrófono.';
   }
@@ -207,7 +207,7 @@ export async function entrarVoz(roomId: string, salaNombre = '', grupoId: string
     if (motivo !== D.CLIENT_INITIATED) {
       voz.error = motivo === D.PARTICIPANT_REMOVED ? 'Te sacaron de la llamada.'
         : motivo === D.ROOM_DELETED ? 'La sala de voz se borró.'
-        : motivo === D.DUPLICATE_IDENTITY ? 'Entraste a la voz desde otra ventana.'
+        : motivo === D.DUPLICATE_IDENTITY ? 'Te conectaste a la voz desde otro dispositivo.'
         : 'Se perdió la conexión de voz.';
     }
     salirVoz();
