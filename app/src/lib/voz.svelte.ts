@@ -109,6 +109,7 @@ function limpiar() {
   Object.assign(voz, { salaId: null, salaNombre: '', grupoId: null, conectando: false, ensordecido: false, sinPermiso: false, participantes: [], senal: 'buena', transmitiendo: false, viendo: [] });
   void detenerAudioPantalla();
   if (nativo) { nativo = false; voz.calidadEnVivo = null; void detenerNativo(); }
+  if (navegador) { navegador = false; voz.calidadEnVivo = null; }
   avisarSala(null);
   (r?.disconnect() ?? Promise.resolve()).catch(() => {}).finally(() => c?.close().catch(() => {}));
 }
@@ -348,6 +349,7 @@ if ('__TAURI_INTERNALS__' in globalThis) {
 let tx = 0;
 let arrancando = false;
 let nativo = false; // hay una transmisión andando
+let navegador = false; // transmitiendo con el compartir pantalla del navegador (versión web)
 
 /** `fuente`: un monitor o una ventana (ids de `fuentes_transmisor`); `id: 'pantalla'` es el monitor principal.
  *  `pid`: el programa de la ventana, para mandar solo su sonido. */
@@ -390,8 +392,42 @@ async function arrancarNativo(r: Room, c: AudioContext, mio: number, calidad: Ca
   await compartirSonido(r, c, vigente, fuente.tipo === 'ventana' ? fuente.pid : undefined);
 }
 
+/** Versión web: comparte con el selector del navegador (él elige pantalla, ventana o pestaña, y su audio si lo ofrece).
+ *  Cancelar el selector no es un error: no queda nada a medias. */
+export async function transmitirNavegador(calidad: Calidad) {
+  const r = room;
+  if (!r || voz.transmitiendo || arrancando) return;
+  arrancando = true;
+  const mio = ++tx;
+  const { alto, fps, mbps } = CALIDADES[calidad];
+  voz.error = '';
+  try {
+    const pub = await r.localParticipant.setScreenShareEnabled(true,
+      { audio: true, resolution: { width: Math.round((alto * 16) / 9), height: alto, frameRate: fps }, contentHint: 'motion' },
+      { videoEncoding: { maxBitrate: mbps * 1_000_000, maxFramerate: fps } });
+    if (!pub) return;
+    if (room !== r || mio !== tx) { await r.localParticipant.setScreenShareEnabled(false); return; }
+    navegador = true;
+    voz.transmitiendo = true;
+    voz.calidadEnVivo = calidad;
+    guardarPrefs({ calidad });
+    // "Dejar de compartir" del propio navegador
+    pub.track?.mediaStreamTrack.addEventListener('ended', () => { if (navegador && room === r) void dejarDeTransmitir(); });
+    actualizar();
+  } catch (e) {
+    if (!(e instanceof DOMException && e.name === 'NotAllowedError')) voz.error = 'No se pudo compartir la pantalla.';
+  } finally { arrancando = false; }
+}
+
 /** Cambia la calidad de la transmisión nativa sin cortarla (`voz.calidadEnVivo` dice si se puede). */
 export async function cambiarCalidad(calidad: Calidad) {
+  if (navegador && calidad !== voz.calidadEnVivo) {
+    const { alto, fps } = CALIDADES[calidad];
+    const t = room?.localParticipant.getTrackPublication(lk.Track.Source.ScreenShare)?.track;
+    try { await t?.mediaStreamTrack.applyConstraints({ height: alto, frameRate: fps }); voz.calidadEnVivo = calidad; guardarPrefs({ calidad }); }
+    catch { voz.error = 'No se pudo cambiar la calidad.'; }
+    return;
+  }
   if (!nativo || calidad === voz.calidadEnVivo) return;
   const { alto, fps, mbps } = CALIDADES[calidad];
   if (!await calidadNativo(fps, mbps, alto)) { voz.error = 'No se pudo cambiar la calidad.'; return; }
@@ -420,6 +456,14 @@ export async function dejarDeTransmitir() {
   const r = room;
   if (!r) return;
   tx++;
+  if (navegador) {
+    navegador = false;
+    voz.calidadEnVivo = null;
+    voz.transmitiendo = false;
+    await r.localParticipant.setScreenShareEnabled(false).catch(() => {});
+    actualizar();
+    return;
+  }
   if (!nativo) return;
   nativo = false;
   voz.calidadEnVivo = null;

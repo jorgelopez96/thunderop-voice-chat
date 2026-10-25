@@ -14,6 +14,9 @@ export type Fuente = { tipo: 'monitor' | 'ventana'; id: string; titulo: string; 
 export type Opciones = { url: string; token: string; que: string; fps: number; mbps: number; alto: number };
 
 const enTauri = () => '__TAURI_INTERNALS__' in globalThis;
+/** Transmite con el nativo: en el escritorio, o en los E2E de desarrollo que piden el simulado (`dm.simularNativo`).
+ *  En el navegador se usa el compartir pantalla del navegador. */
+export const conNativo = () => enTauri() || (import.meta.env.DEV && localStorage.getItem('dm.simularNativo') === '1');
 
 /** Sube el registro de una transmisión al servidor para diagnosticar. Sin esperar y sin fallar: todo error se ignora (también el 429). */
 export async function subirDiagnostico(codigo: number, registro: string): Promise<void> {

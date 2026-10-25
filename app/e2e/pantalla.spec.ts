@@ -14,8 +14,14 @@ const mismoVideo = (p: Page) => p.getByLabel('Pantalla de Ana').evaluate((v: HTM
 });
 
 // El transmisor es el simulado de desarrollo (transmisorSimulado.ts): publica como `<id>.pantalla`, igual que el nativo.
+
+// En el navegador se transmite con el selector del navegador; estos tests piden el transmisor nativo simulado.
+async function conSimulado(p: Page) {
+  await p.addInitScript(() => localStorage.setItem('dm.simularNativo', '1'));
+  return p;
+}
 test('transmitir y ver una pantalla', async ({ browser }) => {
-  const [a, b, c] = await Promise.all([0, 1, 2].map(async () => (await browser.newContext()).newPage()));
+  const [a, b, c] = await Promise.all([0, 1, 2].map(async () => conSimulado(await (await browser.newContext()).newPage())));
 
   await crearCuenta(a, 'Ana');
   const link = await crearGrupo(a, 'Pantallas');
@@ -111,7 +117,7 @@ test('transmitir y ver una pantalla', async ({ browser }) => {
 });
 
 test('mirar dos transmisiones a la vez', async ({ browser }) => {
-  const [a, b, c] = await Promise.all([0, 1, 2].map(async () => (await browser.newContext()).newPage()));
+  const [a, b, c] = await Promise.all([0, 1, 2].map(async () => conSimulado(await (await browser.newContext()).newPage())));
   await crearCuenta(a, 'Ana');
   const link = await crearGrupo(a, 'Dos transmisiones');
   await crearCuenta(b, 'Beto');

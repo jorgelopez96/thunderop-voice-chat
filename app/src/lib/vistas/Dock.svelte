@@ -1,13 +1,14 @@
 <script lang="ts">
   import { alTocar, estabaAbierto } from '../menu';
   import { Mic, MicOff, Headphones, HeadphoneOff, ChevronDown, Monitor, AudioWaveform, Music, PhoneOff } from '@lucide/svelte';
-  import { voz, alternarMute, ensordecer, cambiarSupresion, salirVoz, transmitir, dejarDeTransmitir, cambiarCalidad, dispositivos, elegirEntrada, elegirSalida } from '../voz.svelte';
+  import { voz, alternarMute, ensordecer, cambiarSupresion, salirVoz, transmitir, transmitirNavegador, dejarDeTransmitir, cambiarCalidad, dispositivos, elegirEntrada, elegirSalida } from '../voz.svelte';
   import { grupos } from '../grupos.svelte';
   import { CALIDADES, leerPrefs, type Calidad } from '../prefs';
   import Botonera from './Botonera.svelte';
   import Musica from './Musica.svelte';
   import { sesion } from '../sesion.svelte';
-  import { fuentes, type Fuente } from '../transmisorNativo';
+  import { fuentes, conNativo, type Fuente } from '../transmisorNativo';
+  import { puedeTransmitir } from '../plataforma.svelte';
   import { elegirFuente } from '../transmision';
 
   const g = $derived(grupos.lista.find((x) => x.id === voz.grupoId));
@@ -76,12 +77,15 @@
     return enVuelo;
   }
   let reloj: ReturnType<typeof setInterval> | undefined;
+  let nativoUI = $state(true);
   function abrirTransmision() {
     clearInterval(reloj);
     gen++;
     calidad = leerPrefs().calidad;
     fuentesLista = null; elegida = null; perdida = false; aviso = ''; comprobando = false;
+    nativoUI = conNativo();
     d?.showModal();
+    if (!nativoUI) return; // en el navegador, qué compartir lo elige su propio selector
     void refrescar();
     reloj = setInterval(refrescar, 3000);
   }
@@ -90,6 +94,7 @@
   $effect(() => alCerrar);
   // Antes de empezar se vuelve a mirar: la ventana pudo cerrarse o ser otra.
   async function empezar() {
+    if (!nativoUI) { d?.close(); void transmitirNavegador(calidad); return; }
     const f = elegida;
     if (!f || comprobando) return;
     comprobando = true; aviso = '';
@@ -141,7 +146,7 @@
         <button class="icono flecha" aria-label="Calidad de la transmisión" title="Cambiar la calidad" onpointerdown={() => alTocar(menuCalidad)} onclick={abrirCalidad}><ChevronDown size={14} strokeWidth={1.75} /></button>
       </div>
     {:else}
-      <button class="icono cian" onclick={abrirTransmision} disabled={voz.conectando} aria-label="Transmitir" title="Transmitir pantalla"><Monitor size={20} strokeWidth={1.75} /></button>
+    {#if puedeTransmitir()}<button class="icono cian" onclick={abrirTransmision} disabled={voz.conectando} aria-label="Transmitir" title="Transmitir pantalla"><Monitor size={20} strokeWidth={1.75} /></button>{/if}
     {/if}
     <button class="icono magenta" aria-pressed={abiertoSonidos} popovertarget="dock-sonidos" onclick={ubicarPanel} aria-label="Sonidos" title="Sonidos"><AudioWaveform size={20} strokeWidth={1.75} /></button>
     <button class="icono violeta" aria-pressed={abiertoMusica} popovertarget="dock-musica" onclick={ubicarPanel} aria-label="Música" title="Música"><Music size={20} strokeWidth={1.75} /></button>
@@ -195,19 +200,20 @@
 
 <dialog bind:this={d} class="fuentes" onclose={alCerrar}>
   <h3>Transmitir pantalla</h3>
-  <div class="scroll" aria-live="polite">
+  {#if nativoUI}<div class="scroll" aria-live="polite">
     {#if fuentesLista === null}<small>Buscando pantallas y ventanas…</small>
     {:else if perdida}<small>Lo que elegiste ya no está disponible. Elegí otra opción.</small>{@render grilla('Pantallas', monitores)}{@render grilla('Ventanas', ventanas)}
     {:else if !fuentesLista.length}<small>No se encontró nada para transmitir.</small>
     {:else}{@render grilla('Pantallas', monitores)}{@render grilla('Ventanas', ventanas)}{/if}
     {#if aviso}<small role="alert">{aviso}</small>{/if}
   </div>
+  {:else}<p class="tenue-web">El navegador te va a preguntar qué pantalla, ventana o pestaña compartir.</p>{/if}
   <label>Calidad
     <select bind:value={calidad}>{#each Object.keys(CALIDADES) as c (c)}<option value={c}>{nombreCalidad(c as Calidad)}</option>{/each}</select>
   </label>
   <div class="fila" style="justify-content:flex-end">
     <button class="plano" onclick={() => d?.close()}>Cancelar</button>
-    <button class="primario" onclick={empezar} disabled={!elegida || comprobando}>{comprobando ? 'Comprobando…' : 'Empezar'}</button>
+    <button class="primario" onclick={empezar} disabled={(nativoUI && !elegida) || comprobando}>{comprobando ? 'Comprobando…' : 'Empezar'}</button>
   </div>
 </dialog>
 
@@ -269,6 +275,7 @@
   .menu hr { border: 0; border-top: 1px solid var(--borde); margin: 6px 0; width: 100%; }
   .menu small { padding: 4px 8px; }
   dialog { flex-direction: column; gap: 12px; min-width: 300px; }
+  .tenue-web { margin: 0; color: var(--tenue); font-size: 13px; }
   dialog[open] { display: flex; }
   dialog.fuentes { width: min(760px, 94vw); max-width: none; max-height: 85vh; }
   .scroll { overflow-y: auto; min-height: 120px; display: flex; flex-direction: column; gap: 8px; }
