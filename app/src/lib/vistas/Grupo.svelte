@@ -14,7 +14,7 @@
   import Avatar from './Avatar.svelte';
   import Cajon from './movil/Cajon.svelte';
   import { pantalla } from '../plataforma.svelte';
-  import { conAtras, cerrarCapa } from '../navMovil.svelte';
+  import { conAtras, cerrarCapa, navMovil } from '../navMovil.svelte';
   import { deslizar } from '../deslizar';
   import { abrirEnPunto } from '../menu';
   import ConfigGrupo from './ConfigGrupo.svelte';
@@ -92,6 +92,8 @@
   const abrirDer = () => { if (!pantalla.movil || cajonDer || enSalaVoz) return; cajonDer = true; conAtras(() => (cajonDer = false)); };
   // Al entrar a un grupo en el celular se abre su primer chat (no hay columna de salas a la vista).
   $effect(() => { if (pantalla.movil && !salaId && !centroVoz && chat.length) salaId = chat[0].id; });
+  // La barrita de llamada pidió volver a la sala.
+  $effect(() => { if (navMovil.irASala && voz.salaId && salaVoz) { centroVoz = true; navMovil.irASala = false; } });
 
   // El dueño ordena las salas arrastrándolas dentro de su sección.
   let arrastrada = $state<RecordModel | null>(null);
@@ -190,7 +192,7 @@
   {#if config}<ConfigGrupo {grupo} cerrar={() => (config = false)} />{/if}
   {#if invitando}<Invitar {grupo} cerrar={() => (invitando = false)} />{/if}
 
-  {#if enSalaVoz && salaVoz}<Voz {grupo} {soyDueno} {salasVoz} sala={salaVoz.name} verParticipantes={() => capaParticipantes?.showPopover()} />
+  {#if enSalaVoz && salaVoz}<Voz {grupo} {soyDueno} {salasVoz} sala={salaVoz.name} abrirSalas={pantalla.movil ? abrirIzq : undefined} verParticipantes={() => capaParticipantes?.showPopover()} />
   {:else if salaAbierta}{#key salaAbierta.id}<Chat titulo={`# ${salaAbierta.name}`} menu={pantalla.movil ? abrirIzq : undefined} gente={pantalla.movil ? abrirDer : undefined} miembros={grupo.expand?.members ?? []} abrir={() => abrirChat(salaAbierta.id)} enviar={(t, f, r) => enviar(salaAbierta.id, t, f, r)} {borrar} silencio={salaAbierta.id} acciones={soyDueno ? accionesSala : undefined}
     puedeBorrar={(m) => m.author === sesion.usuario?.id || soyDueno} />{/key}
   {:else}<div class="vacio">Elegí una sala de chat</div>{/if}

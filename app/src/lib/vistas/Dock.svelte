@@ -1,6 +1,6 @@
 <script lang="ts">
   import { alTocar, estabaAbierto } from '../menu';
-  import { Mic, MicOff, Headphones, HeadphoneOff, ChevronDown, Monitor, AudioWaveform, Music, PhoneOff } from '@lucide/svelte';
+  import { Mic, MicOff, Headphones, HeadphoneOff, ChevronDown, Monitor, AudioWaveform, Music, PhoneOff, MessageSquare, Ellipsis } from '@lucide/svelte';
   import { voz, alternarMute, ensordecer, cambiarSupresion, salirVoz, transmitir, transmitirNavegador, dejarDeTransmitir, cambiarCalidad, dispositivos, elegirEntrada, elegirSalida } from '../voz.svelte';
   import { grupos } from '../grupos.svelte';
   import { CALIDADES, leerPrefs, type Calidad } from '../prefs';
@@ -8,7 +8,8 @@
   import Musica from './Musica.svelte';
   import { sesion } from '../sesion.svelte';
   import { fuentes, conNativo, type Fuente } from '../transmisorNativo';
-  import { puedeTransmitir } from '../plataforma.svelte';
+  import { puedeTransmitir, pantalla } from '../plataforma.svelte';
+  import { navMovil, conAtras } from '../navMovil.svelte';
   import { elegirFuente } from '../transmision';
 
   const g = $derived(grupos.lista.find((x) => x.id === voz.grupoId));
@@ -121,6 +122,26 @@
   const TEXTO_SENAL = { buena: 'Buena conexión', regular: 'Conexión inestable', mala: 'Mala conexión' };
 </script>
 
+{#if pantalla.movil}
+<!-- Celular: una fila con lo esencial; sonidos y transmitir en "Más". -->
+<div class="dock-movil" role="toolbar" aria-label="Llamada">
+  <button class="icono" class:apagado={voz.muteado || voz.sinPermiso} onclick={alternarMute} disabled={voz.sinPermiso} aria-label={voz.muteado ? 'Activar micrófono' : 'Silenciarme'}>
+    {#if voz.muteado || voz.sinPermiso}<MicOff size={22} strokeWidth={1.75} />{:else}<Mic size={22} strokeWidth={1.75} />{/if}</button>
+  <button class="icono" class:apagado={voz.ensordecido} onclick={() => ensordecer(!voz.ensordecido)} aria-label={voz.ensordecido ? 'Activar sonido' : 'Ensordecerme'}>
+    {#if voz.ensordecido}<HeadphoneOff size={22} strokeWidth={1.75} />{:else}<Headphones size={22} strokeWidth={1.75} />{/if}</button>
+  <button class="icono violeta" popovertarget="dock-musica" onclick={ubicarPanel} aria-label="Música"><Music size={22} strokeWidth={1.75} /></button>
+  <button class="icono" aria-label="Chat de la sala" onclick={() => { navMovil.chatSala = true; conAtras(() => (navMovil.chatSala = false)); }}><MessageSquare size={22} strokeWidth={1.75} /></button>
+  <button class="icono" popovertarget="dock-mas" aria-label="Más opciones"><Ellipsis size={22} strokeWidth={1.75} /></button>
+  <button class="icono colgar" onclick={salirVoz} aria-label="Desconectarse"><PhoneOff size={22} strokeWidth={1.75} /></button>
+</div>
+<div popover id="dock-mas" class="menu mas">
+  <button class="plano" popovertarget="dock-sonidos" onclick={ubicarPanel}><AudioWaveform size={18} strokeWidth={1.75} /> Sonidos</button>
+  {#if puedeTransmitir()}
+    {#if voz.transmitiendo}<button class="plano" onclick={dejarDeTransmitir}><Monitor size={18} strokeWidth={1.75} /> Dejar de transmitir</button>
+    {:else}<button class="plano" onclick={abrirTransmision}><Monitor size={18} strokeWidth={1.75} /> Transmitir</button>{/if}
+  {/if}
+</div>
+{:else}
 <footer class="dock">
   <div class="estado">
     <span class="senal {voz.conectando ? 'regular' : voz.senal}" title={TEXTO_SENAL[voz.conectando ? 'regular' : voz.senal]}></span>
@@ -155,6 +176,7 @@
   </div>
   <span></span>
 </footer>
+{/if}
 
 <div popover id="dock-sonidos" class="panel" style="left:{posPanel.x}px;bottom:{posPanel.y}px" ontoggle={(e) => (abiertoSonidos = e.newState === 'open')}>
   {#if g}{#key g.id}<Botonera grupoId={g.id} userId={sesion.usuario?.id} soyDueno={g.owner === sesion.usuario?.id} />{/key}{/if}
@@ -219,6 +241,13 @@
 
 
 <style>
+  .dock-movil { flex: none; display: flex; justify-content: space-around; align-items: center; height: calc(62px + env(safe-area-inset-bottom));
+    padding: 0 8px env(safe-area-inset-bottom); background: var(--panel); border-top: 1px solid var(--borde); }
+  .dock-movil .icono { width: 48px; min-height: 48px; border-radius: var(--radio-menu); }
+  .dock-movil .apagado { color: var(--peligro); background: var(--peligro-suave); }
+  .dock-movil .colgar { width: 56px; background: var(--peligro); color: #fff; }
+  .mas { min-width: 220px; }
+  .mas:popover-open { inset: auto 8px calc(70px + env(safe-area-inset-bottom)) auto; }
   .dock { flex: none; height: 64px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 16px; padding: 0 16px;
     background: var(--panel); border-top: 1px solid var(--borde); }
   :global([data-modo='moderno']) .dock { animation: sube 280ms var(--curva-salida); }

@@ -163,3 +163,39 @@ test('girar o achicar la pantalla no corta la llamada ni cambia el chat', async 
     await expect(p.getByRole('button', { name: 'Desconectarse' })).toBeVisible();
   }
 });
+
+test('celular: la llamada con su dock, el chat de la sala y la barrita en otras pantallas', async ({ browser }) => {
+  const p = await (await browser.newContext({ viewport: CELULAR })).newPage();
+  await crearCuenta(p, 'Ana');
+  await p.getByRole('button', { name: 'Crear mi grupo' }).click();
+  await p.getByPlaceholder('Nombre del grupo nuevo').fill('Llamadas');
+  await p.getByRole('button', { name: 'Crear grupo' }).click();
+  await p.getByRole('button', { name: 'Abrir salas' }).click();
+  await p.getByRole('button', { name: 'Sala de voz General' }).click();
+  // En la sala: grilla de 2 columnas y el dock de llamada en lugar de las pestañas.
+  const dock = p.getByRole('toolbar', { name: 'Llamada' });
+  for (const n of ['Silenciarme', 'Ensordecerme', 'Música', 'Chat de la sala', 'Desconectarse']) await expect(dock.getByRole('button', { name: n })).toBeVisible({ timeout: 15_000 });
+  expect(await p.locator('section.voz .franja').evaluate((e) => getComputedStyle(e).gridTemplateColumns.split(' ').length)).toBe(2);
+  expect(await sinScrollLateral(p)).toBe(true);
+  // El chat de la sala a pantalla completa; atrás lo cierra.
+  await dock.getByRole('button', { name: 'Chat de la sala' }).click();
+  await expect(p.locator('h2.titulo', { hasText: 'Chat de la sala' })).toBeInViewport();
+  await p.goBack();
+  await expect(p.locator('h2.titulo', { hasText: 'Chat de la sala' })).not.toBeInViewport();
+  // En otro chat: la barrita de llamada; afuera del grupo también, arriba de las pestañas.
+  await p.getByRole('button', { name: 'Abrir salas' }).click();
+  await p.getByRole('button', { name: 'Sala de chat general' }).click();
+  const barrita = p.getByRole('button', { name: 'Volver a la llamada' });
+  await expect(barrita).toBeVisible();
+  await expect(dock).toHaveCount(0);
+  await p.goBack();
+  await expect(p.getByRole('navigation', { name: 'Secciones' })).toBeVisible();
+  await expect(barrita).toBeVisible();
+  // Tocarla vuelve a la sala; colgar desde la barrita sale de la llamada.
+  await barrita.click();
+  await expect(dock).toBeVisible();
+  await p.getByRole('button', { name: 'Abrir salas' }).click();
+  await p.getByRole('button', { name: 'Sala de chat general' }).click();
+  await p.locator('.barra-llamada').getByRole('button', { name: 'Desconectarse' }).click();
+  await expect(barrita).toHaveCount(0);
+});

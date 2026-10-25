@@ -2,7 +2,9 @@
   import { lleno } from '../rango';
   import Insignia from './Insignia.svelte';
   import type { RecordModel } from 'pocketbase';
-  import { MicOff, Users, Link, ChevronRight, MessageSquare, Eye, Volume2 } from '@lucide/svelte';
+  import { MicOff, Users, Link, ChevronRight, MessageSquare, Eye, Volume2, Menu } from '@lucide/svelte';
+  import { pantalla } from '../plataforma.svelte';
+  import { navMovil, cerrarCapa } from '../navMovil.svelte';
   import { foto } from '../foto';
   import { mensajeError, sesion } from '../sesion.svelte';
   import { crearInvitacion, grupos } from '../grupos.svelte';
@@ -16,7 +18,7 @@
   import { abrirEnPunto } from '../menu';
   import { mirar as mirarSala } from '../noLeidos.svelte';
 
-  let { grupo, soyDueno, sala, verParticipantes, salasVoz = [] }: { grupo: RecordModel; soyDueno: boolean; sala: string; verParticipantes: () => void; salasVoz?: RecordModel[] } = $props();
+  let { grupo, soyDueno, sala, verParticipantes, salasVoz = [], abrirSalas }: { grupo: RecordModel; soyDueno: boolean; sala: string; verParticipantes: () => void; salasVoz?: RecordModel[]; abrirSalas?: () => void } = $props();
   const miembros = $derived((grupo.expand?.members ?? []) as RecordModel[]);
   const miembro = (id: string) => miembros.find((m) => m.id === id);
   // Silencios recién pedidos, hasta que el grupo se refresque con el valor del servidor.
@@ -66,6 +68,8 @@
   // Chat de la sala, plegable y recordado.
   let chatAbierto = $state((() => { try { return localStorage.getItem('dm.chatSala') !== '0'; } catch { return true; } })());
   $effect(() => { if (chatAbierto && voz.salaId) return mirarSala(voz.salaId); });
+  // En el celular el chat de la sala se abre a pantalla completa desde el dock (navMovil.chatSala).
+  const verChat = $derived(pantalla.movil ? navMovil.chatSala : chatAbierto);
   function plegarChat(a: boolean) { chatAbierto = a; try { localStorage.setItem('dm.chatSala', a ? '1' : '0'); } catch { /* sin almacenamiento */ } }
 </script>
 
@@ -73,15 +77,16 @@
   <span class="espectadores num" title={`${n} ${n === 1 ? 'persona mirando' : 'personas mirando'}`}><Eye size={14} strokeWidth={1.75} />{n}</span>
 {/snippet}
 
-<section class="voz" class:conChat={chatAbierto}>
+<section class="voz" class:conChat={chatAbierto && !pantalla.movil} class:movil={pantalla.movil}>
   <div class="centro">
     <header>
+      {#if abrirSalas}<button class="icono" aria-label="Abrir salas" title="Salas" onclick={abrirSalas}><Menu size={20} strokeWidth={1.75} /></button>{/if}
       <Volume2 size={18} strokeWidth={1.75} color="var(--icono)" />
       <h2>{sala}</h2>
       <span class="en-voz num">{voz.participantes.length} en voz</span>
       <button class="plano" onclick={verParticipantes}><Users size={16} strokeWidth={1.75} /> Participantes · {miembros.length}</button>
       <button class="icono" onclick={copiarLink} aria-label="Copiar link de invitación" title="Copiar link de invitación"><Link size={16} strokeWidth={1.75} /></button>
-      {#if !chatAbierto}<button class="icono" onclick={() => plegarChat(true)} aria-label="Abrir chat de la sala" title="Chat de la sala"><MessageSquare size={16} strokeWidth={1.75} /></button>{/if}
+      {#if !chatAbierto && !pantalla.movil}<button class="icono" onclick={() => plegarChat(true)} aria-label="Abrir chat de la sala" title="Chat de la sala"><MessageSquare size={16} strokeWidth={1.75} /></button>{/if}
     </header>
     {#if voz.conectando}<p role="status">Conectando…</p>{/if}
     {#if aviso}<p role="status">{aviso}</p>{/if}
@@ -118,11 +123,11 @@
     <div class="pie-musica"><AhoraSuena /></div>
   </div>
 
-  {#if chatAbierto && voz.salaId}
+  {#if verChat && voz.salaId}
     {@const id = voz.salaId}
     <aside class="chatSala">
-      <button class="icono plegar" onclick={() => plegarChat(false)} aria-label="Plegar chat de la sala" title="Plegar"><ChevronRight size={16} strokeWidth={1.75} /></button>
-      {#key id}<Chat titulo="Chat de la sala" miembros={grupos.lista.find((g) => g.id === voz.grupoId)?.expand?.members ?? []} abrir={() => abrirChat(id)} enviar={(t, f, r) => enviar(id, t, f, r)} {borrar} silencio={id}
+      {#if !pantalla.movil}<button class="icono plegar" onclick={() => plegarChat(false)} aria-label="Plegar chat de la sala" title="Plegar"><ChevronRight size={16} strokeWidth={1.75} /></button>{/if}
+      {#key id}<Chat titulo="Chat de la sala" cerrar={pantalla.movil ? cerrarCapa : undefined} miembros={grupos.lista.find((g) => g.id === voz.grupoId)?.expand?.members ?? []} abrir={() => abrirChat(id)} enviar={(t, f, r) => enviar(id, t, f, r)} {borrar} silencio={id}
         puedeBorrar={(m) => m.author === sesion.usuario?.id || soyDueno} />{/key}
     </aside>
   {/if}
@@ -147,6 +152,9 @@
 <style>
   .voz { display: grid; grid-template-columns: 1fr; min-height: 0; min-width: 0; }
   .voz.conChat { grid-template-columns: minmax(0, 1fr) 296px; }
+  /* Celular: tarjetas de a 2 y el chat de la sala encima de todo, a pantalla completa. */
+  .voz.movil .franja { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .voz.movil .chatSala { position: fixed; inset: 0; z-index: 15; padding-top: env(safe-area-inset-top); border: 0; }
   .centro { padding: 0 16px 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
   header { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 8px; height: 52px; flex: none; margin: 0 -16px; padding: 0 12px 0 16px;
     background: var(--fondo); border-bottom: 1px solid var(--borde); }

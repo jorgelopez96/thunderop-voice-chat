@@ -4,6 +4,7 @@
   import Amigos from './Amigos.svelte';
   import Pestanas from './movil/Pestanas.svelte';
   import PerfilMovil from './movil/PerfilMovil.svelte';
+  import BarraLlamada from './movil/BarraLlamada.svelte';
   import { pantalla } from '../plataforma.svelte';
   import { navMovil, conAtras } from '../navMovil.svelte';
   import { grupos, grupoActual, iniciarGrupos, miga } from '../grupos.svelte';
@@ -78,7 +79,8 @@
   {:else}
     <Inicio />
   {/if}
-  {#if voz.salaId}<Dock />{/if}
+  <!-- Celular: en la sala, el dock de la llamada; en cualquier otra pantalla, la barrita. -->
+  {#if voz.salaId}{#if pantalla.movil && !(actual && miga.voz)}<BarraLlamada />{:else}<Dock />{/if}{/if}
   {#if pantalla.movil && !actual}<Pestanas />{/if}
   <div class="reproductor" bind:this={hostMusica}></div>
 </main>
