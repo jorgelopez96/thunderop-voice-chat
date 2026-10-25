@@ -12,6 +12,10 @@
   import Confirmar from './Confirmar.svelte';
   import { ChevronDown, Hash, UserPlus, Pencil, Trash2, Settings, Volume2, Monitor, ArrowUpDown } from '@lucide/svelte';
   import Avatar from './Avatar.svelte';
+  import Cajon from './movil/Cajon.svelte';
+  import { pantalla } from '../plataforma.svelte';
+  import { conAtras, cerrarCapa } from '../navMovil.svelte';
+  import { deslizar } from '../deslizar';
   import { abrirEnPunto } from '../menu';
   import ConfigGrupo from './ConfigGrupo.svelte';
   import Invitar from './Invitar.svelte';
@@ -81,6 +85,14 @@
   let menuSalaEl = $state<HTMLElement>();
   let dlgNombre = $state<HTMLDialogElement>();
   $effect(() => { if (editando) dlgNombre?.showModal(); });
+  // Celular: el chat ocupa la pantalla; las salas y los participantes van en cajones (☰ / 👥 o deslizando desde el borde).
+  let cajonIzq = $state(false);
+  let cajonDer = $state(false);
+  const abrirIzq = () => { if (!pantalla.movil || cajonIzq) return; cajonIzq = true; conAtras(() => (cajonIzq = false)); };
+  const abrirDer = () => { if (!pantalla.movil || cajonDer || enSalaVoz) return; cajonDer = true; conAtras(() => (cajonDer = false)); };
+  // Al entrar a un grupo en el celular se abre su primer chat (no hay columna de salas a la vista).
+  $effect(() => { if (pantalla.movil && !salaId && !centroVoz && chat.length) salaId = chat[0].id; });
+
   // El dueño ordena las salas arrastrándolas dentro de su sección.
   let arrastrada = $state<RecordModel | null>(null);
   let sobre = $state<string | null>(null);
@@ -106,7 +118,7 @@
     ondragover={(e) => { if (arrastrada && arrastrada.kind === r.kind) { e.preventDefault(); sobre = r.id; } }}
     ondragleave={() => sobre === r.id && (sobre = null)} ondrop={(e) => { e.preventDefault(); soltar(r); }} ondragend={() => (arrastrada = sobre = null)}
     oncontextmenu={(e) => { if (!soyDueno) return; e.preventDefault(); menuSala = r; abrirEnPunto(menuSalaEl, e.clientX, e.clientY); }} class:activa={r.kind === 'chat' ? r.id === salaId && !centroVoz : r.id === voz.salaId && centroVoz}>
-      <button class="plano nombre" class:sin-leer={!!noLeidos.salas[r.id]} aria-label={`${r.kind === 'chat' ? 'Sala de chat' : 'Sala de voz'} ${r.name}`} onclick={() => hacer(() => abrir(r))}>
+      <button class="plano nombre" class:sin-leer={!!noLeidos.salas[r.id]} aria-label={`${r.kind === 'chat' ? 'Sala de chat' : 'Sala de voz'} ${r.name}`} onclick={() => { if (cajonIzq) cerrarCapa(); hacer(() => abrir(r)); }}>
         {#if r.kind === 'chat'}<Hash size={16} strokeWidth={1.75} />{:else}<Volume2 size={16} strokeWidth={1.75} />{/if}<span>{r.name}</span>
         {#if r.kind === 'voz'}<small class:verde={q.length}>{q.length ? `${q.length} en voz` : 'vacía'}</small>{/if}
         {#if noLeidos.salas[r.id]}<span class="contador num" aria-label={`${noLeidos.salas[r.id]} sin leer`}>{noLeidos.salas[r.id]}</span>{/if}
@@ -132,7 +144,16 @@
   <div class="seccion-salas"><h3>{texto}</h3></div>
 {/snippet}
 
-<div class="grupo" class:enSalaVoz>
+<div class="grupo" class:enSalaVoz class:movil={pantalla.movil} use:deslizar={{ alAbrirIzq: abrirIzq, alAbrirDer: abrirDer }}>
+  <Cajon lado="izq" abierto={cajonIzq}>
+  <div class="lado-izq">
+  {#if pantalla.movil}
+    <!-- Columnita de grupos para cambiar sin salir (solo en el cajón del celular). -->
+    <ul class="mis-grupos">{#each grupos.lista as g (g.id)}
+      <li><button class="plano" class:actual={g.id === grupo.id} aria-label={`Grupo ${g.name}`} title={g.name}
+        onclick={() => { if (g.id === grupo.id) return; cerrarCapa(); grupoActual.id = g.id; }}>{g.name.slice(0, 1).toUpperCase()}</button></li>
+    {/each}</ul>
+  {/if}
   <nav class="salas">
     <!-- popovertarget: el navegador abre y cierra con el mismo botón (con onclick, el clic cerraba y volvía a abrir) -->
     <button class="plano cabecera" bind:this={cabecera} popovertarget="menu-grupo">
@@ -145,6 +166,8 @@
     {#if grupo.chatsArriba}{@render seccionChats()}{@render seccionVoz()}{:else}{@render seccionVoz()}{@render seccionChats()}{/if}
 
   </nav>
+  </div>
+  </Cajon>
 
   <!-- Menú del nombre del grupo: invitar, configuraciones y cambiar de grupo. Borrar va adentro de Configuraciones (a propósito, lejos). -->
   <div popover id="menu-grupo" class="menu" bind:this={menuGrupo}
@@ -168,12 +191,12 @@
   {#if invitando}<Invitar {grupo} cerrar={() => (invitando = false)} />{/if}
 
   {#if enSalaVoz && salaVoz}<Voz {grupo} {soyDueno} {salasVoz} sala={salaVoz.name} verParticipantes={() => capaParticipantes?.showPopover()} />
-  {:else if salaAbierta}{#key salaAbierta.id}<Chat titulo={`# ${salaAbierta.name}`} miembros={grupo.expand?.members ?? []} abrir={() => abrirChat(salaAbierta.id)} enviar={(t, f, r) => enviar(salaAbierta.id, t, f, r)} {borrar} silencio={salaAbierta.id} acciones={soyDueno ? accionesSala : undefined}
+  {:else if salaAbierta}{#key salaAbierta.id}<Chat titulo={`# ${salaAbierta.name}`} menu={pantalla.movil ? abrirIzq : undefined} gente={pantalla.movil ? abrirDer : undefined} miembros={grupo.expand?.members ?? []} abrir={() => abrirChat(salaAbierta.id)} enviar={(t, f, r) => enviar(salaAbierta.id, t, f, r)} {borrar} silencio={salaAbierta.id} acciones={soyDueno ? accionesSala : undefined}
     puedeBorrar={(m) => m.author === sesion.usuario?.id || soyDueno} />{/key}
   {:else}<div class="vacio">Elegí una sala de chat</div>{/if}
 
   {#if enSalaVoz}<div popover class="capa" bind:this={capaParticipantes}><Participantes {grupo} /></div>
-  {:else}<Participantes {grupo} />{/if}
+  {:else}<Cajon lado="der" abierto={cajonDer}><Participantes {grupo} /></Cajon>{/if}
   <div popover class="menu" bind:this={menuSalaEl}>
     {#if menuSala}{@const r = menuSala}
       <button class="plano" onclick={() => { menuSalaEl?.hidePopover(); editando = { id: r.id, name: r.name }; }}><Pencil size={16} strokeWidth={1.75} /> Cambiar nombre</button>
@@ -207,6 +230,12 @@
 <style>
   .grupo { flex: 1; min-height: 0; display: grid; grid-template-columns: 248px minmax(0, 1fr) 240px; }
   .grupo.enSalaVoz { grid-template-columns: 248px minmax(0, 1fr); }
+  .grupo.movil { grid-template-columns: minmax(0, 1fr); }
+  .lado-izq { display: flex; min-height: 0; }
+  .lado-izq > .salas { flex: 1; min-width: 0; }
+  .mis-grupos { display: flex; flex-direction: column; gap: 8px; padding: 12px 8px; background: var(--fondo); border-right: 1px solid var(--borde); overflow-y: auto; }
+  .mis-grupos button { width: 44px; height: 44px; border-radius: var(--radio-tarjeta); background: var(--elevado-2); color: var(--texto); font-size: 17px; font-weight: 700; }
+  .mis-grupos button.actual { background: var(--acento); color: var(--sobre-acento); }
   .capa { position: fixed; inset: 48px 0 56px auto; max-height: calc(100vh - 104px); margin: 0; width: 240px; padding: 0; border: 0; border-left: 1px solid var(--borde); background: var(--panel); color: var(--texto); }
   .capa:popover-open { display: grid; }
   .salas { background: var(--panel); padding: 0 8px 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; border-right: 1px solid var(--borde); --anillo: var(--panel); }

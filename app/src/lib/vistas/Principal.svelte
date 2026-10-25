@@ -5,7 +5,7 @@
   import Pestanas from './movil/Pestanas.svelte';
   import PerfilMovil from './movil/PerfilMovil.svelte';
   import { pantalla } from '../plataforma.svelte';
-  import { navMovil } from '../navMovil.svelte';
+  import { navMovil, conAtras } from '../navMovil.svelte';
   import { grupos, grupoActual, iniciarGrupos, miga } from '../grupos.svelte';
   import Inicio from './Inicio.svelte';
   import MenuPerfil from './MenuPerfil.svelte';
@@ -29,6 +29,13 @@
 
   const actual = $derived(grupos.lista.find((g) => g.id === grupoActual.id));
   let config = $state(false);
+  // Celular: entrar a un grupo deja una capa en el historial (atrás vuelve a la pestaña).
+  let grupoPrevio: string | null = null;
+  $effect(() => {
+    const id = grupoActual.id;
+    if (pantalla.movil && id && !grupoPrevio) conAtras(() => (grupoActual.id = null));
+    grupoPrevio = id;
+  });
   let hostMusica = $state<HTMLElement>();
   // El reproductor vive acá y no en la vista de la sala: cambiar de chat o de grupo no corta la música.
   $effect(() => {
@@ -40,9 +47,9 @@
 </script>
 
 <main>
-  {#if pantalla.movil && !actual}
-    <!-- Celular, pantallas de afuera: barra simple arriba, la pestaña elegida y las pestañas abajo. -->
-    <header class="barra-movil"><LogoThunderop /><Campanita /></header>
+  {#if pantalla.movil}
+    <!-- Celular: afuera, barra simple arriba y pestañas abajo; adentro de un grupo, la cabecera del chat o la sala. -->
+    {#if !actual}<header class="barra-movil"><LogoThunderop /><Campanita /></header>{/if}
   {:else}
   <BarraTitulo>
     <h1><button class="plano logo" onclick={() => (grupoActual.id = null)} aria-label="Inicio"><LogoThunderop /></button></h1>

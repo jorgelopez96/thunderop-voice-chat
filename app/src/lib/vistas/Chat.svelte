@@ -2,7 +2,7 @@
   import { alTocar, estabaAbierto } from '../menu';
   import { horaDe } from '../hora.svelte';
   import Insignia from './Insignia.svelte';
-  import { Paperclip, Smile, SmilePlus, Reply, Trash2, X, Pencil, Download } from '@lucide/svelte';
+  import { Paperclip, Smile, SmilePlus, Reply, Trash2, X, Pencil, Download, Menu, Users } from '@lucide/svelte';
   import { EMOJIS } from '../emojis';
   import { tick } from 'svelte';
   import type { RecordModel } from 'pocketbase';
@@ -25,8 +25,8 @@
   // `soloLectura`: oculta el compositor y muestra ese texto (privado con alguien que ya no es amigo).
   // `silencio`: id del chat para el menú de tres puntitos (silenciar avisos); `acciones`: más opciones en ese menú.
   // `miembros`: quiénes pueden estar en el chat, para los nombres de las reacciones y las menciones con @.
-  let { titulo, foto: fotoChat, cerrar, abrir, enviar, borrar, puedeBorrar, soloLectura = '', alVer, silencio, acciones, miembros = [] }: {
-    titulo: string; foto?: string; cerrar?: () => void; abrir: () => ChatAbierto; enviar: (texto: string, archivo?: File, respondeA?: string) => Promise<unknown>;
+  let { titulo, foto: fotoChat, cerrar, menu, gente, abrir, enviar, borrar, puedeBorrar, soloLectura = '', alVer, silencio, acciones, miembros = [] }: {
+    titulo: string; foto?: string; cerrar?: () => void; menu?: () => void; gente?: () => void; abrir: () => ChatAbierto; enviar: (texto: string, archivo?: File, respondeA?: string) => Promise<unknown>;
     borrar: (id: string) => Promise<unknown>; puedeBorrar: (m: RecordModel) => boolean; soloLectura?: string;
     alVer?: (ultimo: RecordModel) => void; // se llama con el último mensaje visible (privados: marcar leído)
     silencio?: string; acciones?: Snippet<[() => void]>; miembros?: { id: string; name: string }[];
@@ -242,7 +242,7 @@
 </script>
 
 <section class="chat" aria-label="Chat {titulo}">
-  <h2 class="titulo">{#if fotoChat}<img class="avatar foto-chat" src={fotoChat} alt="" />{/if}<span class="nombre-chat">{titulo}</span>{#if silencio}<MenuChat chat={silencio} {acciones} />{/if}{#if cerrar}<button class="icono cerrar-chat" aria-label="Cerrar chat" title="Cerrar (Esc)" onclick={cerrar}><X size={18} strokeWidth={1.75} /></button>{/if}</h2>
+  <h2 class="titulo">{#if menu}<button class="icono" aria-label="Abrir salas" title="Salas" onclick={menu}><Menu size={20} strokeWidth={1.75} /></button>{/if}{#if fotoChat}<img class="avatar foto-chat" src={fotoChat} alt="" />{/if}<span class="nombre-chat">{titulo}</span>{#if silencio}<MenuChat chat={silencio} {acciones} />{/if}{#if gente}<button class="icono" aria-label="Ver participantes" title="Participantes" onclick={gente}><Users size={19} strokeWidth={1.75} /></button>{/if}{#if cerrar}<button class="icono cerrar-chat" aria-label="Cerrar chat" title="Cerrar (Esc)" onclick={cerrar}><X size={18} strokeWidth={1.75} /></button>{/if}</h2>
   <div class="lista" bind:this={lista} onscroll={alScroll} onloadcapture={() => pegado && bajar()} data-testid="mensajes">
     {#if chat.hayMas}<button class="plano" onclick={() => chat.cargarMas()}>Cargar anteriores</button>{/if}
     {#if chat.error}<p role="alert">{chat.error}</p>{/if}

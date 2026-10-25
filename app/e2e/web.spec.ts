@@ -117,3 +117,49 @@ test('PC: sin pestañas, con la barra de siempre', async ({ browser }) => {
   await expect(p.getByRole('navigation', { name: 'Secciones' })).toHaveCount(0);
   await expect(p.getByRole('button', { name: 'Configuración' })).toBeVisible();
 });
+
+test('celular: grupo con chat a pantalla completa, cajones y botón atrás', async ({ browser }) => {
+  const p = await (await browser.newContext({ viewport: CELULAR })).newPage();
+  await crearCuenta(p, 'Ana');
+  await p.getByRole('button', { name: 'Crear mi grupo' }).click();
+  await p.getByPlaceholder('Nombre del grupo nuevo').fill('Celus');
+  await p.getByRole('button', { name: 'Crear grupo' }).click();
+  // Entra directo al chat, a pantalla completa y sin pestañas.
+  const titulo = p.locator('h2.titulo', { hasText: '# general' });
+  await expect(titulo).toBeVisible();
+  await expect(p.getByRole('navigation', { name: 'Secciones' })).toHaveCount(0);
+  expect(await sinScrollLateral(p)).toBe(true);
+  // ☰ abre el cajón con las salas; elegir una lo cierra.
+  await p.getByRole('button', { name: 'Abrir salas' }).click();
+  await expect(p.getByRole('button', { name: 'Sala de voz General' })).toBeInViewport();
+  await p.getByRole('button', { name: 'Sala de chat general' }).click();
+  await expect(p.getByRole('button', { name: 'Sala de voz General' })).not.toBeInViewport();
+  // 👥 abre Participantes; atrás lo cierra y sigue en el chat.
+  await p.getByRole('button', { name: 'Ver participantes' }).click();
+  await expect(p.getByText(/^Participantes — /)).toBeInViewport();
+  await p.goBack();
+  await expect(p.getByText(/^Participantes — /)).not.toBeInViewport();
+  await expect(titulo).toBeVisible();
+  // Atrás con el cajón abierto lo cierra; otro atrás sale del grupo.
+  await p.getByRole('button', { name: 'Abrir salas' }).click();
+  await p.goBack();
+  await expect(p.getByRole('button', { name: 'Sala de voz General' })).not.toBeInViewport();
+  await expect(titulo).toBeVisible();
+  await p.goBack();
+  await expect(p.getByRole('navigation', { name: 'Secciones' })).toBeVisible();
+});
+
+test('girar o achicar la pantalla no corta la llamada ni cambia el chat', async ({ browser }) => {
+  const p = await (await browser.newContext({ viewport: CELULAR })).newPage();
+  await crearCuenta(p, 'Ana');
+  await p.getByRole('button', { name: 'Crear mi grupo' }).click();
+  await p.getByPlaceholder('Nombre del grupo nuevo').fill('Giro');
+  await p.getByRole('button', { name: 'Crear grupo' }).click();
+  await p.getByRole('button', { name: 'Abrir salas' }).click();
+  await p.getByRole('button', { name: 'Sala de voz General' }).click();
+  await expect(p.getByRole('button', { name: 'Desconectarse' })).toBeVisible({ timeout: 15_000 });
+  for (const v of [{ width: 1280, height: 800 }, CELULAR]) {
+    await p.setViewportSize(v);
+    await expect(p.getByRole('button', { name: 'Desconectarse' })).toBeVisible();
+  }
+});
