@@ -149,6 +149,7 @@
                 </span>
                 <span class="datos">
                   <strong>{g.name}</strong>
+                  {#if g.descripcion}<span class="descripcion" title={g.descripcion}>{g.descripcion}</span>{/if}
                   {#if delGrupo(g.id)}<span class="punto-nuevo" aria-label="Mensajes sin leer"></span>{/if}
                   {#if v.length}
                     <small class="verde"><span class="punto"></span><span class="num">{v.length}</span> en voz
@@ -192,7 +193,7 @@
     background: var(--superficie); border: 1px solid var(--borde); border-radius: var(--radio-pildora); }
 
   .grupos { display: grid; grid-template-columns: repeat(auto-fill, 220px); gap: 16px; }
-  .grupo { position: relative; width: 220px; height: 128px; padding: 0; flex-direction: column; align-items: stretch; justify-content: flex-start; gap: 0;
+  .grupo { position: relative; width: 220px; height: 140px; padding: 0; flex-direction: column; align-items: stretch; justify-content: flex-start; gap: 0;
     background: var(--panel); border: 1px solid var(--borde); border-radius: var(--radio-tarjeta); text-align: left; }
   .grupo:hover:not(:disabled) { background: var(--panel); border-color: var(--borde-fuerte); }
   /* Sin overflow en la tarjeta (cortaría la sombra del hover): el banner lleva sus propias esquinas. */
@@ -201,6 +202,7 @@
   .datos { position: relative; flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 2px; padding: 0 12px; min-width: 0; }
   .datos strong { font-size: 15px; font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 12px; }
   .datos small { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+  .descripcion { font-size: 12px; color: var(--tenue); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .datos .punto { width: 6px; height: 6px; }
   .nadie { color: var(--apagado); }
   .punto-nuevo { position: absolute; top: 14px; right: 12px; width: 8px; height: 8px; border-radius: 999px; background: var(--acento); }

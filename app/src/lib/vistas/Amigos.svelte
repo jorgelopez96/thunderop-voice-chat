@@ -1,13 +1,14 @@
 <script lang="ts">
   import type { RecordModel } from 'pocketbase';
   import { sesion } from '../sesion.svelte';
-  import { amigos, solicitarPorUsuario, quitar } from '../amigos.svelte';
+  import { amigos, solicitarPorUsuario, quitar, bloquear } from '../amigos.svelte';
   import { noLeidos, abrirPrivado, enviarPrivado, borrarPrivado, marcarLeido } from '../privados.svelte';
   import Avatar from './Avatar.svelte';
   import Insignia from './Insignia.svelte';
   import Chat from './Chat.svelte';
   import Confirmar from './Confirmar.svelte';
-  import { UserPlus } from '@lucide/svelte';
+  import { UserPlus, Ban, UserMinus } from '@lucide/svelte';
+  import { foto } from '../foto';
   import { estado } from '../presencia.svelte';
 
   // Panel fijo a la derecha de la portada. Solo se muestra el estado elegido, nunca en qué grupo o sala está.
@@ -21,6 +22,7 @@
   let ok = $state('');
   let abierto = $state<RecordModel | null>(null);
   let eliminar = $state(false);
+  let bloqueando = $state(false);
   let d = $state<HTMLDialogElement>();
   // La amistad puede desaparecer con el chat abierto (el otro la eliminó): el historial queda en solo lectura.
   const amistad = $derived(abierto ? amigos.lista.find((a) => a.usuario.id === abierto!.id) : undefined);
@@ -67,24 +69,26 @@
   </div>
 </aside>
 
-<dialog class="privado" bind:this={d} onclose={() => (abierto = null)}>
+<dialog class="privado" bind:this={d} onclose={() => (abierto = null)} onclick={(e) => e.target === d && d.close()}>
   {#if abierto}
     {@const u = abierto}
     {#key u.id}
-      <Chat titulo={u.name} miembros={[sesion.usuario, u].filter((x) => !!x).map((x) => ({ id: x.id, name: x.name }))} abrir={() => abrirPrivado(u.id)} enviar={(t, f, r) => enviarPrivado(u.id, t, f, r)} borrar={borrarPrivado}
+      <Chat titulo={u.name} foto={foto(u)} cerrar={() => d?.close()} miembros={[sesion.usuario, u].filter((x) => !!x).map((x) => ({ id: x.id, name: x.name }))} abrir={() => abrirPrivado(u.id)} enviar={(t, f, r) => enviarPrivado(u.id, t, f, r)} borrar={borrarPrivado}
         puedeBorrar={(m) => m.author === sesion.usuario?.id} alVer={(m) => marcarLeido(u.id, m.created)}
         soloLectura={amistad ? '' : 'Ya no son amigos: no se pueden mandar mensajes.'} silencio={u.id}>
         {#snippet acciones(cerrar: () => void)}
-          {#if amistad}<button class="plano peligro" onclick={() => { cerrar(); eliminar = true; }}>Eliminar amigo</button>{/if}
+          <button class="plano" onclick={() => { cerrar(); bloqueando = true; }}><Ban size={16} strokeWidth={1.75} /> Bloquear</button>
+          {#if amistad}<button class="plano peligro" onclick={() => { cerrar(); eliminar = true; }}><UserMinus size={16} strokeWidth={1.75} /> Eliminar amigo</button>{/if}
         {/snippet}
       </Chat>
     {/key}
-    <div class="fila pie">
-      <button class="plano" onclick={() => d?.close()}>Cerrar</button>
-    </div>
   {/if}
 </dialog>
 
+{#if bloqueando && abierto}{@const u = abierto}
+  <Confirmar texto={`¿Bloquear a ${u.name}? Deja de ser tu amigo, no puede escribirte ni mandarte solicitudes y no ve si estás conectado. Lo podés desbloquear desde Configuración → Cuenta.`}
+    accion="Bloquear" cancelar={() => (bloqueando = false)} confirmar={() => { bloqueando = false; d?.close(); void bloquear(u.id); }} />
+{/if}
 {#if eliminar && amistad && abierto}
   <Confirmar texto={`¿Eliminar a ${abierto.name} de tus amigos? El historial queda, pero no van a poder escribirse.`}
     cancelar={() => (eliminar = false)} confirmar={() => { eliminar = false; void quitar(amistad.amistad); }} />
@@ -111,5 +115,4 @@
   .privado { width: min(640px, 90vw); height: 80vh; max-width: none; padding: 0; flex-direction: column; }
   .privado[open] { display: flex; }
   .privado :global(.chat) { flex: 1; }
-  .pie { justify-content: flex-end; padding: 0 16px 12px; }
 </style>

@@ -10,6 +10,7 @@
   import { TEMAS, aplicarModo, aplicarTema, modoGuardado, temaGuardado, type Modo } from '../tema';
   import { formatoHora, cambiarFormatoHora } from '../hora.svelte';
   import { pb } from '../pb';
+  import { bloquear, bloqueados } from '../amigos.svelte';
   import { sesion, salir, mensajeError } from '../sesion.svelte';
   import { pedirCodigo, restablecer } from '../cuenta.svelte';
   import { errorClave, soloDigitos } from '../reglasCuenta';
@@ -58,6 +59,7 @@
   }
 
   let desactivar = $state(false);
+  let listaBloqueados = $state(bloqueados());
   let borrar = $state<0 | 1 | 2>(0);
   let escrito = $state('');
 </script>
@@ -95,6 +97,16 @@
         <div class="fila"><button disabled={ocupado} onclick={pedir}>Cambiar contraseña</button>{#if clave === 'lista'}<span class="ok">Contraseña cambiada.</span>{/if}</div>
       {/if}
       <div class="item"><span>Dispositivos con la sesión iniciada</span><span class="pronto">Próximamente</span></div>
+    </section>
+    <section>
+      <h3>Personas bloqueadas</h3>
+      {#await listaBloqueados}<small>Cargando…</small>
+      {:then lista}
+        {#each lista as b (b.id)}
+          <div class="item"><span>{b.name} <small>@{b.username}</small></span>
+            <button onclick={() => hacer(async () => { await bloquear(b.id, false); listaBloqueados = bloqueados(); })}>Desbloquear</button></div>
+        {:else}<small>No bloqueaste a nadie.</small>{/each}
+      {:catch}<small>No se pudo cargar la lista.</small>{/await}
     </section>
     <section class="peligroso">
       <h3>Desactivar o borrar la cuenta</h3>

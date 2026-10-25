@@ -217,4 +217,14 @@ describe('música', () => {
     await expect(h.admin.collection('canciones').getFullList(filtro)).resolves.toHaveLength(0);
     await expect(h.admin.collection('reproducciones').getFullList(filtro)).resolves.toHaveLength(0);
   });
+
+  it('vaciar borra la cola y corta la que suena', async () => {
+    const { b, voz } = await setup();
+    await musica(b, voz, { accion: 'agregar', url: yt('aaaaaaaaaaa') });
+    await musica(b, voz, { accion: 'agregar', url: yt('bbbbbbbbbbb') });
+    await musica(b, voz, { accion: 'agregar', url: yt('ccccccccccc') });
+    const r = await musica(b, voz, { accion: 'vaciar' });
+    expect(r.reproduccion.actual).toBe('');
+    expect((await canciones(b, voz)).map((c) => c.estado)).toEqual(['hecha']);
+  });
 });

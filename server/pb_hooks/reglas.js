@@ -84,4 +84,15 @@ function errorOAuthMail(email) {
   return String(email || "").trim() ? "" : MSG_OAUTH_SIN_MAIL;
 }
 
-module.exports = { normalizarUsuario, datosOAuth, errorOAuthMail, errorUsuario, errorClave, edad, errorEdad, errorTerminos, terminosVigente, codigoValido, falta, MSG_TERMINOS };
+/** ¿Alguno de los dos bloqueó al otro? Lee `bloqueados` (oculto) de ambos. */
+function bloqueo(app, a, b) {
+  const tiene = (de, a2) => {
+    try {
+      const lista = JSON.parse(app.findRecordById("users", de).getString("bloqueados") || "[]") || [];
+      return lista.some((x) => x.id === a2);
+    } catch { return false; }
+  };
+  return tiene(a, b) || tiene(b, a);
+}
+
+module.exports = { bloqueo, normalizarUsuario, datosOAuth, errorOAuthMail, errorUsuario, errorClave, edad, errorEdad, errorTerminos, terminosVigente, codigoValido, falta, MSG_TERMINOS };

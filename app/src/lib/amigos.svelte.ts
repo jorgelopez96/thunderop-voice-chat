@@ -51,3 +51,7 @@ export const solicitarA = (usuario: string) => solicitar({ usuario });
 export const aceptar = (id: string) => hacer(() => pb.collection('amistades').update(id, { estado: 'aceptada' }));
 /** Rechazar, cancelar y eliminar amigo son lo mismo: borrar la amistad. */
 export const quitar = (id: string) => hacer(() => pb.collection('amistades').delete(id));
+/** Bloquear borra la amistad y corta privados y solicitudes; `bloquear(id, false)` desbloquea. */
+export const bloquear = (usuario: string, si = true) => hacer(() => pb.send('/api/amigos/bloquear', { method: 'POST', body: { usuario, bloquear: si } }));
+export type Bloqueado = { id: string; name: string; username: string; fecha: string };
+export const bloqueados = (): Promise<Bloqueado[]> => pb.send('/api/amigos/bloqueados', {});

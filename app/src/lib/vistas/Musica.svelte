@@ -1,6 +1,7 @@
 <script lang="ts">
   import { X } from '@lucide/svelte';
-  import { musica, agregar, agregarLista, quitar } from '../musica/musica.svelte';
+  import { musica, agregar, agregarLista, quitar, vaciar } from '../musica/musica.svelte';
+  import Confirmar from './Confirmar.svelte';
   import { idDeLista, videosDeLista, conTitulos, mezclar } from '../musica/lista';
   import { voz } from '../voz.svelte';
 
@@ -23,10 +24,12 @@
     finally { leyendo = ''; }
   }
   const enCola = $derived(musica.cola);
+  let vaciando = $state(false);
 </script>
 
 <div class="musica">
-  <h3>Música</h3>
+  <div class="cabecera"><h3>Música</h3>
+    {#if musica.actual || enCola.length}<button class="plano peligro chico" onclick={() => (vaciando = true)}>Quitar todas</button>{/if}</div>
   <form class="fila" onsubmit={enviar}>
     <input bind:value={url} required placeholder="Pegá un link de YouTube (video o lista)" aria-label="Pegá un link de YouTube" />
     <button type="submit" class="primario" disabled={!voz.salaId || voz.conectando || !!leyendo}>Agregar</button>
@@ -45,10 +48,16 @@
     </ul>
   {:else}<p class="tenue">No hay canciones en la cola.</p>{/if}
 </div>
+{#if vaciando}
+  <Confirmar texto="¿Quitar todas las canciones? Se corta la que suena y se vacía la cola para todos." accion="Quitar todas"
+    cancelar={() => (vaciando = false)} confirmar={() => { vaciando = false; void vaciar(); }} />
+{/if}
 
 <style>
   .musica { display: flex; flex-direction: column; gap: 12px; }
   h3 { margin: 0; }
+  .cabecera { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .chico { padding: 4px 8px; font-size: 13px; }
   .fila { display: flex; gap: 8px; align-items: center; }
   .fila input { flex: 1; }
   ul { display: flex; flex-direction: column; max-height: 40vh; overflow-y: auto; }

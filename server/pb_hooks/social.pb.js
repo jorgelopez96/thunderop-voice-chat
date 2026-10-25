@@ -39,6 +39,8 @@ routerAdd("POST", "/api/amigos/solicitar", (e) => {
   if (!otro) throw new NotFoundError("No hay nadie con ese usuario.");
   if (otro.id === yo) throw new BadRequestError("No te podés agregar a vos mismo.");
   if (otro.getBool("desactivada")) throw new BadRequestError("Esa cuenta está desactivada.");
+  const { bloqueo } = require(`${__hooks}/reglas.js`);
+  if (bloqueo(e.app, yo, otro.id)) throw new BadRequestError("No podés agregar a esta persona.");
 
   let amistad = null;
   e.app.runInTransaction((tx) => {
@@ -81,3 +83,35 @@ onRecordCreateRequest((e) => {
   }
   e.next();
 }, "privados");
+
+// Bloquear: borra la amistad (en cualquier estado) y lo anota en `bloqueados` del que bloquea.
+// Sin amistad ya no hay privados; `/api/amigos/solicitar` rechaza en los dos sentidos. `bloquear: false` desbloquea.
+routerAdd("POST", "/api/amigos/bloquear", (e) => {
+  const body = e.requestInfo().body;
+  const yo = e.auth.id;
+  if (typeof body.usuario !== "string" || typeof body.bloquear !== "boolean") throw new BadRequestError("Faltan datos: usuario y bloquear.");
+  if (body.usuario === yo) throw new BadRequestError("No te podés bloquear a vos mismo.");
+  e.app.runInTransaction((tx) => {
+    const u = tx.findRecordById("users", yo);
+    let lista = [];
+    try { lista = JSON.parse(u.getString("bloqueados") || "[]") || []; } catch { lista = []; }
+    lista = lista.filter((b) => b.id !== body.usuario);
+    if (body.bloquear) {
+      let otro;
+      try { otro = tx.findRecordById("users", body.usuario); } catch { throw new NotFoundError("No existe ese usuario."); }
+      lista.push({ id: otro.id, name: otro.getString("name"), username: otro.getString("username"), fecha: new DateTime().string() });
+      tx.findRecordsByFilter("amistades", "(de = {:yo} && para = {:otro}) || (de = {:otro} && para = {:yo})", "", 0, 0, { yo, otro: otro.id })
+        .forEach((a) => tx.delete(a));
+    }
+    u.set("bloqueados", lista);
+    tx.saveNoValidate(u);
+  });
+  return e.json(200, { ok: true });
+}, $apis.requireAuth("users"));
+
+routerAdd("GET", "/api/amigos/bloqueados", (e) => {
+  const u = e.app.findRecordById("users", e.auth.id);
+  let lista = [];
+  try { lista = JSON.parse(u.getString("bloqueados") || "[]") || []; } catch { lista = []; }
+  return e.json(200, lista);
+}, $apis.requireAuth("users"));

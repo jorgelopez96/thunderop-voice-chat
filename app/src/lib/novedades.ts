@@ -4,11 +4,14 @@ export type Novedad = { version: string; fecha: string; cambios: { tipo: 'nuevo'
 
 export const NOVEDADES: Novedad[] = [
   {
-    version: '0.7.0', fecha: '2026-10-25', cambios: [
-      { tipo: 'nuevo', texto: 'Diseño renovado en toda la app: logo nuevo, barra de título propia del color de la ventana, portada con «Ahora en voz» y panel de amigos, chat, sala de voz y dock rediseñados.' },
-      { tipo: 'nuevo', texto: 'Modo visual en Configuración → Apariencia: Básico (liviano, sin animaciones, ideal mientras jugás) o Moderno (sombras, brillos en tu color y animaciones cortas).' },
-      { tipo: 'nuevo', texto: 'La campanita ahora junta todas las notificaciones: menciones, mensajes privados y solicitudes de amistad. Se pueden borrar cuando ya las leíste.' },
-      { tipo: 'nuevo', texto: 'Las actualizaciones se bajan solas en segundo plano: la campanita te avisa y elegís cuándo reiniciar.' },
+    version: '0.7.1', fecha: '2026-10-25', cambios: [
+      { tipo: 'nuevo', texto: 'Chat de amigos renovado: su foto al lado del nombre, se cierra tocando afuera o con la ✕, y el menú ⋮ trae Silenciar, Bloquear y Eliminar amigo.' },
+      { tipo: 'nuevo', texto: 'Bloquear: deja de ser tu amigo, no puede escribirte ni mandarte solicitudes. Se desbloquea desde Configuración → Cuenta.' },
+      { tipo: 'nuevo', texto: 'El dueño puede ordenar las salas arrastrándolas y elegir si los chats van arriba o abajo de las salas de voz.' },
+      { tipo: 'nuevo', texto: 'Música: botón «Quitar todas». En el dock, un circulito verde, naranja o rojo según tu conexión.' },
+      { tipo: 'nuevo', texto: 'Perfil nuevo: foto con lápiz para cambiarla, apodo, descripción corta y tu mail oculto. Sin foto, se muestra tu inicial con un color.' },
+      { tipo: 'arreglo', texto: 'Al entrar a un chat te deja en el último mensaje, los GIFs ya no se salen del chat de la sala y la pantalla completa de una transmisión ocupa toda la pantalla.' },
+      { tipo: 'arreglo', texto: 'La tarjeta de quien transmite se acomoda al tamaño, el clip quedó alineado y la descripción del grupo pasó a la tarjeta de Inicio.' },
     ],
   },
 ];

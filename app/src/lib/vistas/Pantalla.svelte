@@ -3,6 +3,7 @@
   import { Volume2, VolumeX, Maximize, X, Eye } from '@lucide/svelte';
   import { voz, ver, pistaPantalla, volumenPantalla } from '../voz.svelte';
   import Video from './Video.svelte';
+  import { isTauri } from '@tauri-apps/api/core';
 
   // Una pantalla que se está mirando: video, quién transmite, espectadores, volumen, pantalla completa y cerrar.
   let { sid }: { sid: string } = $props();
@@ -13,6 +14,15 @@
   let marco = $state<HTMLElement>();
   let pct = $state(100);
   let ultimo = 100;
+  // La pantalla completa del navegador solo llena la ventana: se lleva también la ventana a pantalla completa
+  // (si no, queda una franja abajo, donde estaría la barra de tareas) y se devuelve al salir.
+  $effect(() => {
+    if (!isTauri()) return;
+    const cambio = () => import('@tauri-apps/api/window')
+      .then(({ getCurrentWindow }) => getCurrentWindow().setFullscreen(document.fullscreenElement === marco)).catch(() => {});
+    document.addEventListener('fullscreenchange', cambio);
+    return () => document.removeEventListener('fullscreenchange', cambio);
+  });
   function sonar(v: number) {
     if (v) ultimo = v;
     pct = v;

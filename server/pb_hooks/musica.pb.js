@@ -21,7 +21,7 @@ routerAdd("POST", "/api/rooms/{id}/musica", (e) => {
   const body = e.requestInfo().body;
   const accion = body.accion;
   const cancionId = typeof body.cancionId === "string" ? body.cancionId : "";
-  if (!["agregar", "agregarLista", "pausar", "reanudar", "saltar", "termino", "error", "quitar"].includes(accion)) {
+  if (!["agregar", "agregarLista", "pausar", "reanudar", "saltar", "termino", "error", "quitar", "vaciar"].includes(accion)) {
     throw new BadRequestError("Acción desconocida.");
   }
 
@@ -119,6 +119,15 @@ routerAdd("POST", "/api/rooms/{id}/musica", (e) => {
       if (pausaS != null) {
         rep.set("inicioMs", Math.round(ahora - pausaS * 1000));
         rep.set("pausaS", null);
+      }
+    } else if (accion === "vaciar") {
+      // Quitar todas: borra la cola y corta la que suena.
+      tx.findRecordsByFilter("canciones", "room = {:r} && estado = 'cola'", "", 0, 0, { r: room.id }).forEach((c) => tx.delete(c));
+      if (actual) {
+        const c = tx.findRecordById("canciones", actual);
+        c.set("estado", "hecha");
+        tx.save(c);
+        sonar(null);
       }
     } else if (cancionId && cancionId === actual) {
       // saltar, termino, error y quitar de la actual; el id viejo de otro cliente no hace nada

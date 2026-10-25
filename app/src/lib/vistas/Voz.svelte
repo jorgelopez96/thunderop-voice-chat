@@ -161,7 +161,10 @@
   /* Modo moderno: al entrar a la llamada las tarjetas aparecen escalonadas (tope de 6). */
   :global([data-modo='moderno']) .franja li { animation: entra 240ms var(--curva-salida) backwards; animation-delay: calc(var(--i) * 40ms); }
   @keyframes entra { from { opacity: 0; transform: scale(.92); } }
-  .franja .avatar { width: 80px; height: 80px; }
+  /* La foto se achica con la tarjeta (container query): nunca pisa los chips de arriba ni el nombre y el botón de abajo. */
+  .franja li { container-type: size; }
+  .franja .avatar { width: clamp(32px, calc(100cqh - 96px), 80px); height: clamp(32px, calc(100cqh - 96px), 80px); }
+  .franja li.transmite .etiqueta-nombre { max-width: calc(100% - 130px); }
   .etiqueta-nombre { position: absolute; left: 8px; bottom: 8px; max-width: calc(100% - 16px); display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px;
     border-radius: var(--radio-pildora); font-size: 13px; background: rgb(8 9 13 / .75); }
   .nombre { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -173,7 +176,7 @@
   :global([data-modo='moderno']) .punto-vivo { animation: latido 2s ease-in-out infinite; }
   @keyframes latido { 50% { opacity: .35; } }
   .espectadores { color: #fff; background: rgb(8 9 13 / .75); font-weight: 650; }
-  .ver { position: absolute; bottom: 8px; right: 8px; }
+  .ver { position: absolute; bottom: 8px; right: 8px; min-height: 28px; height: 28px; padding: 0 12px; font-size: 13px; }
   /* Cada pantalla mide al menos 520 px de ancho (se distingue lo que muestra); si no entran, bajan a otra fila. */
   .escenarios { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 520px), 1fr)); }
   .escenarios.varias { --alto: 46vh; }
@@ -196,5 +199,6 @@
   .menu:popover-open { display: flex; }
   .menu input { padding: 0; background: none; border: 0; }
   .menu hr { border: 0; border-top: 1px solid var(--borde); margin: 4px 0; width: 100%; }
-  .menu button { justify-content: flex-start; color: var(--texto); }
+  .menu button { justify-content: flex-start; }
+  .menu button:not(.peligro) { color: var(--texto); }
 </style>

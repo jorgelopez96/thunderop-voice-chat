@@ -116,7 +116,9 @@ button.primario:hover:not(:disabled), button[type='submit']:hover:not(:disabled)
 button.peligro { color: var(--peligro); background: none; border-color: color-mix(in srgb, var(--peligro) 50%, transparent); }
 button.peligro:hover:not(:disabled) { background: var(--peligro-suave); }
 button.plano { font-weight: 450; color: var(--tenue); background: none; border-color: transparent; padding: 4px 8px; min-height: 0; }
-button.plano:hover:not(:disabled) { color: var(--texto); background: var(--hover); }button.icono { color: var(--icono); background: none; border-color: transparent; padding: 0; min-width: 36px; min-height: 36px; border-radius: var(--radio-menu); }
+button.plano:hover:not(:disabled) { color: var(--texto); background: var(--hover); }
+button.plano.peligro, button.plano.peligro:hover:not(:disabled) { color: var(--peligro); }
+button.plano.peligro:hover:not(:disabled) { background: var(--peligro-suave); }button.icono { color: var(--icono); background: none; border-color: transparent; padding: 0; min-width: 36px; min-height: 36px; border-radius: var(--radio-menu); }
 button.icono:hover:not(:disabled) { color: var(--texto); background: var(--hover); }
 
 input, textarea, select {

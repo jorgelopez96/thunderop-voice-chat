@@ -1,6 +1,6 @@
 <script lang="ts">
   import { alTocar, estabaAbierto } from '../menu';
-  import { Mic, MicOff, Headphones, HeadphoneOff, ChevronDown, Monitor, AudioWaveform, Music, PhoneOff, Signal } from '@lucide/svelte';
+  import { Mic, MicOff, Headphones, HeadphoneOff, ChevronDown, Monitor, AudioWaveform, Music, PhoneOff } from '@lucide/svelte';
   import { voz, alternarMute, ensordecer, cambiarSupresion, salirVoz, transmitir, dejarDeTransmitir, cambiarCalidad, dispositivos, elegirEntrada, elegirSalida } from '../voz.svelte';
   import { grupos } from '../grupos.svelte';
   import { CALIDADES, leerPrefs, type Calidad } from '../prefs';
@@ -113,11 +113,12 @@
     posCalidad = { x: r.left, y: innerHeight - r.top + 8 };
     menuCalidad?.showPopover();
   }
+  const TEXTO_SENAL = { buena: 'Buena conexión', regular: 'Conexión inestable', mala: 'Mala conexión' };
 </script>
 
 <footer class="dock">
   <div class="estado">
-    <Signal size={18} strokeWidth={1.75} color="var(--ok)" />
+    <span class="senal {voz.conectando ? 'regular' : voz.senal}" title={TEXTO_SENAL[voz.conectando ? 'regular' : voz.senal]}></span>
     <span><strong>{voz.conectando ? 'Conectando…' : 'Conectado'}</strong><small>{voz.salaNombre}{g ? ` · ${g.name}` : ''}</small></span>
   </div>
   <div class="centro">
@@ -218,7 +219,15 @@
   @keyframes sube { from { opacity: 0; transform: translateY(100%); } }
   .estado { display: flex; align-items: center; gap: 10px; min-width: 0; }
   .estado span { display: flex; flex-direction: column; min-width: 0; line-height: 1.3; }
-  .estado strong { font-weight: 650; color: var(--ok); font-size: 13.5px; }
+  .estado strong { font-weight: 650; font-size: 13.5px; }
+  /* Circulito de señal: verde, naranja o rojo. En moderno respira con un neón suave (capa pintada, se anima su opacidad). */
+  .senal { position: relative; flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--c); margin: 0 2px; }
+  .buena { --c: var(--ok); }
+  .regular { --c: #F0A04B; }
+  .mala { --c: var(--peligro); }
+  :global([data-modo='moderno']) .senal::after { content: ''; position: absolute; inset: -3px; border-radius: 50%;
+    box-shadow: 0 0 10px 2px var(--c); opacity: .25; animation: respira 3s ease-in-out infinite; }
+  @keyframes respira { 50% { opacity: .9; } }
   .estado small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
   /* La isla: botones de 40 sobre una superficie elevada. */
   .centro { display: flex; align-items: center; gap: 4px; padding: 5px; background: var(--superficie); border: 1px solid var(--borde);
@@ -255,7 +264,8 @@
     background: var(--elevado); color: var(--texto); border: 1px solid var(--borde-fuerte); border-radius: var(--radio-menu); box-shadow: var(--sombra-2); }
   .menu:popover-open { display: flex; }
   .menu h3 { margin: 4px 8px 6px; }
-  .menu button { justify-content: flex-start; text-align: left; padding: 6px 8px; color: var(--texto); }
+  .menu button { justify-content: flex-start; text-align: left; padding: 6px 8px; }
+  .menu button:not(.peligro) { color: var(--texto); }
   .menu hr { border: 0; border-top: 1px solid var(--borde); margin: 6px 0; width: 100%; }
   .menu small { padding: 4px 8px; }
   dialog { flex-direction: column; gap: 12px; min-width: 300px; }

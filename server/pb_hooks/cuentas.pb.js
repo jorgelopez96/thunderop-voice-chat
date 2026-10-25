@@ -260,7 +260,9 @@ routerAdd("POST", "/api/descarga/validar", (e) => {
   if (!porCodigo && !porCuenta) return e.json(401, {});
   // El link del instalador solo sale en esta respuesta (la página no lo tiene en el HTML ni en el código).
   const base = ($os.getenv("APP_URL") || e.app.settings().meta.appURL).replace(/\/+$/, "");
-  return e.json(200, { url: `${base}/descargas/thunderop-setup.exe` });
+  // `version: "beta"` da el instalador de prueba; la actualización automática (latest.json) sigue con el estable.
+  const archivo = e.requestInfo().body.version === "beta" ? "thunderop-setup-beta.exe" : "thunderop-setup.exe";
+  return e.json(200, { url: `${base}/descargas/${archivo}` });
 });
 
 // Desactivar la cuenta: se ve desconectada, no recibe solicitudes de amistad y se cierran todas sus sesiones.

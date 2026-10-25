@@ -80,6 +80,8 @@ export const pausar = () => enviar('pausar');
 export const reanudar = () => enviar('reanudar');
 export const saltar = () => (musica.actual ? enviar('saltar', { cancionId: musica.actual.id }) : Promise.resolve(false));
 export const quitar = (id: string) => enviar('quitar', { cancionId: id });
+/** Quitar todas: vacía la cola y corta la que suena (para todos). */
+export const vaciar = () => enviar('vaciar');
 
 /** Volumen de la música (0 a 100), aparte del de las voces. Se guarda en prefs. */
 /** Ensordecido no escucha nada, tampoco la música (el volumen elegido se conserva para cuando vuelva). */

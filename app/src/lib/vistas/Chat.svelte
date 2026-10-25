@@ -25,8 +25,8 @@
   // `soloLectura`: oculta el compositor y muestra ese texto (privado con alguien que ya no es amigo).
   // `silencio`: id del chat para el menú de tres puntitos (silenciar avisos); `acciones`: más opciones en ese menú.
   // `miembros`: quiénes pueden estar en el chat, para los nombres de las reacciones y las menciones con @.
-  let { titulo, descripcion = '', abrir, enviar, borrar, puedeBorrar, soloLectura = '', alVer, silencio, acciones, miembros = [] }: {
-    titulo: string; descripcion?: string; abrir: () => ChatAbierto; enviar: (texto: string, archivo?: File, respondeA?: string) => Promise<unknown>;
+  let { titulo, foto: fotoChat, cerrar, abrir, enviar, borrar, puedeBorrar, soloLectura = '', alVer, silencio, acciones, miembros = [] }: {
+    titulo: string; foto?: string; cerrar?: () => void; abrir: () => ChatAbierto; enviar: (texto: string, archivo?: File, respondeA?: string) => Promise<unknown>;
     borrar: (id: string) => Promise<unknown>; puedeBorrar: (m: RecordModel) => boolean; soloLectura?: string;
     alVer?: (ultimo: RecordModel) => void; // se llama con el último mensaje visible (privados: marcar leído)
     silencio?: string; acciones?: Snippet<[() => void]>; miembros?: { id: string; name: string }[];
@@ -62,10 +62,13 @@
   let caja: HTMLTextAreaElement | undefined = $state();
   let ultimoId = '';
 
-  // Baja al final cuando llega un mensaje nuevo (no al cargar anteriores).
+  // Baja al final cuando llega un mensaje nuevo (no al cargar anteriores). Mientras estés abajo de todo, las fotos,
+  // GIFs y vistas previas que terminan de cargar después no te dejan a mitad de camino.
+  let pegado = true;
+  const bajar = () => lista && (lista.scrollTop = lista.scrollHeight);
   $effect(() => {
     const id = chat.mensajes.at(-1)?.id ?? '';
-    if (id !== ultimoId) { ultimoId = id; tick().then(() => lista && (lista.scrollTop = lista.scrollHeight)); }
+    if (id !== ultimoId) { ultimoId = id; pegado = true; tick().then(bajar); }
   });
 
   const autor = (m: RecordModel) => m.expand?.author as RecordModel | undefined;
@@ -165,7 +168,11 @@
     aBorrar = null;
     try { await borrar(m.id); } catch (e) { error = mensajeError(e); }
   }
-  function alScroll() { if (lista && lista.scrollTop === 0 && chat.hayMas) chat.cargarMas(); }
+  function alScroll() {
+    if (!lista) return;
+    pegado = lista.scrollHeight - lista.scrollTop - lista.clientHeight < 48;
+    if (lista.scrollTop === 0 && chat.hayMas) chat.cargarMas();
+  }
 
   // Menú de emojis: para escribir (destino '') o para reaccionar a un mensaje (destino = su id).
   let menuEmojis: HTMLElement | undefined = $state();
@@ -235,8 +242,8 @@
 </script>
 
 <section class="chat" aria-label="Chat {titulo}">
-  <h2 class="titulo"><span class="nombre-chat">{titulo}</span>{#if descripcion}<span class="descripcion">{descripcion}</span>{/if}{#if silencio}<MenuChat chat={silencio} {acciones} />{/if}</h2>
-  <div class="lista" bind:this={lista} onscroll={alScroll} data-testid="mensajes">
+  <h2 class="titulo">{#if fotoChat}<img class="avatar foto-chat" src={fotoChat} alt="" />{/if}<span class="nombre-chat">{titulo}</span>{#if silencio}<MenuChat chat={silencio} {acciones} />{/if}{#if cerrar}<button class="icono cerrar-chat" aria-label="Cerrar chat" title="Cerrar (Esc)" onclick={cerrar}><X size={18} strokeWidth={1.75} /></button>{/if}</h2>
+  <div class="lista" bind:this={lista} onscroll={alScroll} onloadcapture={() => pegado && bajar()} data-testid="mensajes">
     {#if chat.hayMas}<button class="plano" onclick={() => chat.cargarMas()}>Cargar anteriores</button>{/if}
     {#if chat.error}<p role="alert">{chat.error}</p>{/if}
     {#each chat.mensajes as m, i (m.id)}
@@ -334,12 +341,12 @@
 <style>
   .chat { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
   .titulo { flex: none; display: flex; align-items: center; gap: 12px; height: 52px; padding: 0 12px 0 16px; border-bottom: 1px solid var(--borde); font-size: 15px; font-weight: 650; letter-spacing: 0; }
-  .nombre-chat { flex: none; white-space: nowrap; }
-  .descripcion { flex: 1; min-width: 0; padding-left: 12px; border-left: 1px solid var(--borde-fuerte); font-size: 13px; font-weight: 450; color: var(--tenue);
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .foto-chat { width: 28px; height: 28px; margin-right: -2px; }
+  .cerrar-chat { margin-left: -6px; }
+  .nombre-chat { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .dia { display: flex; align-items: center; gap: 12px; margin: 20px 16px 4px; font-size: 12px; font-weight: 600; color: var(--apagado); }
   .dia::before, .dia::after { content: ''; flex: 1; border-top: 1px solid var(--borde); }
-  .lista { flex: 1; overflow-y: auto; padding: 8px 0; }
+  .lista { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 8px 0; }
   /* Separados entre sí; los seguidos del mismo autor van sin nombre ni foto. */
   .msg { position: relative; display: flex; gap: 12px; margin: 12px 8px 0; padding: 6px 12px; border-radius: var(--radio-menu); font-size: 14.5px; line-height: 1.5;
     transition: background-color var(--dur-rapida); }
@@ -394,8 +401,8 @@
   :global([data-modo='moderno']) .chip[aria-pressed='true'] .e { animation: reaccion 280ms var(--curva-resorte); }
   @keyframes reaccion { 0% { transform: scale(.6); } 60% { transform: scale(1.18); } }
   .emoji { padding: 4px; color: var(--icono); }
-  .gif { display: block; max-width: 280px; max-height: 240px; border-radius: var(--radio); margin-top: 2px; }
-  .gif-boton { font-size: 11px; font-weight: 700; letter-spacing: .04em; padding: 2px 6px; border: 1.5px solid var(--icono); border-radius: 4px; color: var(--icono); }
+  .gif { display: block; max-width: min(280px, 100%); max-height: 240px; border-radius: var(--radio); margin-top: 2px; }
+  .gif-boton { font-size: 12px; font-weight: 750; letter-spacing: .04em; color: var(--icono); }
   .panel-gifs { position: fixed; inset: auto; margin: 0; padding: 10px; background: var(--elevado); color: var(--texto); border: 1px solid var(--borde-fuerte); border-radius: var(--radio-menu); box-shadow: var(--sombra-2); }
   .emojis { position: fixed; inset: auto; margin: 0; padding: 6px; width: 296px; flex-wrap: wrap; gap: 2px;
     background: var(--elevado); color: var(--texto); border: 1px solid var(--borde-fuerte); border-radius: var(--radio-menu); box-shadow: var(--sombra-2); }
@@ -416,7 +423,7 @@
     border: 1px solid var(--borde); border-radius: var(--radio-tarjeta); transition: border-color var(--dur-rapida); }
   .composer:focus-within { border-color: var(--acento-borde); box-shadow: 0 0 0 3px var(--acento-suave); }
   :global([data-modo='moderno']) .composer:focus-within { box-shadow: 0 0 0 3px var(--acento-suave), var(--brillo); }
-  .composer > .emoji, .composer > .gif-boton, .composer > .clip { min-width: 34px; height: 34px; justify-content: center; }
+  .composer > .emoji, .composer > .gif-boton, .composer > .clip { min-width: 34px; height: 34px; padding: 0; justify-content: center; align-items: center; border-radius: var(--radio); }
   .composer { position: relative; }
   .sugerencias { position: absolute; left: 8px; bottom: calc(100% + 4px); z-index: 5; margin: 0; padding: 4px; list-style: none; min-width: 200px; background: var(--elevado); color: var(--texto); border: 1px solid var(--borde-fuerte); border-radius: var(--radio-menu); box-shadow: var(--sombra-2); }
   .sugerencias button { width: 100%; text-align: left; padding: 6px 8px; }
@@ -424,7 +431,7 @@
   .mencion { padding: 0 3px; border-radius: 4px; background: var(--acento-medio); color: var(--acento-texto); font-weight: 600; }
   .msg.mencionado { background: color-mix(in srgb, var(--acento) 7%, transparent); box-shadow: inset 2px 0 var(--acento); }
   .composer textarea { flex: 1; min-width: 0; resize: none; field-sizing: content; max-height: 120px; background: none; border: 0; padding: 6px 4px; }
-  .clip { cursor: pointer; flex-direction: row; color: var(--icono); padding: 4px; }
-  .clip:hover { color: var(--texto); }
+  .clip { cursor: pointer; flex-direction: row; gap: 0; color: var(--icono); }
+  .clip:hover { color: var(--texto); background: var(--hover); }
   .unirse { align-self: flex-start; margin-top: 4px; }
 </style>

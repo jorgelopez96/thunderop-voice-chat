@@ -118,6 +118,10 @@ export function salas(groupId: string) {
 export async function crearSala(groupId: string, name: string, kind: 'chat' | 'voz', position: number) {
   await pb.collection('rooms').create({ group: groupId, name, kind, position });
 }
+/** Guarda el orden nuevo (posición = índice); solo toca las salas que se movieron. */
+export async function ordenarSalas(salas: RecordModel[]) {
+  await Promise.all(salas.map((r, i) => (r.position === i ? null : pb.collection('rooms').update(r.id, { position: i }))));
+}
 export async function renombrarSala(roomId: string, name: string) {
   await pb.collection('rooms').update(roomId, { name });
 }

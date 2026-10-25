@@ -14,8 +14,8 @@ export type Participante = { id: string; nombre: string; hablando: boolean; sile
 
 /** `sinPermiso`: el dueño nos silenció (los permisos de LiveKit no dejan publicar el micrófono). `viendo`: sids de las pantallas que miramos
  *  (en el orden en que se eligieron). */
-export const voz = $state<{ salaId: string | null; salaNombre: string; grupoId: string | null; conectando: boolean; error: string; muteado: boolean; ensordecido: boolean; sinPermiso: boolean; supresion: boolean; participantes: Participante[]; transmitiendo: boolean; viendo: string[]; vistaPrevia: boolean; calidadEnVivo: Calidad | null }>({
-  salaId: null, salaNombre: '', grupoId: null, conectando: false, error: '', muteado: false, ensordecido: false, sinPermiso: false, supresion: leerPrefs().supresion, participantes: [], transmitiendo: false, viendo: [], vistaPrevia: leerPrefs().vistaPrevia, calidadEnVivo: null,
+export const voz = $state<{ salaId: string | null; salaNombre: string; grupoId: string | null; conectando: boolean; error: string; muteado: boolean; ensordecido: boolean; sinPermiso: boolean; supresion: boolean; participantes: Participante[]; senal: 'buena' | 'regular' | 'mala'; transmitiendo: boolean; viendo: string[]; vistaPrevia: boolean; calidadEnVivo: Calidad | null }>({
+  salaId: null, salaNombre: '', grupoId: null, conectando: false, error: '', muteado: false, ensordecido: false, sinPermiso: false, supresion: leerPrefs().supresion, participantes: [], senal: 'buena', transmitiendo: false, viendo: [], vistaPrevia: leerPrefs().vistaPrevia, calidadEnVivo: null,
 });
 
 // LiveKit se carga recién al entrar a la voz: el arranque de la app no lo paga. Mientras haya `room`, `lk` está cargado.
@@ -106,7 +106,7 @@ function limpiar() {
   room = null; ctx = null; tx++;
   if (typeof document !== 'undefined') for (const el of document.querySelectorAll('audio[data-voz]')) el.remove();
   if (voz.ensordecido && !muteadoAntes) voz.muteado = false; // la sordera no deja el mic apagado para la próxima sala
-  Object.assign(voz, { salaId: null, salaNombre: '', grupoId: null, conectando: false, ensordecido: false, sinPermiso: false, participantes: [], transmitiendo: false, viendo: [] });
+  Object.assign(voz, { salaId: null, salaNombre: '', grupoId: null, conectando: false, ensordecido: false, sinPermiso: false, participantes: [], senal: 'buena', transmitiendo: false, viendo: [] });
   void detenerAudioPantalla();
   if (nativo) { nativo = false; voz.calidadEnVivo = null; void detenerNativo(); }
   avisarSala(null);
@@ -144,6 +144,12 @@ export async function entrarVoz(roomId: string, salaNombre = '', grupoId: string
   // Al entrar alguien (o yo) sube; al irse baja.
   const pitido = (sube: boolean) => (sube ? tono(520, 780) : tono(700, 460));
   r.on(RoomEvent.Connected, () => pitido(true));
+  // Calidad de mi conexión (la mide LiveKit): excelente o buena = verde, pobre = naranja, perdida o reconectando = rojo.
+  r.on(RoomEvent.ConnectionQualityChanged, (q, part) => {
+    if (part.identity === r.localParticipant.identity) voz.senal = q === 'poor' ? 'regular' : q === 'lost' ? 'mala' : 'buena';
+  });
+  r.on(RoomEvent.Reconnecting, () => (voz.senal = 'mala'));
+  r.on(RoomEvent.Reconnected, () => (voz.senal = 'buena'));
   r.on(RoomEvent.ParticipantConnected, (x) => { if (!esPantallaNativa(x.identity)) pitido(true); });
   r.on(RoomEvent.ParticipantDisconnected, (x) => { if (!esPantallaNativa(x.identity)) pitido(false); });
   // Alguien empieza a transmitir: dos notas que suben. A quien transmite: una nota aguda cuando alguien se pone a mirarlo.

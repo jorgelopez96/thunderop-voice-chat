@@ -133,7 +133,8 @@
   [popover] { position: fixed; inset: auto; margin: 0; padding: 8px; min-width: 220px; flex-direction: column; gap: 2px;
     background: var(--elevado); color: var(--texto); border: 1px solid var(--borde-fuerte); border-radius: var(--radio-menu); box-shadow: var(--sombra-2); }
   [popover]:popover-open { display: flex; }
-  [popover] button { justify-content: flex-start; color: var(--texto); }
+  [popover] button { justify-content: flex-start; }
+  [popover] button:not(.peligro) { color: var(--texto); }
   [popover] hr { border: 0; border-top: 1px solid var(--borde); margin: 4px 0; width: 100%; }
   .vol { padding: 4px 8px; }
   .vol input { padding: 0; background: none; border: 0; }

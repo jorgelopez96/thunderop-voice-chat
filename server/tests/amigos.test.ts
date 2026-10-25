@@ -62,4 +62,21 @@ describe('amistades', () => {
     for (const p of [a, b]) expect(await p.collection('amistades').getFullList()).toEqual([]);
     await expect(a.collection('amistades').create({ de: id(a), para: id(b), estado: 'aceptada' })).rejects.toMatchObject({ status: 403 });
   });
+
+  it('bloquear borra la amistad, corta privados y solicitudes en los dos sentidos; desbloquear lo deshace', async () => {
+    const [a, b] = await Promise.all(['ana', 'beto'].map((n) => h.nuevoUsuario(n)));
+    const bloquear = (pb: PocketBase, usuario: string, bloquear: boolean) => pb.send('/api/amigos/bloquear', { method: 'POST', body: { usuario, bloquear } });
+    const { amistad } = await solicitar(a, { usuario: id(b) });
+    await b.collection('amistades').update(amistad.id, { estado: 'aceptada' });
+    await bloquear(a, id(b), true);
+    expect(await a.collection('amistades').getFullList()).toEqual([]);
+    expect(await a.send('/api/amigos/bloqueados', {})).toMatchObject([{ id: id(b), name: nombre(b) }]);
+    expect((await a.collection('users').getOne(id(a))).bloqueados).toBeUndefined(); // oculto
+    await expect(b.collection('privados').create({ author: id(b), para: id(a), text: 'hola' })).rejects.toMatchObject({ status: 403 });
+    await expect(solicitar(b, { usuario: id(a) })).rejects.toMatchObject({ status: 400, message: 'No podés agregar a esta persona.' });
+    await expect(solicitar(a, { usuario: id(b) })).rejects.toMatchObject({ status: 400 });
+    await bloquear(a, id(b), false);
+    expect(await a.send('/api/amigos/bloqueados', {})).toEqual([]);
+    await solicitar(b, { usuario: id(a) });
+  });
 });
