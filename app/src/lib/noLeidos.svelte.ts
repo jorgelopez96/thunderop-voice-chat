@@ -55,7 +55,7 @@ export function iniciarNoLeidos() {
     if (!noLeidos.grupoDe[s]) pb.collection('rooms').getOne(s, { fields: 'id,group' }).then((r) => (noLeidos.grupoDe[s] = r.group), () => {});
     const meNombran = menciona(e.record.text, pb.authStore.record?.name);
     if (!silenciadoHasta(s) || meNombran) pb.collection('messages').getOne(e.record.id, { expand: 'author,room' })
-      .then((m) => avisar(s, `${m.expand?.author?.name ?? 'Alguien'} ${meNombran ? 'te mencionó en' : '·'} ${m.expand?.room?.name ?? ''}`, resumen(m), meNombran), () => {});
+      .then((m) => avisar(s, `${m.expand?.author?.name ?? 'Alguien'} ${meNombran ? 'te mencionó en' : '·'} ${m.expand?.room?.name ?? ''}`, resumen(m), meNombran, meNombran), () => {});
     if (mirando.has(s)) return marcarLeida(s);
     noLeidos.salas[s] = (noLeidos.salas[s] ?? 0) + 1;
   });

@@ -25,8 +25,8 @@
   // `soloLectura`: oculta el compositor y muestra ese texto (privado con alguien que ya no es amigo).
   // `silencio`: id del chat para el menú de tres puntitos (silenciar avisos); `acciones`: más opciones en ese menú.
   // `miembros`: quiénes pueden estar en el chat, para los nombres de las reacciones y las menciones con @.
-  let { titulo, abrir, enviar, borrar, puedeBorrar, soloLectura = '', alVer, silencio, acciones, miembros = [] }: {
-    titulo: string; abrir: () => ChatAbierto; enviar: (texto: string, archivo?: File, respondeA?: string) => Promise<unknown>;
+  let { titulo, descripcion = '', abrir, enviar, borrar, puedeBorrar, soloLectura = '', alVer, silencio, acciones, miembros = [] }: {
+    titulo: string; descripcion?: string; abrir: () => ChatAbierto; enviar: (texto: string, archivo?: File, respondeA?: string) => Promise<unknown>;
     borrar: (id: string) => Promise<unknown>; puedeBorrar: (m: RecordModel) => boolean; soloLectura?: string;
     alVer?: (ultimo: RecordModel) => void; // se llama con el último mensaje visible (privados: marcar leído)
     silencio?: string; acciones?: Snippet<[() => void]>; miembros?: { id: string; name: string }[];
@@ -75,8 +75,24 @@
   /** Seguido: mismo autor que el anterior y menos de 5 min después (sin repetir nombre y foto). Una respuesta siempre muestra el nombre. */
   const seguido = (i: number) => {
     const m = chat.mensajes[i], p = chat.mensajes[i - 1];
-    return !!p && !m.respondeA && p.author === m.author && fecha(m) - fecha(p) < 5 * 60_000;
+    return !!p && !m.respondeA && p.author === m.author && fecha(m) - fecha(p) < 5 * 60_000 && !nuevoDia(i);
   };
+  const dia = (m: RecordModel) => new Date(fecha(m)).toDateString();
+  const nuevoDia = (i: number) => i === 0 || dia(chat.mensajes[i]) !== dia(chat.mensajes[i - 1]);
+  const nombreDia = (m: RecordModel) => {
+    const d = dia(m), hoy = new Date();
+    if (d === hoy.toDateString()) return 'Hoy';
+    if (d === new Date(hoy.getTime() - 86_400_000).toDateString()) return 'Ayer';
+    return new Date(fecha(m)).toLocaleDateString('es', { weekday: 'long', day: 'numeric', month: 'long' });
+  };
+  // Solo el mensaje que llega en vivo al final entra animado (modo moderno); el historial y "Cargar anteriores", no.
+  let ultimo = '';
+  let llegado = $state('');
+  $effect(() => {
+    const u = chat.mensajes.at(-1)?.id ?? '';
+    if (ultimo && u !== ultimo) llegado = u;
+    ultimo = u;
+  });
 
   // Responder: el mensaje elegido queda marcado y el compositor muestra a quién le contestás.
   let respondiendo = $state<RecordModel | null>(null);
@@ -219,7 +235,7 @@
 </script>
 
 <section class="chat" aria-label="Chat {titulo}">
-  <h2 class="titulo">{titulo}{#if silencio}<MenuChat chat={silencio} {acciones} />{/if}</h2>
+  <h2 class="titulo"><span class="nombre-chat">{titulo}</span>{#if descripcion}<span class="descripcion">{descripcion}</span>{/if}{#if silencio}<MenuChat chat={silencio} {acciones} />{/if}</h2>
   <div class="lista" bind:this={lista} onscroll={alScroll} data-testid="mensajes">
     {#if chat.hayMas}<button class="plano" onclick={() => chat.cargarMas()}>Cargar anteriores</button>{/if}
     {#if chat.error}<p role="alert">{chat.error}</p>{/if}
@@ -227,18 +243,18 @@
       {@const a = autor(m)}
       {@const sigue = seguido(i)}
       {@const cita = m.expand?.respondeA as RecordModel | undefined}
-      <article class="msg" class:sigue class:elegido={respondiendo?.id === m.id} class:resaltado={resaltado === m.id} class:mencionado={m.author !== sesion.usuario?.id && menciona(m.text, sesion.usuario?.name)} id="msg-{m.id}" data-testid="mensaje">
-        {#if sigue}<small class="hora-lado">{hora(m)}</small>
+      {#if nuevoDia(i)}<div class="dia" role="separator"><span>{nombreDia(m)}</span></div>{/if}
+      <article class="msg" class:llegado={m.id === llegado} class:sigue class:elegido={respondiendo?.id === m.id} class:resaltado={resaltado === m.id} class:mencionado={m.author !== sesion.usuario?.id && menciona(m.text, sesion.usuario?.name)} id="msg-{m.id}" data-testid="mensaje">
+        {#if sigue}<time class="hora-lado">{hora(m)}</time>
         {:else}<img class="avatar" src={foto(a)} alt="" />{/if}
         <div class="cuerpo">
           {#if !sigue}<header>
             <strong style="color:{a?.color || 'var(--tenue)'}">{a ? a.name : 'Ex miembro'}</strong><Insignia usuario={a} />
-            <small>{hora(m)}</small>
+            <time>{hora(m)}</time>
           </header>{/if}
           {#if m.respondeA}
             <button class="plano cita" onclick={() => cita && irA(cita.id)} disabled={!cita}>
-              <Reply size={12} strokeWidth={1.75} />
-              {#if cita}<strong>{(cita.expand?.author as RecordModel | undefined)?.name ?? 'Ex miembro'}</strong> <span>{resumen(cita)}</span>
+              {#if cita}<img class="avatar mini" alt="" src={foto(cita.expand?.author as RecordModel | undefined)} /><strong>{(cita.expand?.author as RecordModel | undefined)?.name ?? 'Ex miembro'}</strong> <span>{resumen(cita)}</span>
               {:else}<span>Mensaje borrado</span>{/if}
             </button>
           {/if}
@@ -258,7 +274,7 @@
           {#if reacciones(m).length}<div class="reacciones">
             {#each reacciones(m) as [emoji, quienes] (emoji)}
               <button class="plano chip" aria-pressed={quienes.includes(sesion.usuario?.id ?? '')} onclick={() => reaccionar(m.id, emoji)}
-                title="{quienes.map(nombreDe).join(', ')} reaccion{quienes.length === 1 ? 'ó' : 'aron'} con {emoji}">{emoji} {quienes.length}</button>
+                title="{quienes.map(nombreDe).join(', ')} reaccion{quienes.length === 1 ? 'ó' : 'aron'} con {emoji}"><span class="e">{emoji}</span> <span class="num">{quienes.length}</span></button>
             {/each}
           </div>{/if}
         </div>
@@ -317,30 +333,48 @@
 
 <style>
   .chat { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
-  .titulo { font-size: 15px; padding: 12px 16px; border-bottom: 1px solid var(--hover); display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .titulo { flex: none; display: flex; align-items: center; gap: 12px; height: 52px; padding: 0 12px 0 16px; border-bottom: 1px solid var(--borde); font-size: 15px; font-weight: 650; letter-spacing: 0; }
+  .nombre-chat { flex: none; white-space: nowrap; }
+  .descripcion { flex: 1; min-width: 0; padding-left: 12px; border-left: 1px solid var(--borde-fuerte); font-size: 13px; font-weight: 450; color: var(--tenue);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .dia { display: flex; align-items: center; gap: 12px; margin: 20px 16px 4px; font-size: 12px; font-weight: 600; color: var(--apagado); }
+  .dia::before, .dia::after { content: ''; flex: 1; border-top: 1px solid var(--borde); }
   .lista { flex: 1; overflow-y: auto; padding: 8px 0; }
   /* Separados entre sí; los seguidos del mismo autor van sin nombre ni foto. */
-  .msg { position: relative; display: flex; gap: 12px; margin: 12px 12px 0; padding: 8px 12px; border-radius: var(--radio-menu); transition: background-color .12s; }
+  .msg { position: relative; display: flex; gap: 12px; margin: 12px 8px 0; padding: 6px 12px; border-radius: var(--radio-menu); font-size: 14.5px; line-height: 1.5;
+    transition: background-color var(--dur-rapida); }
+  .msg > .avatar { width: 40px; height: 40px; }
+  :global([data-modo='moderno']) .msg.llegado { animation: llega 200ms var(--curva-salida); }
+  @keyframes llega { from { opacity: 0; transform: translateY(6px); } }
   .msg.sigue { margin-top: 4px; }
-  .msg:hover { background: var(--hover); }
+  .msg:hover { background: rgb(255 255 255 / .025); }
   .msg.elegido, .msg.resaltado { background: var(--acento-suave); box-shadow: inset 2px 0 var(--acento); }
-  .hora-lado { width: 32px; flex: none; font-size: 11px; text-align: center; padding-top: 3px; opacity: 0; }
+  .hora-lado { width: 40px; flex: none; font-size: 11px; color: var(--apagado); text-align: center; padding-top: 4px; opacity: 0; }
   .msg:hover .hora-lado { opacity: 1; }
   .cuerpo { min-width: 0; flex: 1; }
   header { display: flex; align-items: baseline; gap: 8px; margin-bottom: 2px; }
-  header small { font-size: 11px; }
+  header strong { font-weight: 650; }
+  header time { font-size: 11.5px; color: var(--apagado); }
   .texto { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; }
-  .texto a { color: var(--acento); text-decoration: underline; }
-  .editado { font-size: 11px; color: var(--apagado); }
+  .texto a { color: var(--acento-texto); text-decoration: none; }
+  .texto a:hover { text-decoration: underline; }
+  .editado { font-size: 11.5px; color: var(--apagado); }
   .edicion { width: 100%; resize: vertical; }
   .ayuda { font-size: 11px; color: var(--tenue); }
-  .cita { display: flex; gap: 6px; align-items: center; max-width: 100%; margin-bottom: 4px; padding: 2px 8px; font-size: 12px; color: var(--tenue);
-    border-left: 2px solid var(--acento); border-radius: 0 var(--radio) var(--radio) 0; background: var(--hover); justify-content: flex-start; }
+  /* Respuesta: conector curvo que baja desde la cita hacia el avatar del mensaje. */
+  .cita { position: relative; display: flex; gap: 6px; align-items: center; max-width: 100%; margin: 0 0 4px; padding: 0; min-height: 20px;
+    font-size: 12.5px; color: var(--tenue); justify-content: flex-start; }
+  .cita:hover:not(:disabled) { background: none; color: var(--texto); }
+  .cita::before { content: ''; position: absolute; left: -34px; top: 50%; width: 26px; height: 14px; border: 2px solid var(--borde-fuerte);
+    border-right: 0; border-bottom: 0; border-top-left-radius: 8px; }
+  .msg.sigue .cita::before { display: none; }
+  .avatar.mini { width: 16px; height: 16px; }
   .cita span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .cita strong { font-weight: 600; color: var(--texto); flex: none; }
-  .herramientas { position: absolute; top: -12px; right: 8px; display: none; gap: 2px; padding: 2px; background: var(--elevado); border: 1px solid var(--borde); border-radius: var(--radio); }
+  .herramientas { position: absolute; top: -14px; right: 12px; display: none; gap: 2px; padding: 2px; background: var(--elevado); border: 1px solid var(--borde-fuerte);
+    border-radius: var(--radio-menu); box-shadow: var(--sombra-2); }
   .msg:hover .herramientas, .herramientas:focus-within { display: flex; }
-  .herramientas .icono { padding: 4px; }
+  .herramientas .icono { width: 30px; min-width: 30px; height: 28px; min-height: 28px; border-radius: var(--radio); }
   .herramientas .borrar:hover { color: var(--peligro); }
   .respondiendo { display: flex; align-items: center; gap: 8px; margin: 8px 16px 0; padding: 6px 8px; font-size: 13px; color: var(--tenue);
     border-left: 2px solid var(--acento); background: var(--acento-suave); border-radius: 0 var(--radio) var(--radio) 0; }
@@ -353,13 +387,18 @@
   .miniatura { width: 64px; height: 64px; object-fit: cover; border-radius: var(--radio); }
   .ver { padding: 0; display: block; cursor: zoom-in; }
   .reacciones { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
-  .chip { min-height: 26px; padding: 2px 8px; font-size: 13px; border-color: var(--borde); }
+  .chip { min-height: 26px; height: 26px; padding: 0 8px; gap: 4px; font-size: 14px; background: var(--superficie); border: 1px solid var(--borde); border-radius: var(--radio-pildora); color: var(--tenue); }
+  .chip .num { font-size: 12px; font-weight: 650; }
+  .chip[aria-pressed='true'] { background: var(--acento-suave); border-color: var(--acento-borde); color: var(--acento-texto); }
+  .chip .e { display: inline-block; }
+  :global([data-modo='moderno']) .chip[aria-pressed='true'] .e { animation: reaccion 280ms var(--curva-resorte); }
+  @keyframes reaccion { 0% { transform: scale(.6); } 60% { transform: scale(1.18); } }
   .emoji { padding: 4px; color: var(--icono); }
   .gif { display: block; max-width: 280px; max-height: 240px; border-radius: var(--radio); margin-top: 2px; }
   .gif-boton { font-size: 11px; font-weight: 700; letter-spacing: .04em; padding: 2px 6px; border: 1.5px solid var(--icono); border-radius: 4px; color: var(--icono); }
-  .panel-gifs { position: fixed; inset: auto; margin: 0; padding: 10px; background: var(--elevado); color: var(--texto); border: 1px solid var(--borde); border-radius: var(--radio-menu); }
+  .panel-gifs { position: fixed; inset: auto; margin: 0; padding: 10px; background: var(--elevado); color: var(--texto); border: 1px solid var(--borde-fuerte); border-radius: var(--radio-menu); box-shadow: var(--sombra-2); }
   .emojis { position: fixed; inset: auto; margin: 0; padding: 6px; width: 296px; flex-wrap: wrap; gap: 2px;
-    background: var(--panel); border: 1px solid var(--borde); border-radius: 10px; }
+    background: var(--elevado); color: var(--texto); border: 1px solid var(--borde-fuerte); border-radius: var(--radio-menu); box-shadow: var(--sombra-2); }
   .emojis:popover-open { display: flex; }
   .emojis button { font-size: 20px; padding: 2px; min-height: 0; width: 34px; height: 34px; }
   .visor { max-width: none; width: 70vw; height: 70vh; padding: 0; overflow: hidden; background: var(--hondo); }
@@ -368,18 +407,22 @@
   .acciones .boton { display: inline-flex; align-items: center; padding: 6px 14px; color: var(--tenue); text-decoration: none; border-radius: var(--radio); }
   .acciones .boton:hover { color: var(--texto); background: var(--hover); }
   .marco { flex: 1; min-height: 0; overflow: hidden; display: flex; align-items: center; justify-content: center; }
-  .marco img { max-width: 100%; max-height: 100%; object-fit: contain; transition: transform .08s; user-select: none; }
+  .marco img { max-width: 100%; max-height: 100%; object-fit: contain; user-select: none; }
+  :global([data-modo='moderno']) .marco img { transition: transform .08s; }
   .marco.movible { cursor: grab; }
   .marco.agarrado { cursor: grabbing; }
   .marco.agarrado img { transition: none; }
-  .composer { display: flex; align-items: center; gap: 8px; margin: 8px 16px 16px; background: var(--panel); border: 1px solid var(--borde); border-radius: 8px; padding: 6px 8px; }
+  .composer { display: flex; align-items: center; gap: 4px; min-height: 46px; margin: 8px 16px 16px; padding: 5px 6px; background: var(--superficie);
+    border: 1px solid var(--borde); border-radius: var(--radio-tarjeta); transition: border-color var(--dur-rapida); }
+  .composer:focus-within { border-color: var(--acento-borde); box-shadow: 0 0 0 3px var(--acento-suave); }
+  :global([data-modo='moderno']) .composer:focus-within { box-shadow: 0 0 0 3px var(--acento-suave), var(--brillo); }
+  .composer > .emoji, .composer > .gif-boton, .composer > .clip { min-width: 34px; height: 34px; justify-content: center; }
   .composer { position: relative; }
-  .sugerencias { position: absolute; left: 8px; bottom: calc(100% + 4px); z-index: 5; margin: 0; padding: 4px; list-style: none; min-width: 200px; background: var(--panel); border: 1px solid var(--borde); border-radius: var(--radio-menu); }
+  .sugerencias { position: absolute; left: 8px; bottom: calc(100% + 4px); z-index: 5; margin: 0; padding: 4px; list-style: none; min-width: 200px; background: var(--elevado); color: var(--texto); border: 1px solid var(--borde-fuerte); border-radius: var(--radio-menu); box-shadow: var(--sombra-2); }
   .sugerencias button { width: 100%; text-align: left; padding: 6px 8px; }
   .sugerencias button[aria-selected='true'] { background: var(--acento-suave); }
-  .mencion { padding: 0 2px; border-radius: 4px; background: var(--acento-suave); color: var(--acento-texto, var(--acento)); font-weight: 600; }
-  .mencion.yo { background: var(--acento); color: #fff; }
-  .msg.mencionado { box-shadow: inset 2px 0 var(--acento); }
+  .mencion { padding: 0 3px; border-radius: 4px; background: var(--acento-medio); color: var(--acento-texto); font-weight: 600; }
+  .msg.mencionado { background: color-mix(in srgb, var(--acento) 7%, transparent); box-shadow: inset 2px 0 var(--acento); }
   .composer textarea { flex: 1; min-width: 0; resize: none; field-sizing: content; max-height: 120px; background: none; border: 0; padding: 6px 4px; }
   .clip { cursor: pointer; flex-direction: row; color: var(--icono); padding: 4px; }
   .clip:hover { color: var(--texto); }

@@ -1,7 +1,8 @@
 <script lang="ts">
+  import { lleno } from '../rango';
   import Insignia from './Insignia.svelte';
   import type { RecordModel } from 'pocketbase';
-  import { MicOff, Users, Link, ChevronRight, MessageSquare, User } from '@lucide/svelte';
+  import { MicOff, Users, Link, ChevronRight, MessageSquare, Eye, Volume2 } from '@lucide/svelte';
   import { foto } from '../foto';
   import { mensajeError, sesion } from '../sesion.svelte';
   import { crearInvitacion, grupos } from '../grupos.svelte';
@@ -69,14 +70,15 @@
 </script>
 
 {#snippet espectadores(n: number)}
-  <span class="espectadores" title={`${n} ${n === 1 ? 'persona mirando' : 'personas mirando'}`}><User size={12} strokeWidth={2.5} />{n}</span>
+  <span class="espectadores num" title={`${n} ${n === 1 ? 'persona mirando' : 'personas mirando'}`}><Eye size={14} strokeWidth={1.75} />{n}</span>
 {/snippet}
 
 <section class="voz" class:conChat={chatAbierto}>
   <div class="centro">
     <header>
+      <Volume2 size={18} strokeWidth={1.75} color="var(--icono)" />
       <h2>{sala}</h2>
-      <span class="tenue">{grupo.name}</span>
+      <span class="en-voz num">{voz.participantes.length} en voz</span>
       <button class="plano" onclick={verParticipantes}><Users size={16} strokeWidth={1.75} /> Participantes · {miembros.length}</button>
       <button class="icono" onclick={copiarLink} aria-label="Copiar link de invitación" title="Copiar link de invitación"><Link size={16} strokeWidth={1.75} /></button>
       {#if !chatAbierto}<button class="icono" onclick={() => plegarChat(true)} aria-label="Abrir chat de la sala" title="Chat de la sala"><MessageSquare size={16} strokeWidth={1.75} /></button>{/if}
@@ -92,11 +94,11 @@
       </div>
     {/if}
     <ul class="franja">
-      {#each voz.participantes as p (p.id)}
+      {#each voz.participantes as p, i (p.id)}
         {@const m = miembro(p.id)}
-        <li class:hablando={p.hablando} class:transmite={p.transmite} style="background:{fondo(m?.color, p.nombre)}" oncontextmenu={(e) => abrirMenu(e, p)}>
+        <li style:--i={Math.min(i, 5)} class:hablando={p.hablando} class:transmite={p.transmite} style="background:{fondo(m?.color, p.nombre)}" oncontextmenu={(e) => abrirMenu(e, p)}>
           <img class="avatar" alt="" src={foto(m, '256x256')} />
-          {#if p.transmite}<span class="vivo">EN VIVO{@render espectadores(p.espectadores)}</span>
+          {#if p.transmite}<span class="chips-vivo"><span class="vivo"><span class="punto-vivo"></span>EN VIVO</span>{@render espectadores(p.espectadores)}</span>
             {#if !p.local && p.pantalla}{@const sid = p.pantalla}{@const viendo = voz.viendo.includes(sid)}
               <button class="primario ver" aria-pressed={viendo} onclick={() => ver(sid, !viendo)}>{viendo ? 'Dejar de ver' : 'Ver'}</button>{/if}{/if}
           <span class="etiqueta-nombre">
@@ -130,7 +132,7 @@
   {#if elegido}
     {@const p = elegido}
     <label>Volumen · {Math.round((vols[p.id] ?? 1) * 100)} %
-      <input type="range" min="0" max="200" step="5" value={Math.round((vols[p.id] ?? 1) * 100)}
+      <input type="range" min="0" max="200" step="5" value={Math.round((vols[p.id] ?? 1) * 100)} style={lleno((vols[p.id] ?? 1) * 100, 0, 200)}
         aria-label={`Volumen de ${p.nombre}`} oninput={(e) => cambiar(p.id, +e.currentTarget.value)} />
     </label>
     {#if soyDueno}<hr /><button class="plano peligro" onclick={() => alternar(p.id)}>{silenciado(p.id) ? 'Quitar silencio' : 'Silenciar'}</button>
@@ -144,24 +146,34 @@
 
 <style>
   .voz { display: grid; grid-template-columns: 1fr; min-height: 0; min-width: 0; }
-  .voz.conChat { grid-template-columns: 1fr 320px; }
-  .centro { padding: 16px 24px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
-  header { display: flex; align-items: center; gap: 8px; }
-  h2 { font-size: 20px; font-weight: 600; }
-  .tenue { color: var(--tenue); margin-right: auto; }
+  .voz.conChat { grid-template-columns: minmax(0, 1fr) 296px; }
+  .centro { padding: 0 16px 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+  header { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 8px; height: 52px; flex: none; margin: 0 -16px; padding: 0 12px 0 16px;
+    background: var(--fondo); border-bottom: 1px solid var(--borde); }
+  h2 { font-size: 15px; font-weight: 650; letter-spacing: 0; }
+  .en-voz { margin-right: auto; padding: 2px 8px; border-radius: var(--radio-pildora); font-size: 12px; font-weight: 600; color: var(--ok); background: var(--ok-suave); }
   /* Una tarjeta por persona (como Discord); la pantalla que mirás va arriba, a todo el ancho. */
   .franja { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 8px; }
-  .franja li { position: relative; aspect-ratio: 16 / 9; display: grid; place-items: center; border: 2px solid transparent; border-radius: var(--radio-tarjeta); overflow: hidden; transition: border-color .12s; }
-  .franja li.hablando { border-color: var(--ok); }
-  .franja li.transmite:not(.hablando) { border-color: color-mix(in srgb, var(--ok) 40%, transparent); }
+  .franja li { position: relative; aspect-ratio: 16 / 9; display: grid; place-items: center; border: 2px solid var(--borde); border-radius: var(--radio-grande);
+    overflow: hidden; transition: border-color var(--dur-media); }
+  .franja li.hablando { border-color: color-mix(in srgb, var(--ok) 70%, transparent); }
+  .franja li.transmite:not(.hablando) { border-color: color-mix(in srgb, var(--cian) 45%, transparent); }
+  /* Modo moderno: al entrar a la llamada las tarjetas aparecen escalonadas (tope de 6). */
+  :global([data-modo='moderno']) .franja li { animation: entra 240ms var(--curva-salida) backwards; animation-delay: calc(var(--i) * 40ms); }
+  @keyframes entra { from { opacity: 0; transform: scale(.92); } }
   .franja .avatar { width: 80px; height: 80px; }
-  .etiqueta-nombre { position: absolute; left: 8px; bottom: 8px; max-width: calc(100% - 16px); display: flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: var(--radio); background: rgb(0 0 0 / .55); }
-  .nombre { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .mic { color: var(--peligro); display: grid; }
-  .vivo { position: absolute; top: 8px; left: 8px; padding: 2px 8px; border-radius: var(--radio); font-size: 11px; font-weight: 600; color: #fff; background: color-mix(in srgb, var(--ok) 70%, #000); }
+  .etiqueta-nombre { position: absolute; left: 8px; bottom: 8px; max-width: calc(100% - 16px); display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px;
+    border-radius: var(--radio-pildora); font-size: 13px; background: rgb(8 9 13 / .75); }
+  .nombre { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mic { color: var(--tenue); display: grid; }
+  .chips-vivo { position: absolute; top: 8px; left: 8px; display: flex; gap: 6px; }
+  .vivo, .espectadores { display: inline-flex; align-items: center; gap: 5px; height: 24px; padding: 0 8px; border-radius: var(--radio); font-size: 11.5px; font-weight: 750; }
+  .vivo { color: #07210F; background: var(--ok); letter-spacing: .03em; }
+  .punto-vivo { width: 6px; height: 6px; border-radius: 50%; background: #07210F; }
+  :global([data-modo='moderno']) .punto-vivo { animation: latido 2s ease-in-out infinite; }
+  @keyframes latido { 50% { opacity: .35; } }
+  .espectadores { color: #fff; background: rgb(8 9 13 / .75); font-weight: 650; }
   .ver { position: absolute; bottom: 8px; right: 8px; }
-  .espectadores { display: inline-flex; align-items: center; gap: 2px; margin-left: 6px; color: var(--peligro); font-weight: 600; }
-  .vivo .espectadores { color: #fff; }
   /* Cada pantalla mide al menos 520 px de ancho (se distingue lo que muestra); si no entran, bajan a otra fila. */
   .escenarios { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 520px), 1fr)); }
   .escenarios.varias { --alto: 46vh; }
@@ -172,12 +184,17 @@
   .propia :global(.previa) { width: 240px; max-width: 100%; aspect-ratio: 16 / 9; background: var(--hondo); border-radius: var(--radio); }
   .chatSala { position: relative; display: flex; flex-direction: column; min-height: 0; border-left: 1px solid var(--borde); background: var(--fondo); }
   .chatSala :global(.chat) { flex: 1; }
-  .chatSala :global(.titulo) { padding-right: 44px; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--tenue); }
+  .chatSala :global(.titulo) { padding-right: 52px; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--tenue); }
+  /* Chat compacto: avatar de 28 y texto de 13,5. */
+  .chatSala :global(.msg) { font-size: 13.5px; gap: 10px; padding: 4px 8px; margin-inline: 4px; }
+  .chatSala :global(.msg > .avatar) { width: 28px; height: 28px; }
+  .chatSala :global(.hora-lado) { width: 28px; }
+  .chatSala :global(.composer) { margin: 8px; }
   .plegar { position: absolute; top: 8px; right: 8px; z-index: 1; }
   .menu { position: fixed; inset: auto; margin: 0; padding: 8px; min-width: 220px; flex-direction: column; gap: 4px;
-    background: var(--elevado); color: var(--texto); border: 1px solid var(--borde); border-radius: var(--radio-menu); }
+    background: var(--elevado); color: var(--texto); border: 1px solid var(--borde-fuerte); border-radius: var(--radio-menu); box-shadow: var(--sombra-2); }
   .menu:popover-open { display: flex; }
   .menu input { padding: 0; background: none; border: 0; }
   .menu hr { border: 0; border-top: 1px solid var(--borde); margin: 4px 0; width: 100%; }
-  .menu button { justify-content: flex-start; }
+  .menu button { justify-content: flex-start; color: var(--texto); }
 </style>

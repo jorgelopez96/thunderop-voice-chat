@@ -26,7 +26,7 @@ export async function crearCuenta(page: Page, nombre: string) {
   await page.getByLabel('Usuario o email').fill(email);
   await page.getByLabel('Contraseña').fill('clave-segura-123');
   await page.getByRole('button', { name: 'Entrar', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Mis grupos' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /^¡Hola/ })).toBeVisible();
 }
 
 /** Crea el grupo desde la portada y deja el link de invitación a la vista; lo devuelve. */

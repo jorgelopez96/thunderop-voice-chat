@@ -8,11 +8,13 @@
   import Chat from './Chat.svelte';
   import Confirmar from './Confirmar.svelte';
   import { UserPlus } from '@lucide/svelte';
-  import { enLinea } from '../presencia.svelte';
+  import { estado } from '../presencia.svelte';
 
-  // `enVoz(id)`: nombre del grupo donde está en voz ese amigo (la portada lo sabe por la presencia).
-  let { enVoz = () => undefined }: { enVoz?: (id: string) => string | undefined } = $props();
+  // Panel fijo a la derecha de la portada. Solo se muestra el estado elegido, nunca en qué grupo o sala está.
   let agregando = $state(false);
+  const TEXTOS = { disponible: 'Disponible', ausente: 'Ausente', ocupado: 'Ocupado', desconectado: 'Desconectado' };
+  const enLineaYa = $derived(amigos.lista.filter((a) => estado(a.usuario) !== 'desconectado'));
+  const desconectados = $derived(amigos.lista.filter((a) => estado(a.usuario) === 'desconectado'));
 
   let usuario = $state('');
   let error = $state('');
@@ -32,31 +34,38 @@
   function abrir(u: RecordModel) { abierto = u; queueMicrotask(() => d?.showModal()); }
 </script>
 
-<section>
-  <div class="titulo"><h3>Amigos</h3>
-    {#if amigos.lista.length}<button onclick={() => (agregando = !agregando)}><UserPlus size={16} strokeWidth={1.75} /> Agregar amigo</button>{/if}
+{#snippet lista(titulo: string, gente: typeof amigos.lista)}
+  {#if gente.length}
+    <h3>{titulo} — {gente.length}</h3>
+    <ul>
+      {#each gente as a (a.amistad)}
+        {@const e = estado(a.usuario)}
+        <li class:apagado={e === 'desconectado'}><button class="plano amigo" onclick={() => abrir(a.usuario)}>
+          <Avatar usuario={a.usuario} tam={32} />
+          <span class="texto"><span class="nombre">{a.usuario.name}<Insignia usuario={a.usuario} /></span><small>{TEXTOS[e]}</small></span>
+          {#if noLeidos[a.usuario.id]}<span class="contador num" aria-label="{noLeidos[a.usuario.id]} sin leer">{noLeidos[a.usuario.id]}</span>{/if}
+        </button></li>
+      {/each}
+    </ul>
+  {/if}
+{/snippet}
+
+<aside class="amigos">
+  <div class="cabecera"><h2>Amigos</h2>
+    <button onclick={() => (agregando = !agregando)}><UserPlus size={16} strokeWidth={1.75} /> Agregar amigo</button>
   </div>
-  <ul>
-    {#each amigos.lista as a (a.amistad)}
-      {@const grupo = enVoz(a.usuario.id)}
-      <li class:apagado={!enLinea(a.usuario)}><button class="plano amigo" onclick={() => abrir(a.usuario)}>
-        <Avatar usuario={a.usuario} tam={28} />
-        <span class="nombre">{a.usuario.name}<Insignia usuario={a.usuario} /></span>
-        {#if noLeidos[a.usuario.id]}<span class="contador" aria-label="{noLeidos[a.usuario.id]} sin leer">{noLeidos[a.usuario.id]}</span>
-        {:else if grupo}<small class="verde">En voz · {grupo}</small>{/if}
-      </button></li>
-    {:else}
-      {#if amigos.cargado}<li class="vacio"><p>Todavía no tenés amigos. Agregalos por su usuario para hablarles por privado y ver cuándo están conectados.</p>
-        {#if !agregando}<button onclick={() => (agregando = true)}><UserPlus size={16} strokeWidth={1.75} /> Agregar amigo</button>{/if}</li>{/if}
-    {/each}
-  </ul>
+  <div class="cuerpo">
   {#if agregando}<form class="fila" onsubmit={agregar}>
     <input bind:value={usuario} required maxlength="20" placeholder="Usuario exacto" aria-label="Usuario del amigo" />
-    <button type="submit">Agregar amigo</button>
+    <button type="submit">Agregar</button>
   </form>{/if}
   {#if error}<p role="alert">{error}</p>{/if}
   {#if ok}<p role="status">{ok}</p>{/if}
-</section>
+  {@render lista('En línea', enLineaYa)}
+  {@render lista('Desconectados', desconectados)}
+  {#if amigos.cargado && !amigos.lista.length}<p class="vacio">Todavía no tenés amigos. Agregalos por su usuario para hablarles por privado.</p>{/if}
+  </div>
+</aside>
 
 <dialog class="privado" bind:this={d} onclose={() => (abierto = null)}>
   {#if abierto}
@@ -82,17 +91,23 @@
 {/if}
 
 <style>
-  .titulo { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; min-height: 32px; }
-  .titulo h3 { margin: 0; }
-  ul { display: flex; flex-direction: column; gap: 2px; margin-bottom: 8px; }
-  .apagado { opacity: .5; }
-  .amigo { width: 100%; min-height: 44px; justify-content: flex-start; gap: 12px; text-align: left; color: var(--texto); }
-  .nombre { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
-  .verde { color: var(--ok); font-size: 12px; }
-  .contador { min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; background: var(--acento); color: #fff; font-size: 11px; font-weight: 600; display: grid; place-items: center; }
-  .vacio { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; color: var(--tenue); font-size: 13px; }
-  .vacio p { margin: 0; }
-  form input { flex: 1; }
+  .amigos { display: flex; flex-direction: column; min-height: 0; background: var(--panel); border-left: 1px solid var(--borde); --anillo: var(--panel); }
+  .cabecera { display: flex; align-items: center; justify-content: space-between; gap: 8px; height: 52px; padding: 0 12px 0 16px; flex: none; border-bottom: 1px solid var(--borde); }
+  .cabecera h2 { font-size: 15px; font-weight: 700; letter-spacing: 0; }
+  .cuerpo { flex: 1; overflow-y: auto; padding: 4px 8px 16px; }
+  h3 { margin: 16px 8px 4px; }
+  ul { display: flex; flex-direction: column; gap: 2px; }
+  .amigo { width: 100%; min-height: 48px; justify-content: flex-start; gap: 12px; padding: 6px 8px; text-align: left; color: var(--texto); border-radius: var(--radio-menu); }
+  .texto { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .nombre { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+  .texto small { font-size: 12px; color: var(--tenue); }
+  .apagado :global(.caja) { opacity: .55; }
+  .apagado .nombre { color: var(--tenue); }
+  .contador { min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; background: var(--acento); color: var(--sobre-acento); font-size: 11px; font-weight: 650; display: grid; place-items: center; }
+  .vacio { margin: 16px 8px; color: var(--tenue); font-size: 13px; }
+  form { margin: 12px 8px 0; flex-wrap: nowrap; }
+  form input { flex: 1; min-width: 0; }
+  [role='alert'], [role='status'] { margin: 8px; font-size: 13px; }
   .privado { width: min(640px, 90vw); height: 80vh; max-width: none; padding: 0; flex-direction: column; }
   .privado[open] { display: flex; }
   .privado :global(.chat) { flex: 1; }

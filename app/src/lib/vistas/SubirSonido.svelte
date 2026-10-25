@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { lleno } from '../rango';
   import type { RecordModel } from 'pocketbase';
   import { Upload, X } from '@lucide/svelte';
   import { subir, editar } from '../botonera.svelte';
@@ -60,7 +61,7 @@
         <BotonEmoji actual={emoji} texto={emoji ? 'Tocá para cambiarlo' : 'Tocá para elegir'} elegir={(e) => (emoji = e)} /></div>
     </div>
     <label class="campo"><span class="etiqueta">Volumen del sonido <small>{volumen}%</small></span>
-      <input type="range" min="5" max="200" step="5" bind:value={volumen} /></label>
+      <input type="range" min="5" max="200" step="5" bind:value={volumen} style={lleno(volumen, 5, 200)} /></label>
     {#if error}<p role="alert">{error}</p>{/if}
     <div class="botones">
       <button type="button" onclick={() => dlg?.close()}>Cancelar</button>

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import LogoThunderop from './LogoThunderop.svelte';
   import { onMount } from 'svelte';
   import { pedirCodigo, restablecer } from '../cuenta.svelte';
   import { mensajeError } from '../sesion.svelte';
@@ -53,6 +54,7 @@
 
 <main>
   <div class="tarjeta">
+    <LogoThunderop />
     <h1>Olvidé mi contraseña</h1>
     {#if paso === 'mail'}
       <p>Poné tu email y te mandamos un código para elegir una contraseña nueva.</p>

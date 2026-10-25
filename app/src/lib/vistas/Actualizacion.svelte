@@ -1,10 +1,11 @@
 <script lang="ts">
+  import LogoThunderop from './LogoThunderop.svelte';
   import { actualizacion } from '../actualizacion.svelte';
 </script>
 
 <div class="fondo">
   <div class="cartel" role="status">
-    <h1>⚡ THUNDEROP</h1>
+    <h1><LogoThunderop tam={26} /></h1>
     {#if actualizacion.estado === 'buscando'}
       <p class="tenue">Buscando actualizaciones…</p>
     {:else if actualizacion.estado === 'descargando'}

@@ -1,9 +1,11 @@
 <script lang="ts">
-    import { grupos, grupoActual, iniciarGrupos } from '../grupos.svelte';
+  import LogoThunderop from './LogoThunderop.svelte';
+  import BarraTitulo from './BarraTitulo.svelte';
+  import { grupos, grupoActual, iniciarGrupos, miga } from '../grupos.svelte';
   import Inicio from './Inicio.svelte';
   import MenuPerfil from './MenuPerfil.svelte';
   import Configuracion from './Configuracion.svelte';
-  import { Settings, Zap } from '@lucide/svelte';
+  import { Settings } from '@lucide/svelte';
   import Grupo from './Grupo.svelte';
   import Dock from './Dock.svelte';
   import { voz } from '../voz.svelte';
@@ -33,12 +35,15 @@
 </script>
 
 <main>
-  <header class="barra">
-    <h1><button class="plano logo" onclick={() => (grupoActual.id = null)} aria-label="Inicio"><Zap size={18} strokeWidth={1.75} /> THUNDEROP</button></h1>
+  <BarraTitulo>
+    <h1><button class="plano logo" onclick={() => (grupoActual.id = null)} aria-label="Inicio"><LogoThunderop /></button></h1>
+    <div class="libre" data-tauri-drag-region>
+      {#if actual && miga.sala}<span class="miga"><b>{actual.name}</b> › {miga.voz ? `${miga.sala} · sala de voz` : `# ${miga.sala}`}</span>{/if}
+    </div>
     <Campanita />
-    <button class="plano icono" aria-label="Configuración" title="Configuración" onclick={() => (config = true)}><Settings size={20} strokeWidth={1.75} /></button>
+    <button class="plano icono engranaje" aria-label="Configuración" title="Configuración" onclick={() => (config = true)}><Settings size={20} strokeWidth={1.75} /></button>
     <MenuPerfil />
-  </header>
+  </BarraTitulo>
   {#if config}<Configuracion cerrar={() => (config = false)} />{/if}
   {#if voz.error}
     <p class="aviso" role="alert">{voz.error} <button class="plano" aria-label="Cerrar aviso" onclick={() => (voz.error = '')}>✕</button></p>
@@ -57,11 +62,14 @@
 
 <style>
   main { height: 100%; display: flex; flex-direction: column; }
-  .barra { display: flex; align-items: center; gap: 8px; padding: 0 12px; height: 48px; background: var(--fondo); border-bottom: 1px solid var(--borde); flex: none; }
-  .barra h1 { margin-right: auto; }
-  .logo { color: var(--acento); font-size: 14px; font-weight: 700; letter-spacing: .06em; gap: 8px; padding: 4px 0; }
-  .logo:hover:not(:disabled) { color: var(--acento); background: none; }
-  .icono { display: grid; place-items: center; padding: 6px; }
+  .logo { padding: 0 8px; min-height: 36px; border-radius: var(--radio); }
+  .miga { padding-left: 12px; font-size: 13px; color: var(--tenue); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .miga b { color: var(--texto); font-weight: 600; }
+  /* Modo moderno: el rayo parpadea y el engranaje gira un diente (60°, queda igual que en reposo). */
+  :global([data-modo='moderno']) .logo:hover :global(svg) { animation: relampago 380ms linear; }
+  @keyframes relampago { 25% { opacity: .3; } 50% { opacity: 1; } 75% { opacity: .55; } }
+  :global([data-modo='moderno']) .engranaje :global(svg) { transition: transform 420ms var(--curva-salida); }
+  :global([data-modo='moderno']) .engranaje:hover :global(svg) { transform: rotate(60deg); }
   .aviso { display: flex; align-items: center; gap: 8px; padding: 6px 12px; background: var(--hondo); border-top: 1px solid var(--hover); flex: none; }
   .aviso button { margin-left: auto; }
   /* Fuera de pantalla y no display:none: oculto, el iframe de YouTube puede dejar de sonar. */

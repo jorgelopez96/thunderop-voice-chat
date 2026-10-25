@@ -1,4 +1,5 @@
 <script lang="ts">
+  import LogoThunderop from './LogoThunderop.svelte';
   import { onMount } from 'svelte';
   import { pedirCodigo, verificar } from '../cuenta.svelte';
   import { mensajeError } from '../sesion.svelte';
@@ -49,6 +50,7 @@
 
 <main>
   <div class="tarjeta">
+    <LogoThunderop />
     <h1>Confirmá tu cuenta</h1>
     <p>Te mandamos un código de 6 dígitos por mail. Vence en 10 minutos.</p>
     <form onsubmit={confirmar}>

@@ -36,11 +36,13 @@
 {/if}
 
 <style>
-  .vista { display: flex; flex-direction: column-reverse; align-items: stretch; gap: 8px; max-width: 420px; margin-top: 6px; padding: 10px 12px; text-align: left;
-    background: var(--panel); border: 0; border-left: 3px solid var(--acento); border-radius: var(--radio); color: var(--texto); }
-  .textos { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-  small { font-size: 11px; color: var(--tenue); }
-  strong { font-size: 14px; color: var(--acento); }
+  /* Texto a la izquierda y miniatura a la derecha. */
+  .vista { display: flex; align-items: center; gap: 12px; max-width: 460px; margin-top: 6px; padding: 12px; text-align: left; font-weight: 450;
+    background: var(--panel); border: 1px solid var(--borde); border-radius: var(--radio-menu); color: var(--texto); }
+  .vista:hover:not(:disabled) { background: var(--panel); border-color: var(--borde-fuerte); }
+  .textos { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  small { font-size: 11.5px; color: var(--apagado); }
+  strong { font-size: 14px; font-weight: 600; color: var(--acento-texto); }
   .desc { font-size: 13px; color: var(--tenue); display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-  img { width: 100%; max-height: 220px; object-fit: cover; border-radius: var(--radio); }
+  img { flex: none; width: 144px; height: 81px; object-fit: cover; border-radius: 8px; }
 </style>

@@ -1,6 +1,7 @@
 <script lang="ts">
+  import { lleno } from '../rango';
   import type { RecordModel } from 'pocketbase';
-  import { ImagePlus, Plus, Trash2 } from '@lucide/svelte';
+  import { ImagePlus, Plus, Trash2, X } from '@lucide/svelte';
   import { pb } from '../pb';
   import { sesion, mensajeError } from '../sesion.svelte';
   import { borrarGrupo, banear } from '../grupos.svelte';
@@ -65,11 +66,11 @@
 </script>
 
 <dialog class="config" bind:this={d} onclose={cerrar} onclick={(e) => e.target === d && d.close()}>
-  <h2>Configuraciones de {grupo.name}</h2>
+  <div class="cabecera-modal"><h2>Configuraciones de {grupo.name}</h2><button class="icono cerrar-modal" aria-label="Cerrar" title="Cerrar (Esc)" onclick={() => d?.close()}><X size={20} strokeWidth={1.75} /></button></div>
   <div class="solapas" role="tablist">
     {#each solapas as [id, texto] (id)}
       <button role="tab" class="plano" class:rojo={id === 'borrar'} aria-selected={solapa === id} onclick={() => { solapa = id; error = ''; }}>
-        {#if id === 'borrar'}<Trash2 size={14} strokeWidth={1.75} />{/if}{texto}</button>
+        {#if id === 'borrar'}<Trash2 size={16} strokeWidth={1.75} />{/if}{texto}</button>
     {/each}
   </div>
 
@@ -104,7 +105,7 @@
             {#if puede}
               <input value={x.name} maxlength="30" aria-label="Nombre del sonido" onchange={(e) => renombrar(x, e.currentTarget.value)} />
               <BotonEmoji elegir={(e) => renombrar(x, x.name + e)} />
-              <input type="range" min="5" max="200" step="5" value={x.volumen || 100} aria-label={`Volumen de ${x.name}`} title={`${x.volumen || 100}%`}
+              <input type="range" min="5" max="200" step="5" value={x.volumen || 100} style={lleno(x.volumen || 100, 5, 200)} aria-label={`Volumen de ${x.name}`} title={`${x.volumen || 100}%`}
                 onchange={(e) => hacer(() => editar(x.id, { volumen: +e.currentTarget.value }))} />
               <small>{x.volumen || 100}%</small>
               <button class="icono" title="Borrar" aria-label={`Borrar ${x.name}`} onclick={() => (aBorrar = x)}><Trash2 size={14} strokeWidth={1.75} /></button>
@@ -172,11 +173,9 @@
   {/if}
 
   {#if error}<p role="alert">{error}</p>{/if}
-  <div class="fila fin"><button onclick={() => d?.close()}>Cerrar</button></div>
 </dialog>
 
 <style>
-  h2 { font-size: 18px; font-weight: 600; }
   h3 { margin: 0 0 8px; }
   .solapas .rojo { color: var(--peligro); }
   .general { display: grid; grid-template-columns: 1fr auto; gap: 24px; align-items: start; }
@@ -184,7 +183,7 @@
   textarea { resize: vertical; min-height: 96px; font: inherit; }
   .foto { display: flex; flex-direction: column; align-items: center; gap: 8px; }
   .titulo { align-self: flex-start; color: var(--tenue); font-size: 13px; }
-  .foto img, .sin-foto { width: 192px; height: 108px; object-fit: cover; border-radius: var(--radio); background: var(--hondo); }
+  .foto img, .sin-foto { width: 192px; height: 108px; object-fit: cover; border-radius: var(--radio-menu); background: var(--hondo); }
   .sin-foto { display: grid; place-items: center; color: var(--apagado); font-size: 12px; border: 1px dashed var(--punteado); }
   label.boton { flex-direction: row; color: var(--texto); font-size: 14px; }
   ul { display: flex; flex-direction: column; gap: 4px; overflow-y: auto; }
@@ -197,15 +196,14 @@
   .quien { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 14px; }
   .quien small { margin-left: 6px; color: var(--tenue); }
   .chico { padding: 4px 8px; min-height: 0; font-size: 13px; }
-  .peligroso { border: 1px solid color-mix(in srgb, var(--peligro) 40%, transparent); border-radius: var(--radio-tarjeta); padding: 12px; }
+  .peligroso { border: 1px solid var(--peligro); border-radius: var(--radio-tarjeta); padding: 16px; }
   .peligroso h3 { color: var(--peligro); }
   .peligroso p { margin: 0 0 8px; color: var(--tenue); font-size: 13px; }
   .peligroso label { margin-bottom: 8px; }
-  .fin { justify-content: flex-end; margin-top: auto; }
   .sonidos { max-height: 50vh; margin-bottom: 8px; }
   .sonidos li > input:first-child, .sonidos li > span { flex: 1; min-width: 0; }
-  .sonidos input[type='range'] { width: 96px; padding: 0; border: 0; background: none; }
-  .sonidos small { width: 36px; color: var(--tenue); text-align: right; }
+  .sonidos input[type='range'] { width: 96px; }
+  .sonidos small { width: 36px; color: var(--tenue); text-align: right; font-variant-numeric: tabular-nums; }
   .centro { display: flex; width: fit-content; margin: 0 auto; }
   .tenue { color: var(--tenue); font-size: 13px; }
 </style>

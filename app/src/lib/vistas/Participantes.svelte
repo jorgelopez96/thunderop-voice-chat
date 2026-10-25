@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { lleno } from '../rango';
   import type { RecordModel } from 'pocketbase';
   import { MicOff, HeadphoneOff, Monitor } from '@lucide/svelte';
   import { sesion, mensajeError } from '../sesion.svelte';
@@ -86,7 +87,7 @@
     {#if puedoAgregar(m.id)}<button class="plano" onclick={() => hacer(() => solicitarA(m.id))}>Agregar amigo</button>{/if}
     {#if m.id !== sesion.usuario?.id}
       <label class="vol">Volumen · {vol} %
-        <input type="range" min="0" max="200" step="5" bind:value={vol} aria-label={`Volumen de ${m.name}`} oninput={() => volumen(m.id, vol / 100)} /></label>
+        <input type="range" min="0" max="200" step="5" bind:value={vol} style={lleno(vol, 0, 200)} aria-label={`Volumen de ${m.name}`} oninput={() => volumen(m.id, vol / 100)} /></label>
     {/if}
     {#if puedoEchar(m.id) && ((grupo.bloqueados ?? []) as string[]).includes(m.id)}
       <hr /><button class="plano" onclick={() => { menu?.hidePopover(); hacer(() => bloquearVoz(grupo.id, m.id, false)); }}>Permitir volver a la voz</button>
@@ -116,22 +117,23 @@
 {/if}
 
 <style>
-  .participantes { background: var(--panel); padding: 8px 12px 16px; overflow-y: auto; border-left: 1px solid var(--borde); }
+  .participantes { background: var(--panel); padding: 8px 8px 16px; overflow-y: auto; border-left: 1px solid var(--borde); --anillo: var(--panel); }
   .separada { border-top: 1px solid var(--borde); margin-top: 8px; padding-top: 8px; }
-  li { display: flex; align-items: center; gap: 12px; min-height: 40px; padding: 4px 8px; border-radius: var(--radio); }
+  li { display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 4px 8px; border-radius: var(--radio-menu); }
   li:hover { background: var(--hover); }
-  .apagado { opacity: .45; }
+  .apagado :global(.caja) { opacity: .55; }
+  .apagado strong { color: var(--tenue); }
   .quien { flex: 1; min-width: 0; display: flex; flex-direction: column; }
   .quien > * { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .quien strong { font-weight: 500; }
+  .quien strong { font-weight: 600; }
   .quien small { font-size: 12px; }
-  .estados { display: flex; gap: 4px; color: var(--peligro); }
+  .estados { display: flex; gap: 4px; color: var(--apagado); }
   .estados span { display: grid; }
   .estados .vivo { color: var(--ok); }
   [popover] { position: fixed; inset: auto; margin: 0; padding: 8px; min-width: 220px; flex-direction: column; gap: 2px;
-    background: var(--elevado); color: var(--texto); border: 1px solid var(--borde); border-radius: var(--radio-menu); }
+    background: var(--elevado); color: var(--texto); border: 1px solid var(--borde-fuerte); border-radius: var(--radio-menu); box-shadow: var(--sombra-2); }
   [popover]:popover-open { display: flex; }
-  [popover] button { justify-content: flex-start; }
+  [popover] button { justify-content: flex-start; color: var(--texto); }
   [popover] hr { border: 0; border-top: 1px solid var(--borde); margin: 4px 0; width: 100%; }
   .vol { padding: 4px 8px; }
   .vol input { padding: 0; background: none; border: 0; }

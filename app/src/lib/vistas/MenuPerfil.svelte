@@ -25,7 +25,7 @@
 
 <!-- Menú nativo (popover): se cierra solo al tocar afuera o con Esc. -->
 <button class="plano yo" popovertarget="menu-perfil">
-  {#if u}<Avatar usuario={u} tam={24} />{/if}
+  {#if u}<Avatar usuario={u} tam={28} />{/if}
   <span style="color:{u?.color || 'inherit'}">{u?.name}</span><Insignia usuario={u ?? undefined} />
 </button>
 <div id="menu-perfil" popover bind:this={menu}>
@@ -45,11 +45,11 @@
 </dialog>
 
 <style>
-  .yo { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+  .yo { display: flex; align-items: center; gap: 8px; font-weight: 600; padding: 4px 10px 4px 4px; border-radius: var(--radio-pildora); }
   [popover] { position: fixed; inset: 48px 12px auto auto; margin: 0; padding: 6px; display: none; flex-direction: column; gap: 2px;
-    background: var(--panel); color: var(--texto); border: 1px solid var(--borde); border-radius: 10px; }
+    background: var(--elevado); color: var(--texto); border: 1px solid var(--borde-fuerte); border-radius: var(--radio-menu); box-shadow: var(--sombra-2); }
   [popover]:popover-open { display: flex; }
-  [popover] button { justify-content: flex-start; text-align: left; }
+  [popover] button { justify-content: flex-start; text-align: left; color: var(--texto); }
   [popover] hr { border: 0; border-top: 1px solid var(--borde); margin: 4px 0; }
   .usuario { padding: 4px 8px; color: var(--tenue); user-select: text; }
   .estado { display: flex; align-items: center; gap: 8px; }

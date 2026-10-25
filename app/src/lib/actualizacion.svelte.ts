@@ -1,11 +1,14 @@
 import { isTauri } from '@tauri-apps/api/core';
+import type { Update } from '@tauri-apps/plugin-updater';
 
 // Al abrir, si el servidor tiene una versión nueva se descarga e instala antes de dejar entrar
 // (Windows cierra la app y la reabre). Si algo falla, se avisa y se deja entrar igual.
-// `silenciosa` (el chequeo periódico, con la app ya abierta): sin pantalla de "buscando" y si falla sigue como estaba.
-export const actualizacion = $state<{ estado: 'buscando' | 'descargando' | 'error' | 'lista'; version: string; progreso: number; error: string }>({
-  estado: 'buscando', version: '', progreso: 0, error: '',
+// `silenciosa` (el chequeo periódico, con la app ya abierta): la baja de fondo y la deja en `pendiente`
+// para que la campanita ofrezca reiniciar; si falla sigue como estaba.
+export const actualizacion = $state<{ estado: 'buscando' | 'descargando' | 'error' | 'lista'; version: string; progreso: number; error: string; pendiente: string }>({
+  estado: 'buscando', version: '', progreso: 0, error: '', pendiente: '',
 });
+let bajada: Update | null = null;
 
 /** Fracción descargada, 0..1. Sin total conocido → 0. */
 export function progresoDe(bajado: number, total: number | undefined): number {
@@ -15,10 +18,12 @@ export function progresoDe(bajado: number, total: number | undefined): number {
 
 export async function buscarActualizacion(silenciosa = false) {
   if (import.meta.env.DEV || !isTauri()) { actualizacion.estado = 'lista'; return; }
+  if (silenciosa && bajada) return;
   try {
     const { check } = await import('@tauri-apps/plugin-updater');
     const u = await check();
     if (!u) { if (!silenciosa) actualizacion.estado = 'lista'; return; }
+    if (silenciosa) { await u.download(); bajada = u; actualizacion.pendiente = u.version; return; }
     Object.assign(actualizacion, { estado: 'descargando', version: u.version, progreso: 0 });
     let total: number | undefined, bajado = 0;
     await u.downloadAndInstall((e) => {
@@ -31,4 +36,9 @@ export async function buscarActualizacion(silenciosa = false) {
     if (silenciosa) { actualizacion.estado = 'lista'; return; }
     Object.assign(actualizacion, { estado: 'error', error: 'No se pudo actualizar. Podés entrar igual y se va a reintentar la próxima vez.' });
   }
+}
+
+/** Instala la versión ya bajada; el instalador de Windows cierra la app y la vuelve a abrir. */
+export async function reiniciarParaActualizar() {
+  await bajada?.install();
 }

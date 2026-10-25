@@ -1,7 +1,15 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <!-- Ícono de la app (paleta de Fable): superficie #161821 y el rayo de lucide en violeta #8B7CF6. Se genera con `npx tauri icon src-tauri/icons/icono.svg`. -->
-  <rect width="512" height="512" rx="112" fill="#161821"/>
-  <g transform="translate(64 64) scale(16)" fill="#8B7CF6" stroke="#8B7CF6" stroke-width="1.75" stroke-linejoin="round">
-    <path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- Ícono de la app: cuadrado con radio del 24 %, degradé #272A3B → #0D0E13 a 160°, aro interior y la T con rayo al 62 % en #8B7CF6.
+       Se genera con `npx tauri icon src-tauri/icons/icono.svg` (borrar después las carpetas android/ios que crea). -->
+  <defs>
+    <linearGradient id="fondo" x1=".33" y1=".03" x2=".67" y2=".97">
+      <stop offset="0" stop-color="#272A3B"/>
+      <stop offset="1" stop-color="#0D0E13"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="1024" rx="246" fill="url(#fondo)"/>
+  <rect x="2" y="2" width="1020" height="1020" rx="244" fill="none" stroke="#FFFFFF" stroke-opacity=".06" stroke-width="4"/>
+  <g transform="translate(194.5 194.5) scale(26.46)" fill="#8B7CF6">
+    <path d="M4.2 2h15.6A1.2 1.2 0 0 1 21 3.2v2.1a1.2 1.2 0 0 1-1.2 1.2h-4.6L13.4 11.2H17L10 22.6l1.4-7.6H7.8l1.4-8.5H4.2A1.2 1.2 0 0 1 3 5.3V3.2A1.2 1.2 0 0 1 4.2 2z"/>
   </g>
 </svg>

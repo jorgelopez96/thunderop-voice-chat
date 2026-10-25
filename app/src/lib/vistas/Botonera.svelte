@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { lleno } from '../rango';
   import type { RecordModel } from 'pocketbase';
   import { Search, Volume2, Plus } from '@lucide/svelte';
   import SubirSonido from './SubirSonido.svelte';
@@ -22,7 +23,7 @@
   <div class="arriba">
     <label class="buscar"><Search size={16} strokeWidth={1.75} /><input bind:value={busqueda} placeholder="Buscá un sonido" aria-label="Buscar sonido" /></label>
     <span class="vol" title="Volumen de la botonera"><Volume2 size={16} strokeWidth={1.75} />
-      <input type="range" min="0" max="100" step="5" bind:value={vol} aria-label="Volumen de la botonera" oninput={() => guardarPrefs({ volBotonera: vol / 100 })} /></span>
+      <input type="range" min="0" max="100" step="5" bind:value={vol} style={lleno(vol, 0, 100)} aria-label="Volumen de la botonera" oninput={() => guardarPrefs({ volBotonera: vol / 100 })} /></span>
   </div>
   <ul class="grilla">
     {#each visibles as x (x.id)}
@@ -48,7 +49,7 @@
   .vol { display: flex; align-items: center; gap: 4px; color: var(--icono); }
   .vol input { width: 72px; padding: 0; border: 0; background: none; }
   .grilla { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; max-height: 50vh; overflow-y: auto; }
-  .sonido { width: 100%; height: 48px; padding: 4px 8px; background: var(--panel); border-color: transparent; font-size: 13px; line-height: 1.2; text-align: center; overflow: hidden; }
+  .sonido { width: 100%; height: 48px; padding: 4px 8px; background: var(--superficie); border-color: transparent; font-size: 13px; line-height: 1.2; text-align: center; overflow: hidden; }
   .sonido:hover:not([aria-disabled='true']) { background: var(--hover); }
   .sonido[aria-disabled='true'] { opacity: .4; cursor: not-allowed; }
   .nuevo { display: flex; align-items: center; justify-content: center; gap: 4px; background: none; border: 1px dashed var(--punteado); color: var(--tenue); }

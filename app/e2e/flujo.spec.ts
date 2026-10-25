@@ -39,6 +39,6 @@ test('cuentas, grupos, invitaciones y chat', async ({ browser }) => {
   await a.getByRole('listitem').filter({ hasText: 'Beto' }).click({ button: 'right' });
   await a.getByRole('button', { name: 'Expulsar del grupo' }).click();
   await a.getByRole('button', { name: 'Confirmar' }).click();
-  await expect(b.getByRole('heading', { name: 'Mis grupos' })).toBeVisible({ timeout: 15_000 });
+  await expect(b.getByRole('heading', { name: /^¡Hola/ })).toBeVisible({ timeout: 15_000 });
   await expect(b.getByRole('button', { name: 'Los pibes' })).toHaveCount(0);
 });

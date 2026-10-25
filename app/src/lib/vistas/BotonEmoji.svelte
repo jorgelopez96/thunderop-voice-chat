@@ -20,7 +20,7 @@
   .actual { font-size: 18px; line-height: 18px; }
   .campo { width: 100%; justify-content: flex-start; gap: 8px; padding: 0 10px; height: 38px; border: 1px solid var(--borde); background: var(--hondo); border-radius: var(--radio); }
   .texto { color: var(--apagado); font-weight: 400; }
-  .emojis { position: fixed; inset: auto; margin: 0; padding: 6px; width: 296px; flex-wrap: wrap; gap: 2px; background: var(--panel); border: 1px solid var(--borde); border-radius: 10px; }
+  .emojis { position: fixed; inset: auto; margin: 0; padding: 6px; width: 296px; flex-wrap: wrap; gap: 2px; background: var(--elevado); color: var(--texto); border: 1px solid var(--borde-fuerte); border-radius: var(--radio-menu); box-shadow: var(--sombra-2); }
   .emojis:popover-open { display: flex; }
   .emojis button { font-size: 20px; padding: 2px; min-height: 0; width: 34px; height: 34px; }
 </style>

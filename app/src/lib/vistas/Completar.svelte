@@ -1,4 +1,5 @@
 <script lang="ts">
+  import LogoThunderop from './LogoThunderop.svelte';
   import { aceptarTerminos, completar, cuenta, leerTerminos, ponerInvitacion } from '../cuenta.svelte';
   import { mensajeError, salir } from '../sesion.svelte';
   import { errorEdad, errorUsuario, normalizarUsuario } from '../reglasCuenta';
@@ -38,6 +39,7 @@
 
 <main>
   <div class="tarjeta">
+    <LogoThunderop />
     <h1>Completá tu cuenta</h1>
     <form onsubmit={enviar}>
       {#if paso === 'invitacion'}

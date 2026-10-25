@@ -1,4 +1,5 @@
 <script lang="ts">
+  import LogoThunderop from './LogoThunderop.svelte';
   import { entrar, registrarse, mensajeError, emailRecordado } from '../sesion.svelte';
   import { entrarCon, leerTerminos } from '../cuenta.svelte';
   import { errorClave, errorEdad, errorUsuario, normalizarUsuario } from '../reglasCuenta';
@@ -71,7 +72,7 @@
 {:else}
 <main>
   <div class="tarjeta">
-  <h1>Thunderop - voice chat</h1>
+  <h1><LogoThunderop tam={28} /></h1>
   <div role="tablist" class="fila">
     <button role="tab" class="plano" aria-selected={modo === 'entrar'} onclick={() => (modo = 'entrar')}>Entrar</button>
     <button role="tab" class="plano" aria-selected={modo === 'crear'} onclick={() => (modo = 'crear')}>Crear cuenta</button>

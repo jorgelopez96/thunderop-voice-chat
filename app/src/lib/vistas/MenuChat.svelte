@@ -21,18 +21,18 @@
 </span>
 <div popover class="menu" bind:this={menu}>
   {#if hasta}<small>{estado}</small><button class="plano" onclick={() => elegir(0)}>Quitar silencio</button>
-  {:else}<small>Silenciar notificaciones</small>
+  {:else}<small>Silenciar este chat</small>
     {#each DURACIONES as [texto, dias] (texto)}<button class="plano" onclick={() => elegir(dias)}>{texto}</button>{/each}{/if}
   {#if acciones}<hr />{@render acciones(cerrar)}{/if}
 </div>
 
 <style>
-  .lado { display: flex; align-items: center; gap: 4px; }
+  .lado { display: flex; align-items: center; gap: 4px; margin-left: auto; }
   .silenciado { display: grid; color: var(--apagado); }
   .menu { position: fixed; inset: auto; margin: 0; padding: 8px; width: 220px; flex-direction: column; gap: 2px;
-    background: var(--elevado); color: var(--texto); border: 1px solid var(--borde); border-radius: var(--radio-menu); }
+    background: var(--elevado); color: var(--texto); border: 1px solid var(--borde-fuerte); border-radius: var(--radio-menu); box-shadow: var(--sombra-2); }
   .menu:popover-open { display: flex; }
-  .menu :global(button) { justify-content: flex-start; }
+  .menu :global(button) { justify-content: flex-start; color: var(--texto); }
   .menu small { padding: 4px 8px 0; font-size: 11px; color: var(--tenue); }
   .menu hr { border: 0; border-top: 1px solid var(--borde); margin: 4px 0; width: 100%; }
 </style>

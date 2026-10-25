@@ -10,10 +10,12 @@
   import { cargarEstado, cuenta } from '$lib/cuenta.svelte';
   import { actualizacion, buscarActualizacion } from '$lib/actualizacion.svelte';
   import Actualizacion from '$lib/vistas/Actualizacion.svelte';
+  import BarraTitulo from '$lib/vistas/BarraTitulo.svelte';
   import { voz } from '$lib/voz.svelte';
-  import { aplicarTema, temaGuardado } from '$lib/tema';
+  import { aplicarModo, aplicarTema, modoGuardado, temaGuardado } from '$lib/tema';
 
   aplicarTema(temaGuardado());
+  aplicarModo(modoGuardado());
 
   onMount(validarSesionAlIniciar);
   // Con sesión se consulta qué le falta a la cuenta; sin sesión se limpia.
@@ -29,6 +31,8 @@
   });
 </script>
 
+<!-- Principal trae su propia barra con el logo y el perfil; las demás pantallas usan esta, encima. -->
+{#if actualizacion.estado !== 'lista' || !sesion.usuario || cuenta.falta?.length !== 0}<BarraTitulo flotante />{/if}
 {#if actualizacion.estado !== 'lista'}
   <Actualizacion />
 {:else if !sesion.usuario}

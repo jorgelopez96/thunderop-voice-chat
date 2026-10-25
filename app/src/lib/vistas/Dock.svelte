@@ -1,6 +1,6 @@
 <script lang="ts">
   import { alTocar, estabaAbierto } from '../menu';
-  import { Mic, MicOff, Headphones, HeadphoneOff, ChevronDown, Monitor, AudioWaveform, Music, PhoneOff } from '@lucide/svelte';
+  import { Mic, MicOff, Headphones, HeadphoneOff, ChevronDown, Monitor, AudioWaveform, Music, PhoneOff, Signal } from '@lucide/svelte';
   import { voz, alternarMute, ensordecer, cambiarSupresion, salirVoz, transmitir, dejarDeTransmitir, cambiarCalidad, dispositivos, elegirEntrada, elegirSalida } from '../voz.svelte';
   import { grupos } from '../grupos.svelte';
   import { CALIDADES, leerPrefs, type Calidad } from '../prefs';
@@ -116,16 +116,20 @@
 </script>
 
 <footer class="dock">
+  <div class="estado">
+    <Signal size={18} strokeWidth={1.75} color="var(--ok)" />
+    <span><strong>{voz.conectando ? 'Conectando…' : 'Conectado'}</strong><small>{voz.salaNombre}{g ? ` · ${g.name}` : ''}</small></span>
+  </div>
   <div class="centro">
     <div class="doble" class:apagado={voz.muteado || voz.sinPermiso}>
       <button class="icono" onclick={alternarMute} disabled={voz.sinPermiso} aria-label={voz.muteado ? 'Activar micrófono' : 'Silenciarme'} title={voz.sinPermiso ? 'El dueño te silenció' : voz.muteado ? 'Activar micrófono' : 'Silenciarme'}>
-        {#if voz.muteado || voz.sinPermiso}<MicOff size={20} strokeWidth={1.75} />{:else}<Mic size={20} strokeWidth={1.75} />{/if}
+        {#key voz.muteado || voz.sinPermiso}<span class="ico pop">{#if voz.muteado || voz.sinPermiso}<MicOff size={20} strokeWidth={1.75} />{:else}<Mic size={20} strokeWidth={1.75} />{/if}</span>{/key}
       </button>
       <button class="icono flecha" aria-label="Opciones del micrófono" title="Micrófono y supresión" onpointerdown={() => alTocar(menu)} onclick={(e) => abrirMenu(e, 'entrada')}><ChevronDown size={14} strokeWidth={1.75} /></button>
     </div>
     <div class="doble" class:apagado={voz.ensordecido}>
       <button class="icono" onclick={() => ensordecer(!voz.ensordecido)} aria-label={voz.ensordecido ? 'Activar sonido' : 'Ensordecerme'} title={voz.ensordecido ? 'Activar sonido' : 'Ensordecerme'}>
-        {#if voz.ensordecido}<HeadphoneOff size={20} strokeWidth={1.75} />{:else}<Headphones size={20} strokeWidth={1.75} />{/if}
+        {#key voz.ensordecido}<span class="ico pop">{#if voz.ensordecido}<HeadphoneOff size={20} strokeWidth={1.75} />{:else}<Headphones size={20} strokeWidth={1.75} />{/if}</span>{/key}
       </button>
       <button class="icono flecha" aria-label="Opciones del sonido" title="Salida de audio" onpointerdown={() => alTocar(menu)} onclick={(e) => abrirMenu(e, 'salida')}><ChevronDown size={14} strokeWidth={1.75} /></button>
     </div>
@@ -143,6 +147,7 @@
     <span class="separador"></span>
     <button class="icono colgar" onclick={salirVoz} aria-label="Desconectarse" title="Desconectarse"><PhoneOff size={20} strokeWidth={1.75} /></button>
   </div>
+  <span></span>
 </footer>
 
 <div popover id="dock-sonidos" class="panel" style="left:{posPanel.x}px;bottom:{posPanel.y}px" ontoggle={(e) => (abiertoSonidos = e.newState === 'open')}>
@@ -207,29 +212,50 @@
 
 
 <style>
-  .dock { flex: none; height: 56px; display: flex; align-items: center; justify-content: center; gap: 16px; padding: 0 16px; background: var(--panel); border-top: 1px solid var(--borde); }
-  .centro { display: flex; align-items: center; gap: 8px; }
-  .doble { display: flex; border-radius: var(--radio); background: var(--hover); }
-  .doble .icono { border-radius: 0; height: 40px; }
-  .doble .icono:first-child { width: 44px; border-radius: var(--radio) 0 0 var(--radio); }
-  .flecha { width: 20px; border-left: 1px solid var(--borde) !important; border-radius: 0 var(--radio) var(--radio) 0 !important; }
+  .dock { flex: none; height: 64px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 16px; padding: 0 16px;
+    background: var(--panel); border-top: 1px solid var(--borde); }
+  :global([data-modo='moderno']) .dock { animation: sube 280ms var(--curva-salida); }
+  @keyframes sube { from { opacity: 0; transform: translateY(100%); } }
+  .estado { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .estado span { display: flex; flex-direction: column; min-width: 0; line-height: 1.3; }
+  .estado strong { font-weight: 650; color: var(--ok); font-size: 13.5px; }
+  .estado small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+  /* La isla: botones de 40 sobre una superficie elevada. */
+  .centro { display: flex; align-items: center; gap: 4px; padding: 5px; background: var(--superficie); border: 1px solid var(--borde);
+    border-radius: var(--radio-grande); box-shadow: var(--luz-borde), var(--sombra-2); }
+  .centro .icono { width: 40px; height: 40px; min-height: 40px; border-radius: var(--radio-menu); }
+  .ico { display: grid; }
+  .doble { display: flex; border-radius: var(--radio-menu); }
+  .doble .icono:first-child { border-radius: var(--radio-menu) 0 0 var(--radio-menu); }
+  .doble .flecha { width: 18px; min-width: 18px; border-radius: 0 var(--radio-menu) var(--radio-menu) 0; }
+  .doble:hover { background: var(--hover); }
   .doble.apagado { background: var(--peligro-suave); }
   .doble.apagado .icono:first-child { color: var(--peligro); }
-  .separador { width: 1px; height: 24px; background: var(--borde); margin: 0 4px; }
-  .centro > .icono { width: 40px; height: 40px; }
+  .separador { width: 1px; height: 24px; background: var(--borde-fuerte); margin: 0 4px; }
   .cian { color: var(--cian); }
   .magenta { color: var(--magenta); }
-  .violeta { color: var(--acento); }
-  .vivo { background: var(--ok-suave); color: #fff; }
-  .centro > .colgar { width: 56px; background: var(--peligro); color: #fff; }
-  .centro > .colgar:hover { background: color-mix(in srgb, var(--peligro) 85%, #000); }
+  .violeta { color: var(--acento-texto); }
+  .centro .vivo { background: var(--cian-suave); color: var(--cian); box-shadow: 0 0 14px -4px var(--cian); }
+  .centro .colgar { width: 56px; background: var(--peligro); color: #fff; }
+  .centro .colgar:hover:not(:disabled) { background: var(--peligro-hover); color: #fff; }
+  /* Modo moderno: cada ícono reacciona a su manera; solo transform. */
+  :global([data-modo='moderno']) .centro .icono :global(svg) { transition: transform 180ms var(--curva-resorte); }
+  :global([data-modo='moderno']) .doble .icono:first-child:hover :global(svg) { transform: scale(1.1); }
+  :global([data-modo='moderno']) .doble .icono:first-child:active :global(svg) { transform: scale(.88); transition-duration: 90ms; }
+  :global([data-modo='moderno']) .pop { animation: pop 260ms var(--curva-resorte); }
+  @keyframes pop { from { transform: scale(.6); } }
+  :global([data-modo='moderno']) .cian:hover :global(svg), :global([data-modo='moderno']) .vivo:hover :global(svg) { transform: translateY(-2px); }
+  :global([data-modo='moderno']) .magenta:hover :global(svg) { transform: scaleY(1.2); }
+  :global([data-modo='moderno']) .violeta:hover :global(svg) { transform: rotate(-12deg) scale(1.06); }
+  :global([data-modo='moderno']) .colgar { box-shadow: 0 4px 14px -4px color-mix(in srgb, var(--peligro) 70%, transparent); }
+  :global([data-modo='moderno']) .colgar:hover :global(svg) { transform: rotate(-12deg); }
   .panel { position: fixed; inset: auto; margin: 0; padding: 16px; width: 440px; max-width: calc(100vw - 16px);
-    background: var(--elevado); color: var(--texto); border: 1px solid var(--borde); border-radius: var(--radio-tarjeta); }
+    background: var(--elevado); color: var(--texto); border: 1px solid var(--borde-fuerte); border-radius: var(--radio-tarjeta); box-shadow: var(--sombra-3); }
   .menu { position: fixed; inset: auto; margin: 0; padding: 8px; min-width: 260px; max-width: 360px; flex-direction: column; gap: 2px;
-    background: var(--elevado); color: var(--texto); border: 1px solid var(--borde); border-radius: var(--radio-menu); }
+    background: var(--elevado); color: var(--texto); border: 1px solid var(--borde-fuerte); border-radius: var(--radio-menu); box-shadow: var(--sombra-2); }
   .menu:popover-open { display: flex; }
   .menu h3 { margin: 4px 8px 6px; }
-  .menu button { justify-content: flex-start; text-align: left; padding: 6px 8px; }
+  .menu button { justify-content: flex-start; text-align: left; padding: 6px 8px; color: var(--texto); }
   .menu hr { border: 0; border-top: 1px solid var(--borde); margin: 6px 0; width: 100%; }
   .menu small { padding: 4px 8px; }
   dialog { flex-direction: column; gap: 12px; min-width: 300px; }
@@ -244,5 +270,4 @@
   .nombre { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 13px; text-align: left; }
   .nombre span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .ico { width: 16px; height: 16px; flex: none; }
-  select { font: inherit; color: var(--texto); background: var(--hondo); border: 1px solid var(--borde); border-radius: var(--radio); padding: 8px 12px; }
 </style>
