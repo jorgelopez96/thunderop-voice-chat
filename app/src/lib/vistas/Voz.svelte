@@ -69,6 +69,10 @@
   // Chat de la sala, plegable y recordado.
   let chatAbierto = $state((() => { try { return localStorage.getItem('dm.chatSala') !== '0'; } catch { return true; } })());
   $effect(() => { if (chatAbierto && voz.salaId) return mirarSala(voz.salaId); });
+  // Celular: el navegador puede cortar el audio con la pantalla bloqueada; se avisa una vez por sesión.
+  const esIphone = typeof navigator !== 'undefined' && /iPhone|iPad|iPod/.test(navigator.userAgent);
+  let avisoLlamada = $state(pantalla.movil && (() => { try { return !sessionStorage.getItem('dm.avisoLlamada'); } catch { return true; } })());
+  function entendido() { avisoLlamada = false; try { sessionStorage.setItem('dm.avisoLlamada', '1'); } catch { /* sin almacenamiento: dura esta vista */ } }
   // En el celular el chat de la sala se abre a pantalla completa desde el dock (navMovil.chatSala).
   const verChat = $derived(pantalla.movil ? navMovil.chatSala : chatAbierto);
   function plegarChat(a: boolean) { chatAbierto = a; try { localStorage.setItem('dm.chatSala', a ? '1' : '0'); } catch { /* sin almacenamiento */ } }
@@ -89,6 +93,8 @@
       <button class="icono" onclick={copiarLink} aria-label="Copiar link de invitación" title="Copiar link de invitación"><Link size={16} strokeWidth={1.75} /></button>
       {#if !chatAbierto && !pantalla.movil}<button class="icono" onclick={() => plegarChat(true)} aria-label="Abrir chat de la sala" title="Chat de la sala"><MessageSquare size={16} strokeWidth={1.75} /></button>{/if}
     </header>
+    {#if avisoLlamada}<p class="aviso-celular">{esIphone ? 'En iPhone, la llamada se corta si bloqueás la pantalla o cambiás de app.' : 'Si bloqueás la pantalla o cambiás de app, la llamada puede cortarse.'}
+      <button class="plano" onclick={entendido}>Entendido</button></p>{/if}
     {#if voz.conectando}<p role="status">Conectando…</p>{/if}
     {#if aviso}<p role="status">{aviso}</p>{/if}
     {#if error}<p role="alert">{error}</p>{/if}
@@ -154,6 +160,9 @@
   .voz { display: grid; grid-template-columns: 1fr; min-height: 0; min-width: 0; }
   .voz.conChat { grid-template-columns: minmax(0, 1fr) 296px; }
   /* Celular: tarjetas de a 2 y el chat de la sala encima de todo, a pantalla completa. */
+  .aviso-celular { display: flex; align-items: center; gap: 8px; margin: 0; padding: 10px 12px; font-size: 13px; border-radius: var(--radio-menu);
+    background: color-mix(in srgb, var(--ausente) 12%, transparent); border: 1px solid color-mix(in srgb, var(--ausente) 35%, transparent); }
+  .aviso-celular button { margin-left: auto; flex: none; color: var(--texto); }
   .voz.movil .franja { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .voz.movil .chatSala { position: fixed; inset: 0; z-index: 15; padding-top: env(safe-area-inset-top); border: 0; }
   .centro { padding: 0 16px 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; min-width: 0; }

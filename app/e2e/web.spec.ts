@@ -241,3 +241,38 @@ test('celular: mantener apretado abre las acciones de mensajes, personas y salas
   await p.getByRole('button', { name: 'Subir' }).click();
   await expect.poll(async () => { const o = await orden(); return o.indexOf('Sala de chat memes') < o.indexOf('Sala de chat General'); }).toBe(true);
 });
+
+const IPHONE = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1';
+
+test('instalable: manifest con nombre, modo app e íconos', async ({ page }) => {
+  await page.goto('/');
+  const href = await page.locator('link[rel="manifest"]').getAttribute('href');
+  expect(href).toBeTruthy();
+  const m = await (await page.request.get(href!)).json();
+  expect(m).toMatchObject({ name: 'Thunderop', display: 'standalone', start_url: '/' });
+  expect(m.icons.map((i: { sizes: string }) => i.sizes)).toEqual(expect.arrayContaining(['192x192', '512x512']));
+  for (const i of m.icons) expect((await page.request.get(i.src)).ok()).toBe(true);
+  await expect(page.locator('link[rel="apple-touch-icon"]')).toHaveCount(1);
+});
+
+for (const [nombre, ua, texto] of [
+  ['Android', undefined, 'Si bloqueás la pantalla o cambiás de app, la llamada puede cortarse.'],
+  ['iPhone', IPHONE, 'En iPhone, la llamada se corta si bloqueás la pantalla o cambiás de app.'],
+] as const) {
+  test(`celular (${nombre}): aviso de la llamada al entrar, una vez por sesión`, async ({ browser }) => {
+    const p = await (await browser.newContext({ viewport: CELULAR, ...(ua ? { userAgent: ua } : {}) })).newPage();
+    await crearCuenta(p, 'Ana');
+    await p.getByRole('button', { name: 'Crear mi grupo' }).click();
+    await p.getByPlaceholder('Nombre del grupo nuevo').fill('Avisos');
+    await p.getByRole('button', { name: 'Crear grupo' }).click();
+    await p.getByRole('button', { name: 'Abrir salas' }).click();
+    await p.getByRole('button', { name: 'Sala de voz General' }).click();
+    await expect(p.getByText(texto)).toBeVisible({ timeout: 15_000 });
+    await p.getByRole('button', { name: 'Entendido' }).click();
+    await p.getByRole('button', { name: 'Desconectarse' }).first().click();
+    await p.getByRole('button', { name: 'Abrir salas' }).click();
+    await p.getByRole('button', { name: 'Sala de voz General' }).click();
+    await expect(p.getByRole('toolbar', { name: 'Llamada' })).toBeVisible({ timeout: 15_000 });
+    await expect(p.getByText(texto)).toHaveCount(0);
+  });
+}
