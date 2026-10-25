@@ -1,6 +1,11 @@
 <script lang="ts">
   import LogoThunderop from './LogoThunderop.svelte';
   import BarraTitulo from './BarraTitulo.svelte';
+  import Amigos from './Amigos.svelte';
+  import Pestanas from './movil/Pestanas.svelte';
+  import PerfilMovil from './movil/PerfilMovil.svelte';
+  import { pantalla } from '../plataforma.svelte';
+  import { navMovil } from '../navMovil.svelte';
   import { grupos, grupoActual, iniciarGrupos, miga } from '../grupos.svelte';
   import Inicio from './Inicio.svelte';
   import MenuPerfil from './MenuPerfil.svelte';
@@ -35,6 +40,10 @@
 </script>
 
 <main>
+  {#if pantalla.movil && !actual}
+    <!-- Celular, pantallas de afuera: barra simple arriba, la pestaña elegida y las pestañas abajo. -->
+    <header class="barra-movil"><LogoThunderop /><Campanita /></header>
+  {:else}
   <BarraTitulo>
     <h1><button class="plano logo" onclick={() => (grupoActual.id = null)} aria-label="Inicio"><LogoThunderop /></button></h1>
     <div class="libre" data-tauri-drag-region>
@@ -44,6 +53,7 @@
     <button class="plano icono engranaje" aria-label="Configuración" title="Configuración" onclick={() => (config = true)}><Settings size={20} strokeWidth={1.75} /></button>
     <MenuPerfil />
   </BarraTitulo>
+  {/if}
   {#if config}<Configuracion cerrar={() => (config = false)} />{/if}
   {#if voz.error}
     <p class="aviso" role="alert">{voz.error} <button class="plano" aria-label="Cerrar aviso" onclick={() => (voz.error = '')}>✕</button></p>
@@ -53,15 +63,23 @@
     {#key actual.id}
       <Grupo grupo={actual} volver={() => (grupoActual.id = null)} />
     {/key}
+  {:else if pantalla.movil}
+    {#if navMovil.pestana === 'grupos'}<Inicio vista="grupos" />
+    {:else if navMovil.pestana === 'amigos'}<Amigos />
+    {:else if navMovil.pestana === 'perfil'}<PerfilMovil abrirConfig={() => (config = true)} />
+    {:else}<Inicio />{/if}
   {:else}
     <Inicio />
   {/if}
   {#if voz.salaId}<Dock />{/if}
+  {#if pantalla.movil && !actual}<Pestanas />{/if}
   <div class="reproductor" bind:this={hostMusica}></div>
 </main>
 
 <style>
   main { height: 100%; display: flex; flex-direction: column; }
+  .barra-movil { flex: none; display: flex; align-items: center; justify-content: space-between; height: calc(52px + env(safe-area-inset-top));
+    padding: env(safe-area-inset-top) 8px 0 16px; background: var(--fondo); border-bottom: 1px solid var(--borde); }
   .logo { padding: 0 8px; min-height: 36px; border-radius: var(--radio); }
   .miga { padding-left: 12px; font-size: 13px; color: var(--tenue); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .miga b { color: var(--texto); font-weight: 600; }

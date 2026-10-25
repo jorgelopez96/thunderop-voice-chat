@@ -95,7 +95,7 @@
 {/if}
 
 <style>
-  .amigos { display: flex; flex-direction: column; min-height: 0; background: var(--panel); border-left: 1px solid var(--borde); --anillo: var(--panel); }
+  .amigos { flex: 1; display: flex; flex-direction: column; min-height: 0; background: var(--panel); border-left: 1px solid var(--borde); --anillo: var(--panel); }
   .cabecera { display: flex; align-items: center; justify-content: space-between; gap: 8px; height: 52px; padding: 0 12px 0 16px; flex: none; border-bottom: 1px solid var(--borde); }
   .cabecera h2 { font-size: 15px; font-weight: 700; letter-spacing: 0; }
   .cuerpo { flex: 1; overflow-y: auto; padding: 4px 8px 16px; }

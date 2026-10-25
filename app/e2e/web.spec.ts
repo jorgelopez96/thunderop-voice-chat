@@ -92,3 +92,28 @@ test('cancelar el selector del navegador no deja nada a medias', async ({ browse
   await expect(a.getByRole('alert')).toHaveCount(0);
   await expect(a.getByRole('button', { name: 'Transmitir', exact: true })).toBeVisible();
 });
+
+const CELULAR = { width: 390, height: 844 };
+const sinScrollLateral = (p: import('@playwright/test').Page) => p.evaluate(() => document.documentElement.scrollWidth <= innerWidth);
+
+test('celular: pestañas abajo con Inicio, Grupos, Amigos y Perfil', async ({ browser }) => {
+  const p = await (await browser.newContext({ viewport: CELULAR })).newPage();
+  await crearCuenta(p, 'Ana');
+  const pestanas = p.getByRole('navigation', { name: 'Secciones' });
+  for (const n of ['Inicio', 'Grupos', 'Amigos', 'Perfil']) await expect(pestanas.getByRole('button', { name: n })).toBeVisible();
+  expect(await sinScrollLateral(p)).toBe(true);
+  await pestanas.getByRole('button', { name: 'Amigos' }).click();
+  await expect(p.getByRole('button', { name: 'Agregar amigo' }).first()).toBeVisible();
+  expect(await sinScrollLateral(p)).toBe(true);
+  await pestanas.getByRole('button', { name: 'Perfil' }).click();
+  await expect(p.getByLabel('Apodo')).toBeVisible();
+  for (const n of ['Configuración', 'Notificaciones', 'Cerrar sesión']) await expect(p.locator('.perfil-movil').getByRole('button', { name: n, exact: true })).toBeVisible();
+  expect(await sinScrollLateral(p)).toBe(true);
+});
+
+test('PC: sin pestañas, con la barra de siempre', async ({ browser }) => {
+  const p = await (await browser.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
+  await crearCuenta(p, 'Ana');
+  await expect(p.getByRole('navigation', { name: 'Secciones' })).toHaveCount(0);
+  await expect(p.getByRole('button', { name: 'Configuración' })).toBeVisible();
+});

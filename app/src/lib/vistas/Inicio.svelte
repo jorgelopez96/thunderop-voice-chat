@@ -10,6 +10,10 @@
   import Avatar from './Avatar.svelte';
   import Novedades from './Novedades.svelte';
   import Amigos from './Amigos.svelte';
+  import { pantalla } from '../plataforma.svelte';
+
+  // `vista: 'grupos'`: la pestaña Grupos del celular (solo la lista de grupos).
+  let { vista = 'todo' }: { vista?: 'todo' | 'grupos' } = $props();
 
   const yaCree = $derived(grupos.lista.some((g) => g.owner === sesion.usuario?.id));
 
@@ -90,9 +94,9 @@
   </div>
 {/snippet}
 
-<div class="inicio">
+<div class="inicio" class:movil={pantalla.movil}>
   <div class="principal">
-    <header class="cabecera"><h2>¡Hola, {sesion.usuario?.name}!</h2></header>
+    <header class="cabecera"><h2>{vista === 'grupos' ? 'Grupos' : `¡Hola, ${sesion.usuario?.name}!`}</h2></header>
     <div class="contenido">
       {#if grupos.cargado && !grupos.lista.length}
         <section class="vacio">
@@ -103,7 +107,7 @@
           {#if agregando}{@render formulario()}{/if}
         </section>
       {:else}
-        {#if voz.salaId && miGrupo}
+        {#if vista === 'grupos'}{:else if voz.salaId && miGrupo}
           <section>
             <div class="encabezado"><h2>Ahora en voz</h2></div>
             <div class="en-voz">
@@ -163,14 +167,22 @@
           </div>
         </section>
       {/if}
-      <Novedades />
+      {#if vista !== 'grupos'}<Novedades />{/if}
     </div>
   </div>
-  <Amigos />
+  {#if !pantalla.movil}<Amigos />{/if}
 </div>
 
 <style>
   .inicio { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 280px; }
+  .inicio.movil { grid-template-columns: minmax(0, 1fr); }
+  .movil .cabecera { padding: 0 16px; }
+  .movil .contenido { padding: 16px 16px 24px; gap: 24px; }
+  .movil .grupos { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
+  .movil .grupo { width: 100%; }
+  .movil .en-voz { grid-template-columns: 44px 1fr; }
+  .movil .en-voz > button { grid-column: 1 / -1; }
+  .movil .icono-grupo { width: 44px; height: 44px; font-size: 18px; }
   .principal { display: flex; flex-direction: column; min-height: 0; }
   .cabecera { display: flex; align-items: center; height: 52px; padding: 0 32px; flex: none; border-bottom: 1px solid var(--borde); }
   .cabecera h2 { font-size: 17px; font-weight: 650; }
