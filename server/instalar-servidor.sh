@@ -75,7 +75,9 @@ WantedBy=multi-user.target
 UNIT
 }
 servicio livekit "$DEST/livekit-server --config $DEST/livekit.yaml"
-servicio pocketbase "$DEST/pocketbase serve --http=127.0.0.1:8090 --dir $DEST/pb_data --migrationsDir $DEST/pb_migrations --hooksDir $DEST/pb_hooks"
+# CORS acotado: solo la app de escritorio (tauri.localhost), la versión web, la página y el desarrollo local.
+ORIGENES="https://app.thunderop.com,https://www.thunderop.com,https://thunderop.com,https://thunderop-web.vercel.app,http://tauri.localhost,tauri://localhost,http://localhost:1420,http://localhost:5173"
+servicio pocketbase "$DEST/pocketbase serve --http=127.0.0.1:8090 --dir $DEST/pb_data --migrationsDir $DEST/pb_migrations --hooksDir $DEST/pb_hooks --origins=$ORIGENES"
 
 # Si LiveKit arranca antes que la red (o cambia la IP pública), no anuncia la IP pública y la voz
 # no conecta nunca. Cada 5 minutos se compara con la IP actual y, si no está, se reinicia.
