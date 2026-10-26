@@ -10,7 +10,7 @@
   import Voz from './Voz.svelte';
   import { voz, entrarVoz } from '../voz.svelte';
   import Confirmar from './Confirmar.svelte';
-  import { ChevronDown, Hash, UserPlus, Pencil, Trash2, Settings, Volume2, Monitor, ArrowUpDown, ArrowUp, ArrowDown } from '@lucide/svelte';
+  import { ChevronDown, Hash, UserPlus, Pencil, Trash2, Settings, Volume2, Monitor, ArrowUpDown } from '@lucide/svelte';
   import Avatar from './Avatar.svelte';
   import Cajon from './movil/Cajon.svelte';
   import { pantalla } from '../plataforma.svelte';
@@ -98,6 +98,9 @@
   // La barrita de llamada pidió volver a la sala.
   $effect(() => { if (navMovil.irASala && voz.salaId && salaVoz) { centroVoz = true; navMovil.irASala = false; } });
 
+  let arrastreSeccion = $state<'voz' | 'chat' | null>(null);
+  let seccionSobre = $state<'voz' | 'chat' | null>(null);
+  const invertirSecciones = () => hacer(async () => { await pb.collection('groups').update(grupo.id, { chatsArriba: !grupo.chatsArriba }); });
   // El dueño ordena las salas arrastrándolas dentro de su sección.
   let arrastrada = $state<RecordModel | null>(null);
   let sobre = $state<string | null>(null);
@@ -109,14 +112,6 @@
     lista.splice(lista.findIndex((x) => x.id === destino.id), 0, r);
     hacer(() => ordenarSalas(lista));
   }
-  /** Sube o baja una sala un lugar dentro de su sección. */
-  function mover(r: RecordModel, paso: -1 | 1) {
-    const lista = [...(r.kind === 'voz' ? salasVoz : chat)];
-    const i = lista.findIndex((x) => x.id === r.id);
-    lista.splice(i, 1);
-    lista.splice(i + paso, 0, r);
-    hacer(() => ordenarSalas(lista));
-  }
   async function guardarNombre() {
     const e = editando;
     dlgNombre?.close();
@@ -126,7 +121,7 @@
 
 {#snippet sala(r: RecordModel)}
   {@const q = r.kind === 'voz' ? quienes(r) : []}
-  <li class="sala" class:sobre={sobre === r.id} draggable={soyDueno}
+  <li class="sala" class:sobre={sobre === r.id} draggable={soyDueno && !pantalla.movil}
     ondragstart={(e) => { arrastrada = r; e.dataTransfer?.setData('text/plain', r.id); }}
     ondragover={(e) => { if (arrastrada && arrastrada.kind === r.kind) { e.preventDefault(); sobre = r.id; } }}
     ondragleave={() => sobre === r.id && (sobre = null)} ondrop={(e) => { e.preventDefault(); soltar(r); }} ondragend={() => (arrastrada = sobre = null)}
@@ -154,8 +149,13 @@
   {/if}
 {/snippet}
 
-{#snippet titulo(texto: string)}
-  <div class="seccion-salas"><h3>{texto}</h3></div>
+<!-- Arrastrar el título de una sección sobre el de la otra las da vuelta (dueño, en la PC). -->
+{#snippet titulo(texto: string, tipo: 'voz' | 'chat')}
+  <div class="seccion-salas" class:sobre={seccionSobre === tipo} role="heading" aria-level="3"
+    draggable={soyDueno && !pantalla.movil} ondragstart={(e) => { arrastreSeccion = tipo; e.dataTransfer?.setData('text/plain', tipo); }}
+    ondragover={(e) => { if (arrastreSeccion && arrastreSeccion !== tipo) { e.preventDefault(); seccionSobre = tipo; } }}
+    ondragleave={() => seccionSobre === tipo && (seccionSobre = null)} ondragend={() => (arrastreSeccion = seccionSobre = null)}
+    ondrop={(e) => { e.preventDefault(); const otra = arrastreSeccion; arrastreSeccion = seccionSobre = null; if (otra && otra !== tipo) invertirSecciones(); }}>{texto}</div>
 {/snippet}
 
 <div class="grupo" class:enSalaVoz class:movil={pantalla.movil} use:deslizar={{ alAbrirIzq: abrirIzq, alAbrirDer: abrirDer }}>
@@ -175,8 +175,8 @@
     </button>
     {#if error}<p role="alert">{error}</p>{/if}
 
-    {#snippet seccionVoz()}{@render titulo('Salas de voz')}<ul>{#each salasVoz as r (r.id)}{@render sala(r)}{/each}</ul>{/snippet}
-    {#snippet seccionChats()}{@render titulo('Chats')}<ul>{#each chat as r (r.id)}{@render sala(r)}{/each}</ul>{/snippet}
+    {#snippet seccionVoz()}{@render titulo('Salas de voz', 'voz')}<ul>{#each salasVoz as r (r.id)}{@render sala(r)}{/each}</ul>{/snippet}
+    {#snippet seccionChats()}{@render titulo('Chats', 'chat')}<ul>{#each chat as r (r.id)}{@render sala(r)}{/each}</ul>{/snippet}
     {#if grupo.chatsArriba}{@render seccionChats()}{@render seccionVoz()}{:else}{@render seccionVoz()}{@render seccionChats()}{/if}
 
   </nav>
@@ -214,9 +214,6 @@
   <div popover class="menu" bind:this={menuSalaEl}>
     {#if menuSala}{@const r = menuSala}
       <button class="plano" onclick={() => { menuSalaEl?.hidePopover(); editando = { id: r.id, name: r.name }; }}><Pencil size={16} strokeWidth={1.75} /> Cambiar nombre</button>
-      {@const hermanas = r.kind === 'voz' ? salasVoz : chat}{@const i = hermanas.findIndex((x) => x.id === r.id)}
-      {#if i > 0}<button class="plano" onclick={() => { menuSalaEl?.hidePopover(); mover(r, -1); }}><ArrowUp size={16} strokeWidth={1.75} /> Subir</button>{/if}
-      {#if i < hermanas.length - 1}<button class="plano" onclick={() => { menuSalaEl?.hidePopover(); mover(r, 1); }}><ArrowDown size={16} strokeWidth={1.75} /> Bajar</button>{/if}
       <hr /><button class="plano peligro" onclick={() => { menuSalaEl?.hidePopover(); confirmar = { texto: `¿Borrar la sala "${r.name}"?`, hacer: () => borrarSala(r.id) }; }}><Trash2 size={16} strokeWidth={1.75} /> Borrar sala</button>
     {/if}
   </div>
@@ -259,7 +256,9 @@
   .cabecera { flex: none; justify-content: space-between; height: 52px; margin: 0 -8px 4px; padding: 0 16px; border-radius: 0; border-bottom: 1px solid var(--borde); color: var(--texto); }
   .cabecera h2 { font-size: 15px; font-weight: 700; letter-spacing: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .seccion-salas { display: flex; align-items: center; justify-content: space-between; margin: 16px 0 4px; padding: 0 0 0 8px; }
-  .seccion-salas h3 { margin: 0; }
+  .seccion-salas { font-size: 11.5px; font-weight: 650; text-transform: uppercase; letter-spacing: .06em; color: var(--apagado); border-radius: var(--radio); }
+  .seccion-salas[draggable='true'] { cursor: grab; }
+  .seccion-salas.sobre { box-shadow: inset 0 2px var(--acento); }
   .sala { display: flex; flex-wrap: wrap; align-items: center; border-radius: var(--radio); }
   .sala:hover { background: var(--hover); }
   .sala.activa { background: var(--activo); }

@@ -209,7 +209,7 @@ async function mantenerApretado(l: import('@playwright/test').Locator) {
   await l.dispatchEvent('pointerup', pos);
 }
 
-test('celular: mantener apretado abre las acciones de mensajes, personas y salas', async ({ browser }) => {
+test('celular: mantener apretado abre las acciones de mensajes y personas', async ({ browser }) => {
   const p = await (await browser.newContext({ viewport: CELULAR, hasTouch: true })).newPage();
   await crearCuenta(p, 'Ana');
   await p.getByRole('button', { name: 'Crear mi grupo' }).click();
@@ -229,17 +229,7 @@ test('celular: mantener apretado abre las acciones de mensajes, personas y salas
   await expect(p.getByRole('button', { name: 'Ver perfil' })).toBeVisible();
   await p.keyboard.press('Escape');
   await p.goBack();
-  // Salas: el dueño crea otra y la sube con Subir.
-  await p.getByRole('button', { name: 'Abrir salas' }).click();
-  await p.getByRole('button', { name: 'Toques', exact: true }).click(); // menú del nombre del grupo
-  await p.getByRole('button', { name: 'Nueva sala de chat' }).click();
-  await p.getByPlaceholder('Nombre de la sala').fill('memes');
-  await p.getByRole('button', { name: 'Crear', exact: true }).click();
-  const orden = () => p.locator('.salas li.sala button.nombre').evaluateAll((b) => b.map((x) => x.getAttribute('aria-label')));
-  await expect.poll(orden).toContain('Sala de chat memes');
-  await mantenerApretado(p.getByRole('button', { name: 'Sala de chat memes' }));
-  await p.getByRole('button', { name: 'Subir' }).click();
-  await expect.poll(async () => { const o = await orden(); return o.indexOf('Sala de chat memes') < o.indexOf('Sala de chat General'); }).toBe(true);
+  // En el celular las salas no se ordenan (eso es en la PC, arrastrando).
 });
 
 const IPHONE = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1';
@@ -410,4 +400,26 @@ test('dos transmisiones se ven juntas sin scroll (mitad y mitad) y se pueden ocu
   expect(Math.abs(x!.y - y!.y)).toBeLessThan(4); // lado a lado
   await c.getByRole('button', { name: 'Mostrar participantes' }).click();
   await expect(c.locator('section.voz .franja')).toBeVisible();
+});
+
+test('PC: el dueño ordena salas y secciones arrastrando con el mouse (sin Subir/Bajar)', async ({ browser }) => {
+  const p = await (await browser.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
+  await crearCuenta(p, 'Ana');
+  await crearGrupo(p, 'Orden');
+  await p.getByRole('button', { name: 'Orden', exact: true }).click();
+  await p.getByRole('button', { name: 'Nueva sala de chat' }).click();
+  await p.getByPlaceholder('Nombre de la sala').fill('memes');
+  await p.getByRole('button', { name: 'Crear', exact: true }).click();
+  const orden = () => p.locator('.salas li.sala button.nombre').evaluateAll((b) => b.map((x) => x.getAttribute('aria-label')));
+  await expect.poll(orden).toContain('Sala de chat memes');
+  // Sin botones de subir/bajar en el menú de la sala.
+  await p.getByRole('button', { name: 'Sala de chat memes' }).click({ button: 'right' });
+  await expect(p.getByRole('button', { name: 'Subir' })).toHaveCount(0);
+  await p.keyboard.press('Escape');
+  // Arrastrar memes encima de General.
+  await p.getByRole('button', { name: 'Sala de chat memes' }).dragTo(p.getByRole('button', { name: 'Sala de chat General' }));
+  await expect.poll(async () => { const o = await orden(); return o.indexOf('Sala de chat memes') < o.indexOf('Sala de chat General'); }).toBe(true);
+  // Arrastrar la sección Chats encima de Salas de voz: los chats pasan arriba.
+  await p.getByRole('heading', { name: 'Chats' }).dragTo(p.getByRole('heading', { name: 'Salas de voz' }));
+  await expect.poll(async () => (await orden())[0]?.startsWith('Sala de chat')).toBe(true);
 });
