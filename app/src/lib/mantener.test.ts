@@ -46,4 +46,13 @@ describe('mantener apretado', () => {
     vi.advanceTimersByTime(600);
     expect(llamado).not.toHaveBeenCalled();
   });
+
+  it('el menú del sistema solo se bloquea con el dedo, no con el clic derecho del mouse (Safari no manda pointerType)', () => {
+    const { h } = armar();
+    const conMouse = vi.fn(), conDedo = vi.fn();
+    h.contextmenu({ preventDefault: conMouse });
+    h.contextmenu({ pointerType: 'touch', preventDefault: conDedo });
+    expect(conMouse).not.toHaveBeenCalled();
+    expect(conDedo).toHaveBeenCalled();
+  });
 });

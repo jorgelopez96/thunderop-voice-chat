@@ -16,7 +16,7 @@ export function mantener(nodo: HTMLElement, alMantener: (x: number, y: number) =
     if (reloj && Math.hypot(e.clientX - desde.x, e.clientY - desde.y) > TOLERANCIA) cancelar();
   };
   // El menú del sistema (copiar, compartir) no aparece encima del nuestro.
-  const menuNativo = (e: Event) => { if ((e as PointerEvent).pointerType !== 'mouse') e.preventDefault(); };
+  const menuNativo = (e: Event) => { const t = (e as PointerEvent).pointerType; if (t === 'touch' || t === 'pen') e.preventDefault(); };
   nodo.addEventListener('pointerdown', abajo);
   nodo.addEventListener('pointermove', mueve);
   nodo.addEventListener('pointerup', cancelar);
