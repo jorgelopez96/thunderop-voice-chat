@@ -480,3 +480,22 @@ test('celular: Google es solo el logo y la Configuración entra en la pantalla c
   expect((await icono.boundingBox())!.width).toBeGreaterThanOrEqual(15);
   expect(await sinScrollLateral(p)).toBe(true);
 });
+
+test('celular: los modales entran en la pantalla (confirmar borrar un mensaje)', async ({ browser }) => {
+  const p = await (await browser.newContext({ viewport: { width: 360, height: 740 }, hasTouch: true })).newPage();
+  await crearCuenta(p, 'Ana');
+  await p.getByRole('button', { name: 'Crear mi grupo' }).click();
+  await p.getByPlaceholder('Nombre del grupo nuevo').fill('Modales');
+  await p.getByRole('button', { name: 'Crear grupo' }).click();
+  await p.getByRole('button', { name: 'Sala de chat General' }).click();
+  await p.getByPlaceholder('Escribí un mensaje').fill('borrame');
+  await p.getByRole('button', { name: 'Enviar' }).click();
+  await mantenerApretado(p.getByTestId('mensaje').filter({ hasText: 'borrame' }));
+  await p.getByRole('menu').getByRole('button', { name: 'Borrar' }).click();
+  const d = p.locator('dialog[open]').last();
+  await expect(d).toBeVisible();
+  const c = (await d.boundingBox())!;
+  expect(c.x).toBeGreaterThanOrEqual(8);
+  expect(c.x + c.width).toBeLessThanOrEqual(360 - 8);
+  expect(await sinScrollLateral(p)).toBe(true);
+});
