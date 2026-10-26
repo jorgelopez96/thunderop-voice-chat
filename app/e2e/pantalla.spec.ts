@@ -20,6 +20,12 @@ async function conSimulado(p: Page) {
   await p.addInitScript(() => localStorage.setItem('dm.simularNativo', '1'));
   return p;
 }
+
+/** Dejar de transmitir y confirmar (desde la 0.7.1 se pregunta antes de cortar). */
+async function cortar(p: Page) {
+  await p.getByRole('button', { name: 'Dejar de transmitir' }).click();
+  await p.getByRole('dialog').getByRole('button', { name: 'Dejar de transmitir' }).click();
+}
 test('transmitir y ver una pantalla', async ({ browser }) => {
   const [a, b, c] = await Promise.all([0, 1, 2].map(async () => conSimulado(await (await browser.newContext()).newPage())));
 
@@ -88,7 +94,7 @@ test('transmitir y ver una pantalla', async ({ browser }) => {
   expect(await framesDe(c, 'Ana')).toBe(0);
 
   // Ana corta: Beto pierde el video y el botón en menos de 5 s.
-  await a.getByRole('button', { name: 'Dejar de transmitir' }).click();
+  await cortar(a);
   await expect(b.getByLabel('Pantalla de Ana')).toHaveCount(0, { timeout: 5000 });
   await expect(tarjeta(b, 'Ana').getByRole('button', { name: /^(Ver|Dejar de ver)$/ })).toHaveCount(0, { timeout: 5000 });
 
@@ -144,6 +150,6 @@ test('mirar dos transmisiones a la vez', async ({ browser }) => {
   await tarjeta(c, 'Ana').getByRole('button', { name: 'Dejar de ver' }).click();
   await expect(c.getByLabel('Pantalla de Ana')).toHaveCount(0);
   await expect(c.getByLabel('Pantalla de Beto')).toBeVisible();
-  await b.getByRole('button', { name: 'Dejar de transmitir' }).click();
+  await cortar(b);
   await expect(c.getByLabel('Pantalla de Beto')).toHaveCount(0, { timeout: 10_000 });
 });
