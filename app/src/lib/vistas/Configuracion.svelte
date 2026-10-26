@@ -122,7 +122,7 @@
       <h3>Desactivar o borrar la cuenta</h3>
       <div class="item"><span>Desactivar la cuenta<small>Te ven desconectado y se cierra la sesión en todos lados. Volvés a activarla entrando de nuevo.</small></span>
         <button onclick={() => (desactivar = true)}>Desactivar</button></div>
-      <div class="item"><span>Borrar la cuenta<small>Se borra para siempre, junto con el grupo que creaste.</small></span>
+      <div class="item"><span>Borrar la cuenta<small>Se borra para siempre, junto con los grupos que creaste.</small></span>
         {#if borrar === 0}<button class="peligro" onclick={() => (borrar = 1)}><Trash2 size={15} strokeWidth={1.75} />Borrar</button>{/if}</div>
       {#if borrar === 1}
         <p>¿Seguro? No se puede recuperar.</p>

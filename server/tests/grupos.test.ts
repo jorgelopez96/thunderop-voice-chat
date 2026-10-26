@@ -33,10 +33,10 @@ describe('grupos', () => {
     expect(salas.map((s) => [s.name, s.kind])).toEqual([['General', 'chat'], ['General', 'voz']]);
   });
 
-  it('one group per user', async () => {
+  it('cada uno puede crear varios grupos, hasta 10', async () => {
     const a = await h.nuevoUsuario('ana');
-    await a.collection('groups').create({ name: 'uno' });
-    await expect(a.collection('groups').create({ name: 'dos' })).rejects.toMatchObject({ status: 400 });
+    for (let i = 1; i <= 10; i++) await a.collection('groups').create({ name: `g${i}` });
+    await expect(a.collection('groups').create({ name: 'g11' })).rejects.toMatchObject({ status: 400, message: 'Llegaste al máximo de 10 grupos creados.' });
   });
 
   it('non-member cannot view group', async () => {

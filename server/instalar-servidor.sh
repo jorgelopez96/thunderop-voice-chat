@@ -116,8 +116,15 @@ $DOMINIO {
 	handle /rtc* {
 		reverse_proxy 127.0.0.1:7880
 	}
-	# El panel de PocketBase no se expone: se entra desde la misma máquina (http://127.0.0.1:8090/_/).
+	# El panel de PocketBase no se expone (se entra desde la misma máquina: http://127.0.0.1:8090/_/). Solo /_/ exacto,
+	# donde termina la ventana de "entrar con Google" (/_/#/auth/oauth2-redirect-…), muestra una página que se cierra
+	# sola: el login ya quedó hecho en la app por realtime.
 	handle /_/* {
+		@cierre path /_/
+		handle @cierre {
+			header Content-Type "text/html; charset=utf-8"
+			respond `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Thunderop</title><body style="margin:0;height:100vh;display:grid;place-items:center;background:#0D0E13;color:#ECEDF3;font:16px system-ui,sans-serif"><p>Listo, ya podés volver a Thunderop.</p><script>window.close()</script>` 200
+		}
 		respond 403
 	}
 	# Instalador y actualizaciones de la app (lo que deja npm run release en app/release/).

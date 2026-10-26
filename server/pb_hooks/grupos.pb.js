@@ -4,6 +4,7 @@
 onRecordCreateRequest((e) => {
   // los superusers conservan los valores que mandan
   if (e.auth && e.auth.collection().name === "users") {
+    if (e.app.countRecords("groups", $dbx.hashExp({ owner: e.auth.id })) >= 10) throw new BadRequestError("Llegaste al máximo de 10 grupos creados.");
     e.record.set("owner", e.auth.id);
     e.record.set("members", [e.auth.id]);
     e.record.set("ingresos", { [e.auth.id]: new Date().toISOString() });

@@ -15,7 +15,6 @@
   // `vista: 'grupos'`: la pestaña Grupos del celular (solo la lista de grupos).
   let { vista = 'todo' }: { vista?: 'todo' | 'grupos' } = $props();
 
-  const yaCree = $derived(grupos.lista.some((g) => g.owner === sesion.usuario?.id));
 
   // Quiénes están en voz en cada sala de cada grupo (presencia del servidor), refrescado cada 15 s mientras se ve la portada.
   type EnVoz = { id: string; name: string };
@@ -80,12 +79,10 @@
 
 {#snippet formulario()}
   <div class="tarjeta agregar">
-    {#if !yaCree}
-      <form class="fila" onsubmit={(e) => { e.preventDefault(); hacer(async () => { await crearGrupo(nombre.trim()); nombre = ''; }); }}>
-        <input bind:value={nombre} required maxlength="40" placeholder="Nombre del grupo nuevo" />
-        <button type="submit" class="primario">Crear grupo</button>
-      </form>
-    {/if}
+    <form class="fila" onsubmit={(e) => { e.preventDefault(); hacer(async () => { await crearGrupo(nombre.trim()); nombre = ''; }); }}>
+      <input bind:value={nombre} required maxlength="40" placeholder="Nombre del grupo nuevo" />
+      <button type="submit" class="primario">Crear grupo</button>
+    </form>
     <form class="fila" onsubmit={(e) => { e.preventDefault(); hacer(async () => { await unirse(codigo); codigo = ''; }); }}>
       <input bind:value={codigo} required placeholder="Código o link de invitación" />
       <button type="submit">Unirme</button>
