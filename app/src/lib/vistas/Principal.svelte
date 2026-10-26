@@ -50,7 +50,8 @@
 <main>
   {#if pantalla.movil}
     <!-- Celular: afuera, barra simple arriba y pestañas abajo; adentro de un grupo, la cabecera del chat o la sala. -->
-    {#if !actual}<header class="barra-movil"><LogoThunderop /><Campanita /></header>{/if}
+    {#if !actual}<header class="barra-movil"><LogoThunderop /><span class="acciones-movil"><Campanita />
+      <button class="plano icono engranaje" aria-label="Configuración" title="Configuración" onclick={() => (config = true)}><Settings size={20} strokeWidth={1.75} /></button></span></header>{/if}
   {:else}
   <BarraTitulo>
     <h1><button class="plano logo" onclick={() => (grupoActual.id = null)} aria-label="Inicio"><LogoThunderop /></button></h1>
@@ -74,7 +75,7 @@
   {:else if pantalla.movil}
     {#if navMovil.pestana === 'grupos'}<Inicio vista="grupos" />
     {:else if navMovil.pestana === 'amigos'}<Amigos />
-    {:else if navMovil.pestana === 'perfil'}<PerfilMovil abrirConfig={() => (config = true)} />
+    {:else if navMovil.pestana === 'perfil'}<PerfilMovil />
     {:else}<Inicio />{/if}
   {:else}
     <Inicio />
@@ -87,6 +88,7 @@
 
 <style>
   main { height: 100%; display: flex; flex-direction: column; }
+  .acciones-movil { display: flex; align-items: center; gap: 2px; }
   .barra-movil { flex: none; display: flex; align-items: center; justify-content: space-between; height: calc(52px + env(safe-area-inset-top));
     padding: env(safe-area-inset-top) 8px 0 16px; background: var(--fondo); border-bottom: 1px solid var(--borde); }
   .logo { padding: 0 8px; min-height: 36px; border-radius: var(--radio); }

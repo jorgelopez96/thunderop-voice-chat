@@ -1,17 +1,14 @@
 <script lang="ts">
-  import { Settings, Bell, LogOut } from '@lucide/svelte';
+  import { LogOut } from '@lucide/svelte';
   import Perfil from '../Perfil.svelte';
   import { salir } from '../../sesion.svelte';
 
-  // Pestaña Perfil del celular: el editor de perfil y lo que en la PC está en la barra de arriba.
-  let { abrirConfig }: { abrirConfig: () => void } = $props();
+  // Pestaña Perfil del celular: el editor de perfil y cerrar sesión (configuración y notificaciones están arriba).
 </script>
 
 <div class="perfil-movil">
   <Perfil />
   <div class="acciones">
-    <button onclick={abrirConfig}><Settings size={18} strokeWidth={1.75} />Configuración</button>
-    <button onclick={() => document.getElementById('campanita')?.showPopover()}><Bell size={18} strokeWidth={1.75} />Notificaciones</button>
     <button class="peligro" onclick={salir}><LogOut size={18} strokeWidth={1.75} />Cerrar sesión</button>
   </div>
 </div>

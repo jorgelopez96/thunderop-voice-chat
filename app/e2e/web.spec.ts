@@ -107,7 +107,10 @@ test('celular: pestañas abajo con Inicio, Grupos, Amigos y Perfil', async ({ br
   expect(await sinScrollLateral(p)).toBe(true);
   await pestanas.getByRole('button', { name: 'Perfil' }).click();
   await expect(p.getByLabel('Apodo')).toBeVisible();
-  for (const n of ['Configuración', 'Notificaciones', 'Cerrar sesión']) await expect(p.locator('.perfil-movil').getByRole('button', { name: n, exact: true })).toBeVisible();
+  // Configuración y notificaciones van arriba (engranaje y campanita), no repetidas en Perfil.
+  await expect(p.locator('.perfil-movil').getByRole('button', { name: 'Cerrar sesión', exact: true })).toBeVisible();
+  for (const n of ['Configuración', 'Notificaciones']) await expect(p.locator('.perfil-movil').getByRole('button', { name: n, exact: true })).toHaveCount(0);
+  await expect(p.locator('.barra-movil').getByRole('button', { name: 'Configuración' })).toBeVisible();
   expect(await sinScrollLateral(p)).toBe(true);
 });
 
@@ -443,4 +446,26 @@ test('tocar una notificación de mención lleva a ese chat', async ({ browser })
   await a.locator('#campanita').getByRole('button', { name: /te mencionó/ }).click();
   await expect(a.getByTestId('mensaje').filter({ hasText: 'mirá esto' })).toBeVisible({ timeout: 10_000 });
   await expect(a.locator('h2.titulo', { hasText: '# General' })).toBeVisible();
+});
+
+test('celular: Google es solo el logo y la Configuración entra en la pantalla con solapas deslizables', async ({ browser }) => {
+  const p = await (await browser.newContext({ viewport: CELULAR })).newPage();
+  await p.goto('/');
+  const google = p.getByRole('button', { name: 'Entrar con Google' });
+  await expect(google).toBeVisible();
+  expect((await google.textContent())!.trim()).toBe('');
+  expect((await google.boundingBox())!.width).toBeLessThanOrEqual(56);
+  await crearCuenta(p, 'Ana');
+  await p.locator('.barra-movil').getByRole('button', { name: 'Configuración' }).click();
+  const modal = p.locator('dialog.config');
+  await expect(modal).toBeVisible();
+  const caja = (await modal.boundingBox())!;
+  expect(caja.x).toBeGreaterThanOrEqual(0);
+  expect(caja.x + caja.width).toBeLessThanOrEqual(CELULAR.width);
+  const solapas = modal.locator('.solapas');
+  expect(await solapas.evaluate((e) => getComputedStyle(e).overflowX)).toBe('auto');
+  expect(await solapas.evaluate((e) => getComputedStyle(e).scrollbarWidth)).toBe('none');
+  const icono = modal.getByRole('tab', { name: 'Apariencia y rendimiento' }).locator('svg');
+  expect((await icono.boundingBox())!.width).toBeGreaterThanOrEqual(15);
+  expect(await sinScrollLateral(p)).toBe(true);
 });
