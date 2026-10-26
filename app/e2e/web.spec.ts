@@ -361,3 +361,53 @@ test('dejar de transmitir pide confirmación; la cabecera de la sala no repite e
   await a.getByRole('dialog').getByRole('button', { name: 'Dejar de transmitir' }).click();
   await expect(tarjeta.getByText('EN VIVO')).toHaveCount(0, { timeout: 15_000 });
 });
+
+/** Ana y Beto transmiten (pantalla falsa) y Caro los mira a los dos. */
+async function dosTransmitiendo(browser: import('@playwright/test').Browser, viewport = { width: 1280, height: 800 }) {
+  const [a, b, c] = await Promise.all([0, 1, 2].map(async () => (await browser.newContext({ viewport })).newPage()));
+  for (const p of [a, b]) await p.addInitScript(pantallaFalsa);
+  await crearCuenta(a, 'Ana');
+  const link = await crearGrupo(a, 'Dos pantallas');
+  for (const [p, n] of [[b, 'Beto'], [c, 'Caro']] as const) {
+    await crearCuenta(p, n);
+    await p.getByRole('button', { name: 'Unirme con código' }).click();
+    await p.getByPlaceholder('Código o link de invitación').fill(link);
+    await p.getByRole('button', { name: 'Unirme', exact: true }).click();
+  }
+  for (const p of [a, b, c]) await p.getByRole('button', { name: 'Sala de voz General' }).click();
+  await expect(c.locator('section.voz li')).toHaveCount(3, { timeout: 15_000 });
+  for (const p of [a, b]) {
+    await p.getByRole('button', { name: 'Transmitir', exact: true }).click();
+    await p.getByRole('button', { name: 'Empezar' }).click();
+  }
+  return { a, b, c };
+}
+
+test('tarjeta de quien transmite: EN VIVO, foto, nombre y botón no se pisan', async ({ browser }) => {
+  const { c } = await dosTransmitiendo(browser, { width: 1000, height: 700 }); // tarjetas chicas, como en una ventana angosta
+  const t = c.locator('section.voz li', { hasText: 'Ana' });
+  await expect(t.getByText('EN VIVO')).toBeVisible({ timeout: 15_000 });
+  const cajas = await Promise.all([t.locator('.chips-vivo'), t.locator('img.avatar'), t.locator('.etiqueta-nombre'), t.getByRole('button', { name: 'Ver' })].map((l) => l.boundingBox()));
+  const pisan = (x: { x: number; y: number; width: number; height: number }, y: typeof x) => x.x < y.x + y.width && y.x < x.x + x.width && x.y < y.y + y.height && y.y < x.y + x.height;
+  for (let i = 0; i < cajas.length; i++) for (let j = i + 1; j < cajas.length; j++) expect(pisan(cajas[i]!, cajas[j]!), `${i} y ${j} se pisan`).toBe(false);
+});
+
+test('dos transmisiones se ven juntas sin scroll (mitad y mitad) y se pueden ocultar los participantes', async ({ browser }) => {
+  const { c } = await dosTransmitiendo(browser);
+  for (const n of ['Ana', 'Beto']) {
+    const t = c.locator('section.voz li', { hasText: n });
+    await t.getByRole('button', { name: 'Ver' }).click({ timeout: 15_000 });
+  }
+  const pantallas = c.locator('.escenarios .escenario');
+  await expect(pantallas).toHaveCount(2, { timeout: 15_000 });
+  await c.getByRole('button', { name: 'Ocultar participantes' }).click();
+  await expect(c.locator('section.voz .franja')).toBeHidden();
+  const [x, y] = await Promise.all([pantallas.nth(0).boundingBox(), pantallas.nth(1).boundingBox()]);
+  const alto = c.viewportSize()!.height;
+  expect(x!.y + x!.height).toBeLessThanOrEqual(alto);
+  expect(y!.y + y!.height).toBeLessThanOrEqual(alto);
+  expect(Math.abs(x!.width - y!.width)).toBeLessThan(4); // mitad y mitad
+  expect(Math.abs(x!.y - y!.y)).toBeLessThan(4); // lado a lado
+  await c.getByRole('button', { name: 'Mostrar participantes' }).click();
+  await expect(c.locator('section.voz .franja')).toBeVisible();
+});

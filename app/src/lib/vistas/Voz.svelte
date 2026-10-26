@@ -2,7 +2,7 @@
   import { lleno } from '../rango';
   import Insignia from './Insignia.svelte';
   import type { RecordModel } from 'pocketbase';
-  import { MicOff, Users, ChevronRight, MessageSquare, Eye, Volume2, Menu, ChevronLeft } from '@lucide/svelte';
+  import { MicOff, Users, ChevronRight, MessageSquare, Eye, EyeOff, Volume2, Menu, ChevronLeft } from '@lucide/svelte';
   import { pantalla } from '../plataforma.svelte';
   import { mantener } from '../mantener';
   import { navMovil, cerrarCapa } from '../navMovil.svelte';
@@ -66,6 +66,7 @@
   const esIphone = typeof navigator !== 'undefined' && /iPhone|iPad|iPod/.test(navigator.userAgent);
   let avisoLlamada = $state(pantalla.movil && (() => { try { return !sessionStorage.getItem('dm.avisoLlamada'); } catch { return true; } })());
   function entendido() { avisoLlamada = false; try { sessionStorage.setItem('dm.avisoLlamada', '1'); } catch { /* sin almacenamiento: dura esta vista */ } }
+  let ocultarGente = $state(false); // mientras se mira una transmisión, las tarjetas de la gente se pueden esconder
   // En el celular el chat de la sala se abre a pantalla completa desde el dock (navMovil.chatSala).
   const verChat = $derived(pantalla.movil ? navMovil.chatSala : chatAbierto);
   function plegarChat(a: boolean) { chatAbierto = a; try { localStorage.setItem('dm.chatSala', a ? '1' : '0'); } catch { /* sin almacenamiento */ } }
@@ -83,6 +84,7 @@
       <Volume2 size={18} strokeWidth={1.75} color="var(--icono)" />
       <h2>{sala}</h2>
       <span class="en-voz num">{voz.participantes.length} en voz</span>
+      {#if voz.viendo.length}<button class="plano" onclick={() => (ocultarGente = !ocultarGente)}>{#if ocultarGente}<Eye size={16} strokeWidth={1.75} /> Mostrar participantes{:else}<EyeOff size={16} strokeWidth={1.75} /> Ocultar participantes{/if}</button>{/if}
       <button class="plano" onclick={verParticipantes}><Users size={16} strokeWidth={1.75} /> Participantes · {miembros.length}</button>
       {#if !chatAbierto && !pantalla.movil}<button class="icono" onclick={() => plegarChat(true)} aria-label="Abrir chat de la sala" title="Chat de la sala"><MessageSquare size={16} strokeWidth={1.75} /></button>{/if}
     </header>
@@ -93,18 +95,19 @@
 
     {#if voz.viendo.length}
       <!-- Una sola: grande. Varias: lado a lado si entran a un tamaño que se distinga, si no una abajo de la otra. -->
-      <div class="escenarios" class:varias={voz.viendo.length > 1}>
+      <!-- Todas las que se miran entran en el espacio que hay, sin scroll: 1 = entera, 2 = mitad y mitad, 3-4 = de a dos. -->
+      <div class="escenarios" data-n={Math.min(voz.viendo.length, 5)}>
         {#each voz.viendo as sid (sid)}<Pantalla {sid} />{/each}
       </div>
     {/if}
-    <ul class="franja">
+    <ul class="franja" class:oculta={ocultarGente && voz.viendo.length > 0}>
       {#each voz.participantes as p, i (p.id)}
         {@const m = miembro(p.id)}
         <li style:--i={Math.min(i, 5)} class:hablando={p.hablando} class:transmite={p.transmite} style="background:{fondo(m?.color, p.nombre)}" oncontextmenu={(e) => abrirMenu(e, p)} use:mantener={(x, y) => abrirMenu({ clientX: x, clientY: y, preventDefault() {} } as MouseEvent, p)}>
+          {#if p.transmite}<span class="chips-vivo"><span class="vivo"><span class="punto-vivo"></span>EN VIVO</span>{@render espectadores(p.espectadores)}</span>{/if}
           <img class="avatar" alt="" src={foto(m, '256x256')} />
-          {#if p.transmite}<span class="chips-vivo"><span class="vivo"><span class="punto-vivo"></span>EN VIVO</span>{@render espectadores(p.espectadores)}</span>
-            {#if !p.local && p.pantalla}{@const sid = p.pantalla}{@const viendo = voz.viendo.includes(sid)}
-              <button class="primario ver" aria-pressed={viendo} onclick={() => ver(sid, !viendo)}>{viendo ? 'Dejar de ver' : 'Ver'}</button>{/if}{/if}
+          {#if p.transmite && !p.local && p.pantalla}{@const sid = p.pantalla}{@const viendo = voz.viendo.includes(sid)}
+            <button class="primario ver" aria-pressed={viendo} onclick={() => ver(sid, !viendo)}>{viendo ? 'Dejar de ver' : 'Ver'}</button>{/if}
           <span class="etiqueta-nombre">
             {#if p.silenciado}<span class="mic" title="Sin micrófono" aria-label="Silenciado"><MicOff size={16} strokeWidth={1.75} /></span>{/if}
             <span class="nombre">{p.nombre}{p.local ? ' (vos)' : ''}</span><Insignia usuario={m} />
@@ -164,8 +167,11 @@
   h2 { font-size: 15px; font-weight: 650; letter-spacing: 0; }
   .en-voz { margin-right: auto; padding: 2px 8px; border-radius: var(--radio-pildora); font-size: 12px; font-weight: 600; color: var(--ok); background: var(--ok-suave); }
   /* Una tarjeta por persona (como Discord); la pantalla que mirás va arriba, a todo el ancho. */
+  .franja.oculta { display: none; }
   .franja { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 8px; }
-  .franja li { position: relative; aspect-ratio: 16 / 9; display: grid; place-items: center; border: 2px solid var(--borde); border-radius: var(--radio-grande);
+  /* Tres filas fijas: chips (EN VIVO, espectadores) / foto / nombre y botón. La foto se achica con la tarjeta. */
+  .franja li { position: relative; aspect-ratio: 16 / 9; display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: 24px minmax(0, 1fr) 28px;
+    gap: 6px; padding: 8px; border: 2px solid var(--borde); border-radius: var(--radio-grande);
     overflow: hidden; transition: border-color var(--dur-media); }
   .franja li.hablando { border-color: color-mix(in srgb, var(--ok) 70%, transparent); }
   .franja li.transmite:not(.hablando) { border-color: color-mix(in srgb, var(--cian) 45%, transparent); }
@@ -173,24 +179,27 @@
   :global([data-modo='moderno']) .franja li { animation: entra 240ms var(--curva-salida) backwards; animation-delay: calc(var(--i) * 40ms); }
   @keyframes entra { from { opacity: 0; transform: scale(.92); } }
   /* La foto se achica con la tarjeta (container query): nunca pisa los chips de arriba ni el nombre y el botón de abajo. */
-  .franja li { container-type: size; }
-  .franja .avatar { width: clamp(32px, calc(100cqh - 96px), 80px); height: clamp(32px, calc(100cqh - 96px), 80px); }
-  .franja li.transmite .etiqueta-nombre { max-width: calc(100% - 130px); }
-  .etiqueta-nombre { position: absolute; left: 8px; bottom: 8px; max-width: calc(100% - 16px); display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px;
+  .franja .avatar { grid-column: 1 / -1; grid-row: 2; place-self: center; height: 100%; max-height: 80px; width: auto; aspect-ratio: 1; min-height: 28px; }
+  .etiqueta-nombre { grid-column: 1; grid-row: 3; justify-self: start; align-self: end; max-width: 100%; min-width: 0; display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px;
     border-radius: var(--radio-pildora); font-size: 13px; background: rgb(8 9 13 / .75); }
   .nombre { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .mic { color: var(--tenue); display: grid; }
-  .chips-vivo { position: absolute; top: 8px; left: 8px; display: flex; gap: 6px; }
+  .chips-vivo { grid-column: 1 / -1; grid-row: 1; display: flex; gap: 6px; }
   .vivo, .espectadores { display: inline-flex; align-items: center; gap: 5px; height: 24px; padding: 0 8px; border-radius: var(--radio); font-size: 11.5px; font-weight: 750; }
   .vivo { color: #07210F; background: var(--ok); letter-spacing: .03em; }
   .punto-vivo { width: 6px; height: 6px; border-radius: 50%; background: #07210F; }
   :global([data-modo='moderno']) .punto-vivo { animation: latido 2s ease-in-out infinite; }
   @keyframes latido { 50% { opacity: .35; } }
   .espectadores { color: #fff; background: rgb(8 9 13 / .75); font-weight: 650; }
-  .ver { position: absolute; bottom: 8px; right: 8px; min-height: 28px; height: 28px; padding: 0 12px; font-size: 13px; }
+  .ver { grid-column: 2; grid-row: 3; align-self: end; min-height: 28px; height: 28px; padding: 0 12px; font-size: 13px; }
   /* Cada pantalla mide al menos 520 px de ancho (se distingue lo que muestra); si no entran, bajan a otra fila. */
-  .escenarios { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 520px), 1fr)); }
-  .escenarios.varias { --alto: 46vh; }
+  /* Las transmisiones ocupan el espacio libre (el centro es una columna flex): nada de scroll para ver la segunda. */
+  .escenarios { flex: 1 0 280px; min-height: 0; display: grid; gap: 8px; grid-template-columns: 1fr; grid-auto-rows: minmax(0, 1fr); }
+  .escenarios[data-n='2'] { grid-template-columns: 1fr 1fr; }
+  .escenarios[data-n='3'], .escenarios[data-n='4'] { grid-template-columns: 1fr 1fr; }
+  .escenarios[data-n='5'] { grid-template-columns: repeat(3, 1fr); }
+  .voz.movil .escenarios { grid-template-columns: 1fr; }
+  .escenarios:fullscreen { padding: 4px; gap: 4px; background: #000; }
   /* Pegada abajo, justo arriba del dock, aunque haya pocas tarjetas o muchas (sticky al scrollear). */
   .pie-musica { margin-top: auto; position: sticky; bottom: 0; }
   .pie-musica:empty { display: none; }

@@ -18,15 +18,25 @@
   let pct = $state(100);
   $effect(() => { if (info) pct = Math.round(volumenPantallaDe(duenio(info.identidad)) * 100); });
   let ultimo = 100;
-  // La pantalla completa del navegador solo llena la ventana: se lleva también la ventana a pantalla completa
-  // (si no, queda una franja abajo, donde estaría la barra de tareas) y se devuelve al salir.
+  // La pantalla completa del navegador solo llena la ventana: se lleva también la ventana a pantalla completa y se
+  // devuelve al salir. Sin bordes de Windows (0.7), la sombra de la ventana dejaba una franja negra abajo: se apaga
+  // mientras dura la pantalla completa.
   $effect(() => {
     if (!isTauri()) return;
-    const cambio = () => import('@tauri-apps/api/window')
-      .then(({ getCurrentWindow }) => getCurrentWindow().setFullscreen(document.fullscreenElement === marco)).catch(() => {});
+    const cambio = () => import('@tauri-apps/api/window').then(async ({ getCurrentWindow }) => {
+      const w = getCurrentWindow(), lleno = !!document.fullscreenElement?.contains(marco ?? null);
+      await w.setShadow(!lleno);
+      await w.setFullscreen(lleno);
+    }).catch(() => {});
     document.addEventListener('fullscreenchange', cambio);
     return () => document.removeEventListener('fullscreenchange', cambio);
   });
+  // Con varias a la vez, pantalla completa muestra todas juntas (cada una ocupa su parte); con una, solo esa.
+  function pantallaCompleta() {
+    if (document.fullscreenElement) { void document.exitFullscreen().catch(() => {}); return; }
+    const todas = voz.viendo.length > 1 ? marco?.closest<HTMLElement>('.escenarios') : null;
+    void (todas ?? marco)?.requestFullscreen().catch(() => {});
+  }
   function sonar(v: number) {
     if (v) ultimo = v;
     pct = v;
@@ -45,7 +55,7 @@
     <button class="icono" onclick={() => sonar(pct ? 0 : ultimo)} aria-label={pct ? 'Silenciar transmisión' : 'Activar sonido'}>
       {#if pct}<Volume2 size={16} strokeWidth={1.75} />{:else}<VolumeX size={16} strokeWidth={1.75} />{/if}</button>
     <input type="range" min="0" max="200" step="5" bind:value={pct} style={lleno(pct, 0, 200)} aria-label="Volumen de la transmisión" oninput={() => sonar(pct)} />
-    <button class="icono" onclick={() => (document.fullscreenElement ? document.exitFullscreen() : marco?.requestFullscreen())?.catch(() => {})} aria-label="Pantalla completa" title="Pantalla completa"><Maximize size={16} strokeWidth={1.75} /></button>
+    <button class="icono" onclick={pantallaCompleta} aria-label="Pantalla completa" title="Pantalla completa"><Maximize size={16} strokeWidth={1.75} /></button>
   </div>
 </div>
 
@@ -55,7 +65,8 @@
   :global([data-modo='moderno']) .escenario { animation: aparece 280ms var(--curva-salida); }
   @keyframes aparece { from { opacity: 0; transform: scale(.985); } }
   /* El alto lo pone quien la usa (--alto): con una sola pantalla es más alta que con varias. */
-  .escenario :global(video) { display: block; width: 100%; max-height: var(--alto, 60vh); object-fit: contain; }
+  .escenario { height: 100%; min-height: 0; }
+  .escenario :global(video) { display: block; width: 100%; height: 100%; object-fit: contain; }
   .arriba { position: absolute; top: 12px; left: 12px; display: flex; gap: 6px; }
   .vivo, .espectadores { display: inline-flex; align-items: center; gap: 5px; height: 24px; padding: 0 8px; border-radius: var(--radio); font-size: 11.5px; font-weight: 750; }
   .vivo { color: #07210F; background: var(--ok); letter-spacing: .03em; }
@@ -72,5 +83,5 @@
   .controles { position: absolute; right: 12px; bottom: 12px; display: flex; align-items: center; gap: 4px; padding: 2px 6px; background: rgb(8 9 13 / .75); border-radius: var(--radio-menu); }
   .controles input { width: 100px; }
   .escenario:fullscreen { border: 0; border-radius: 0; background: #000; }
-  .escenario:fullscreen :global(video) { max-height: none; height: 100%; }
+
 </style>
