@@ -93,6 +93,12 @@ test('cancelar el selector del navegador no deja nada a medias', async ({ browse
   await expect(a.getByRole('button', { name: 'Transmitir', exact: true })).toBeVisible();
 });
 
+/** Celular: vuelve a la lista de salas del grupo con el ‹ de la cabecera (si ya está en la lista, no hace nada). */
+async function aLaLista(p: import('@playwright/test').Page) {
+  const v = p.locator('h2.titulo, section.voz header').getByRole('button', { name: 'Volver', exact: true });
+  if (await v.count()) await v.first().click();
+}
+
 const CELULAR = { width: 390, height: 844 };
 const sinScrollLateral = (p: import('@playwright/test').Page) => p.evaluate(() => document.documentElement.scrollWidth <= innerWidth);
 
@@ -121,34 +127,38 @@ test('PC: sin pestañas, con la barra de siempre', async ({ browser }) => {
   await expect(p.getByRole('button', { name: 'Configuración' })).toBeVisible();
 });
 
-test('celular: grupo con chat a pantalla completa, cajones y botón atrás', async ({ browser }) => {
+test('celular: grupo con la lista de salas a pantalla completa, ‹ y botón atrás', async ({ browser }) => {
   const p = await (await browser.newContext({ viewport: CELULAR })).newPage();
   await crearCuenta(p, 'Ana');
   await p.getByRole('button', { name: 'Crear mi grupo' }).click();
   await p.getByPlaceholder('Nombre del grupo nuevo').fill('Celus');
   await p.getByRole('button', { name: 'Crear grupo' }).click();
-  // Entra directo al chat, a pantalla completa y sin pestañas.
-  const titulo = p.locator('h2.titulo', { hasText: '# general' });
-  await expect(titulo).toBeVisible();
-  await expect(p.getByRole('navigation', { name: 'Secciones' })).toHaveCount(0);
-  expect(await sinScrollLateral(p)).toBe(true);
-  // ☰ abre el cajón con las salas; elegir una lo cierra.
-  await p.getByRole('button', { name: 'Abrir salas' }).click();
+  // Entra a la lista de salas, a pantalla completa y sin pestañas (ya no hay cajón ☰).
+  const chatGeneral = p.getByRole('button', { name: 'Sala de chat General' });
+  await expect(chatGeneral).toBeInViewport();
   await expect(p.getByRole('button', { name: 'Sala de voz General' })).toBeInViewport();
-  await p.getByRole('button', { name: 'Sala de chat general' }).click();
-  await expect(p.getByRole('button', { name: 'Sala de voz General' })).not.toBeInViewport();
-  // 👥 abre Participantes; atrás lo cierra y sigue en el chat.
+  await expect(p.getByRole('navigation', { name: 'Secciones' })).toHaveCount(0);
+  await expect(p.getByRole('button', { name: 'Abrir salas' })).toHaveCount(0);
+  expect(await sinScrollLateral(p)).toBe(true);
+  // Tocar el chat lo abre a pantalla completa; ‹ vuelve a la lista.
+  await chatGeneral.click();
+  const titulo = p.locator('h2.titulo', { hasText: '# General' });
+  await expect(titulo).toBeVisible();
+  await expect(chatGeneral).not.toBeInViewport();
+  await aLaLista(p);
+  await expect(chatGeneral).toBeInViewport();
+  // Atrás del sistema también vuelve a la lista.
+  await chatGeneral.click();
+  await expect(titulo).toBeVisible();
+  await p.goBack();
+  await expect(chatGeneral).toBeInViewport();
+  // 👥 desde la lista abre Participantes; atrás lo cierra.
   await p.getByRole('button', { name: 'Ver participantes' }).click();
   await expect(p.getByText(/^Participantes — /)).toBeInViewport();
   await p.goBack();
   await expect(p.getByText(/^Participantes — /)).not.toBeInViewport();
-  await expect(titulo).toBeVisible();
-  // Atrás con el cajón abierto lo cierra; otro atrás sale del grupo.
-  await p.getByRole('button', { name: 'Abrir salas' }).click();
-  await p.goBack();
-  await expect(p.getByRole('button', { name: 'Sala de voz General' })).not.toBeInViewport();
-  await expect(titulo).toBeVisible();
-  await p.goBack();
+  // ‹ en la lista sale del grupo a las pestañas.
+  await p.locator('.salas').getByRole('button', { name: 'Volver', exact: true }).click();
   await expect(p.getByRole('navigation', { name: 'Secciones' })).toBeVisible();
 });
 
@@ -158,7 +168,7 @@ test('girar o achicar la pantalla no corta la llamada ni cambia el chat', async 
   await p.getByRole('button', { name: 'Crear mi grupo' }).click();
   await p.getByPlaceholder('Nombre del grupo nuevo').fill('Giro');
   await p.getByRole('button', { name: 'Crear grupo' }).click();
-  await p.getByRole('button', { name: 'Abrir salas' }).click();
+  await aLaLista(p);
   await p.getByRole('button', { name: 'Sala de voz General' }).click();
   await expect(p.getByRole('button', { name: 'Desconectarse' })).toBeVisible({ timeout: 15_000 });
   for (const v of [{ width: 1280, height: 800 }, CELULAR]) {
@@ -173,7 +183,7 @@ test('celular: la llamada con su dock, el chat de la sala y la barrita en otras 
   await p.getByRole('button', { name: 'Crear mi grupo' }).click();
   await p.getByPlaceholder('Nombre del grupo nuevo').fill('Llamadas');
   await p.getByRole('button', { name: 'Crear grupo' }).click();
-  await p.getByRole('button', { name: 'Abrir salas' }).click();
+  await aLaLista(p);
   await p.getByRole('button', { name: 'Sala de voz General' }).click();
   // En la sala: grilla de 2 columnas y el dock de llamada en lugar de las pestañas.
   const dock = p.getByRole('toolbar', { name: 'Llamada' });
@@ -186,18 +196,19 @@ test('celular: la llamada con su dock, el chat de la sala y la barrita en otras 
   await p.goBack();
   await expect(p.locator('h2.titulo', { hasText: 'Chat de la sala' })).not.toBeInViewport();
   // En otro chat: la barrita de llamada; afuera del grupo también, arriba de las pestañas.
-  await p.getByRole('button', { name: 'Abrir salas' }).click();
+  await aLaLista(p);
   await p.getByRole('button', { name: 'Sala de chat general' }).click();
   const barrita = p.getByRole('button', { name: 'Volver a la llamada' });
   await expect(barrita).toBeVisible();
   await expect(dock).toHaveCount(0);
-  await p.goBack();
+  await p.goBack(); // a la lista
+  await p.goBack(); // afuera del grupo
   await expect(p.getByRole('navigation', { name: 'Secciones' })).toBeVisible();
   await expect(barrita).toBeVisible();
   // Tocarla vuelve a la sala; colgar desde la barrita sale de la llamada.
   await barrita.click();
   await expect(dock).toBeVisible();
-  await p.getByRole('button', { name: 'Abrir salas' }).click();
+  await aLaLista(p);
   await p.getByRole('button', { name: 'Sala de chat general' }).click();
   await p.locator('.barra-llamada').getByRole('button', { name: 'Desconectarse' }).click();
   await expect(barrita).toHaveCount(0);
@@ -218,6 +229,7 @@ test('celular: mantener apretado abre las acciones de mensajes y personas', asyn
   await p.getByRole('button', { name: 'Crear mi grupo' }).click();
   await p.getByPlaceholder('Nombre del grupo nuevo').fill('Toques');
   await p.getByRole('button', { name: 'Crear grupo' }).click();
+  await p.getByRole('button', { name: 'Sala de chat General' }).click();
   await p.getByPlaceholder('Escribí un mensaje').fill('hola');
   await p.getByRole('button', { name: 'Enviar' }).click();
   // Mensaje propio: reaccionar, responder, editar y borrar.
@@ -258,12 +270,12 @@ for (const [nombre, ua, texto] of [
     await p.getByRole('button', { name: 'Crear mi grupo' }).click();
     await p.getByPlaceholder('Nombre del grupo nuevo').fill('Avisos');
     await p.getByRole('button', { name: 'Crear grupo' }).click();
-    await p.getByRole('button', { name: 'Abrir salas' }).click();
+    await aLaLista(p);
     await p.getByRole('button', { name: 'Sala de voz General' }).click();
     await expect(p.getByText(texto)).toBeVisible({ timeout: 15_000 });
     await p.getByRole('button', { name: 'Entendido' }).click();
     await p.getByRole('button', { name: 'Desconectarse' }).first().click();
-    await p.getByRole('button', { name: 'Abrir salas' }).click();
+    await aLaLista(p);
     await p.getByRole('button', { name: 'Sala de voz General' }).click();
     await expect(p.getByRole('toolbar', { name: 'Llamada' })).toBeVisible({ timeout: 15_000 });
     await expect(p.getByText(texto)).toHaveCount(0);
@@ -276,13 +288,14 @@ test('celular: las cabeceras del chat y la sala y la caja de mensaje reservan el
   await p.getByRole('button', { name: 'Crear mi grupo' }).click();
   await p.getByPlaceholder('Nombre del grupo nuevo').fill('Notch');
   await p.getByRole('button', { name: 'Crear grupo' }).click();
+  await p.getByRole('button', { name: 'Sala de chat General' }).click();
   await expect(p.locator('h2.titulo')).toBeVisible();
   // Chromium no simula el notch (env() da 0): se comprueba que las reglas lo usen.
   const usa = (selector: string, prop: string) => p.evaluate(([sel, pr]) => [...document.styleSheets].flatMap((s) => [...s.cssRules])
     .some((r) => r instanceof CSSStyleRule && r.selectorText.includes(sel) && r.style.getPropertyValue(pr).includes('safe-area-inset')), [selector, prop]);
   expect(await usa('.titulo', 'padding-top')).toBe(true);
   expect(await usa('.composer', 'margin-bottom')).toBe(true);
-  await p.getByRole('button', { name: 'Abrir salas' }).click();
+  await aLaLista(p);
   await p.getByRole('button', { name: 'Sala de voz General' }).click();
   await expect(p.locator('section.voz header')).toBeVisible();
   expect(await usa('header', 'padding-top')).toBe(true);
@@ -295,7 +308,7 @@ test('entrar al grupo en vista de PC y pasar a celular: atrás vuelve a las pest
   await p.getByPlaceholder('Nombre del grupo nuevo').fill('Rota');
   await p.getByRole('button', { name: 'Crear grupo' }).click();
   await p.setViewportSize(CELULAR);
-  await expect(p.locator('h2.titulo', { hasText: '# general' })).toBeVisible();
+  await expect(p.getByRole('button', { name: 'Sala de chat General' })).toBeInViewport();
   await p.evaluate(() => ((window as unknown as { marca: number }).marca = 1)); // si atrás recarga la página, se pierde
   await p.goBack();
   await expect(p.getByRole('navigation', { name: 'Secciones' })).toBeVisible();
@@ -322,20 +335,18 @@ test('transmitir desde el navegador pide excluir el audio de la propia pestaña 
   await expect.poll(() => a.evaluate(() => (window as unknown as { pedido?: { audio?: { restrictOwnAudio?: boolean } } }).pedido?.audio?.restrictOwnAudio)).toBe(true);
 });
 
-test('celular: el botón ‹ de la cabecera sale del grupo a las pestañas', async ({ browser }) => {
+test('celular: ‹ en el chat y en la sala vuelve a la lista; en la lista, a las pestañas', async ({ browser }) => {
   const p = await (await browser.newContext({ viewport: CELULAR })).newPage();
   await crearCuenta(p, 'Ana');
   await p.getByRole('button', { name: 'Crear mi grupo' }).click();
   await p.getByPlaceholder('Nombre del grupo nuevo').fill('Salida');
   await p.getByRole('button', { name: 'Crear grupo' }).click();
-  await p.getByRole('button', { name: 'Volver', exact: true }).click();
-  await expect(p.getByRole('navigation', { name: 'Secciones' })).toBeVisible();
-  // También desde la sala de voz.
-  await p.getByRole('navigation', { name: 'Secciones' }).getByRole('button', { name: 'Grupos' }).click();
-  await p.locator('button.grupo', { hasText: 'Salida' }).click();
-  await p.getByRole('button', { name: 'Abrir salas' }).click();
+  await p.getByRole('button', { name: 'Sala de chat General' }).click();
+  await p.locator('h2.titulo').getByRole('button', { name: 'Volver', exact: true }).click();
   await p.getByRole('button', { name: 'Sala de voz General' }).click();
   await p.locator('section.voz header').getByRole('button', { name: 'Volver', exact: true }).click();
+  await expect(p.getByRole('button', { name: 'Sala de chat General' })).toBeInViewport();
+  await p.locator('.salas').getByRole('button', { name: 'Volver', exact: true }).click();
   await expect(p.getByRole('navigation', { name: 'Secciones' })).toBeVisible();
 });
 
