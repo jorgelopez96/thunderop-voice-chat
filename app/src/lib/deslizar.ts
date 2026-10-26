@@ -13,6 +13,7 @@ export function deslizar(nodo: HTMLElement, op: { alAbrirIzq(): void; alAbrirDer
   const mueve = (e: PointerEvent) => {
     if (!inicio) return;
     const dx = e.clientX - inicio.x, dy = e.clientY - inicio.y;
+    if (Math.hypot(dx, dy) < 10) return; // temblor del dedo: todavía no se sabe hacia dónde va
     if (Math.abs(dy) > Math.abs(dx)) { inicio = null; return; } // es scroll
     if (inicio.lado === 'izq' && dx >= RECORRIDO) { inicio = null; op.alAbrirIzq(); }
     else if (inicio.lado === 'der' && dx <= -RECORRIDO) { inicio = null; op.alAbrirDer(); }

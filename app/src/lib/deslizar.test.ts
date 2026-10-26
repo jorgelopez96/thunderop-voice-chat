@@ -47,6 +47,18 @@ describe('deslizar desde el borde', () => {
     expect(der).toHaveBeenCalledOnce();
   });
 
+  it('un temblor inicial del dedo no cancela el gesto', () => {
+    vi.stubGlobal('innerWidth', 390);
+    const h: Record<string, (e: Partial<PointerEvent>) => void> = {};
+    const nodo = { addEventListener: (t: string, f: (e: Partial<PointerEvent>) => void) => (h[t] = f), removeEventListener: () => {} } as unknown as HTMLElement;
+    const izq = vi.fn();
+    deslizar(nodo, { alAbrirIzq: izq, alAbrirDer: () => {} });
+    h.pointerdown({ clientX: 40, clientY: 300 });
+    h.pointermove({ clientX: 41, clientY: 302 });
+    h.pointermove({ clientX: 120, clientY: 308 });
+    expect(izq).toHaveBeenCalledOnce();
+  });
+
   it('lejos del borde no hace nada', () => {
     vi.stubGlobal('innerWidth', 390);
     const { gesto, izq, der } = armar();
