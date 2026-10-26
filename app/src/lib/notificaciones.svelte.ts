@@ -2,6 +2,7 @@ import { isTauri } from '@tauri-apps/api/core';
 import { pb } from './pb';
 import { leerPrefs } from './prefs';
 import { esGif } from './links';
+import { mostrar } from './notifNavegador';
 
 // Aviso de mensaje nuevo (privados y salas): sonido y, si la ventana no está a la vista, notificación de Windows.
 // Cada chat se puede silenciar hasta una fecha o para siempre; se guarda en este dispositivo:
@@ -82,13 +83,7 @@ export async function avisar(chat: string, titulo: string, texto: string, aunSil
   if (guardar) anotar(titulo, texto);
   if (p.sonidoMensajes) ding();
   if (aLaVista || !p.notificaciones) return;
-  if (!isTauri()) {
-    // Navegador: se pide permiso una vez; si lo niegan, quedan el sonido y el contador.
-    if (typeof Notification === 'undefined' || Notification.permission === 'denied') return;
-    if (Notification.permission === 'default' && (await Notification.requestPermission()) !== 'granted') return;
-    new Notification(titulo, { body: texto });
-    return;
-  }
+  if (!isTauri()) { mostrar(titulo, texto); return; }
   try {
     const n = await import('@tauri-apps/plugin-notification');
     if (!(await n.isPermissionGranted()) && (await n.requestPermission()) !== 'granted') return;

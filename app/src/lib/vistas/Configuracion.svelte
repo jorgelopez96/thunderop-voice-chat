@@ -11,6 +11,8 @@
   import { formatoHora, cambiarFormatoHora } from '../hora.svelte';
   import { pb } from '../pb';
   import { bloquear, bloqueados } from '../amigos.svelte';
+  import { pedirPermiso } from '../notifNavegador';
+  import { esEscritorio } from '../plataforma.svelte';
   import { sesion, salir, mensajeError } from '../sesion.svelte';
   import { pedirCodigo, restablecer } from '../cuenta.svelte';
   import { errorClave, soloDigitos } from '../reglasCuenta';
@@ -58,6 +60,14 @@
     });
   }
 
+  // Web: el permiso del navegador se pide al prender el interruptor (con el toque del usuario).
+  let permisoNotif = $state(!esEscritorio && typeof Notification !== 'undefined' ? Notification.permission : 'granted');
+  async function cambiarNotificaciones(caja: HTMLInputElement) {
+    guardarPrefs({ notificaciones: caja.checked });
+    if (!caja.checked || esEscritorio) return;
+    const r = await pedirPermiso();
+    permisoNotif = r === 'sin-soporte' ? 'denied' : r;
+  }
   let desactivar = $state(false);
   let listaBloqueados = $state(bloqueados());
   let borrar = $state<0 | 1 | 2>(0);
@@ -156,7 +166,8 @@
 
   {:else if solapa === 'notificaciones'}
     <section>
-      <label class="casilla"><input type="checkbox" class="switch" checked={prefs.notificaciones} onchange={(e) => guardarPrefs({ notificaciones: e.currentTarget.checked })} /> Notificaciones de escritorio</label>
+      <label class="casilla"><input type="checkbox" class="switch" checked={prefs.notificaciones} onchange={(e) => cambiarNotificaciones(e.currentTarget)} /> Notificaciones de escritorio
+        {#if permisoNotif === 'denied'}<small class="bloqueadas">Bloqueadas en el navegador: habilitalas desde el candado de la barra de direcciones.</small>{/if}</label>
       <label class="casilla"><input type="checkbox" class="switch" checked={prefs.sonidoMensajes} onchange={(e) => guardarPrefs({ sonidoMensajes: e.currentTarget.checked })} /> Sonido de las notificaciones</label>
       <label class="casilla"><input type="checkbox" class="switch" checked={prefs.avisoMensajes} onchange={(e) => guardarPrefs({ avisoMensajes: e.currentTarget.checked })} /> Avisar los mensajes nuevos</label>
       <label class="casilla"><input type="checkbox" class="switch" checked={prefs.avisoMenciones} onchange={(e) => guardarPrefs({ avisoMenciones: e.currentTarget.checked })} /> Avisar cuando me mencionan con @</label>
@@ -200,7 +211,8 @@
   h3 { margin: 0; }
   section { display: flex; flex-direction: column; gap: 12px; }
   form { display: flex; flex-direction: column; gap: 10px; max-width: 360px; }
-  .casilla { flex-direction: row; align-items: center; gap: 8px; }
+  .casilla { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .bloqueadas { flex-basis: 100%; color: var(--ausente); }
   small { display: block; color: var(--tenue); font-size: 12px; margin-top: 2px; }
   input[type='range'] { padding: 0; background: none; }
   dl { display: grid; grid-template-columns: max-content 1fr; gap: 8px 24px; margin: 0; }
