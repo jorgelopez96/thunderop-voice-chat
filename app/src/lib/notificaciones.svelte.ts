@@ -3,6 +3,7 @@ import { pb } from './pb';
 import { leerPrefs } from './prefs';
 import { esGif } from './links';
 import { mostrar } from './notifNavegador';
+import type { Ir } from './ir.svelte';
 
 // Aviso de mensaje nuevo (privados y salas): sonido y, si la ventana no está a la vista, notificación de Windows.
 // Cada chat se puede silenciar hasta una fecha o para siempre; se guarda en este dispositivo:
@@ -34,7 +35,7 @@ export function silenciar(chat: string, dias: number | null) {
 
 // Historial de la campanita (menciones y privados), en este dispositivo:
 // `localStorage['dm.avisos.<usuario>']`, los 50 más nuevos.
-type Aviso = { id: string; titulo: string; texto: string; fecha: string; leido: boolean };
+type Aviso = { id: string; titulo: string; texto: string; fecha: string; leido: boolean; ir?: Ir };
 const claveAvisos = () => `dm.avisos.${pb.authStore.record?.id}`;
 function leerAvisos(): Aviso[] {
   try { return JSON.parse(localStorage.getItem(claveAvisos()) ?? '[]'); } catch { return []; }
@@ -44,8 +45,8 @@ function guardarAvisos(lista: Aviso[]) {
   avisos.lista = lista;
   try { localStorage.setItem(claveAvisos(), JSON.stringify(lista)); } catch { /* sin almacenamiento: dura esta sesión */ }
 }
-const anotar = (titulo: string, texto: string) =>
-  guardarAvisos([{ id: crypto.randomUUID(), titulo, texto, fecha: new Date().toISOString(), leido: false }, ...avisos.lista].slice(0, 50));
+const anotar = (titulo: string, texto: string, ir?: Ir) =>
+  guardarAvisos([{ id: crypto.randomUUID(), titulo, texto, fecha: new Date().toISOString(), leido: false, ir }, ...avisos.lista].slice(0, 50));
 export const marcarAvisosLeidos = () => { if (avisos.lista.some((a) => !a.leido)) guardarAvisos(avisos.lista.map((a) => ({ ...a, leido: true }))); };
 export const borrarAvisos = () => guardarAvisos([]);
 
@@ -73,14 +74,14 @@ function ding() {
 }
 
 /** `aunSilenciado`: te mencionaron con @, avisa aunque el chat esté silenciado (si los avisos de menciones están prendidos).
- * `guardar`: además queda en la campanita. */
-export async function avisar(chat: string, titulo: string, texto: string, aunSilenciado = false, guardar = false) {
+ * `guardar`: además queda en la campanita (`ir`: adónde lleva tocarla). */
+export async function avisar(chat: string, titulo: string, texto: string, aunSilenciado = false, guardar = false, ir?: Ir) {
   const aLaVista = document.visibilityState === 'visible' && document.hasFocus();
   const p = leerPrefs();
   const porMencion = aunSilenciado && p.avisoMenciones;
   const porMensaje = p.avisoMensajes && !silenciadoHasta(chat);
   if ((!porMencion && !porMensaje) || (aLaVista && viendo.has(chat))) return;
-  if (guardar) anotar(titulo, texto);
+  if (guardar) anotar(titulo, texto, ir);
   if (p.sonidoMensajes) ding();
   if (aLaVista || !p.notificaciones) return;
   if (!isTauri()) { mostrar(titulo, texto); return; }

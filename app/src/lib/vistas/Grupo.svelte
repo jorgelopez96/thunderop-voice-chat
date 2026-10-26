@@ -16,6 +16,7 @@
   import { pantalla } from '../plataforma.svelte';
   import { conAtras, cerrarCapa, navMovil, hayCapas } from '../navMovil.svelte';
   import { deslizar } from '../deslizar';
+  import { irA } from '../ir.svelte';
   import { mantener } from '../mantener';
   import { abrirEnPunto } from '../menu';
   import ConfigGrupo from './ConfigGrupo.svelte';
@@ -95,6 +96,8 @@
   const abrirDer = () => { if (!pantalla.movil || cajonDer || enSalaVoz) return; cajonDer = true; conAtras(() => (cajonDer = false)); };
   // Al entrar a un grupo en el celular se abre su primer chat (no hay columna de salas a la vista).
   $effect(() => { if (pantalla.movil && !salaId && !centroVoz && chat.length) salaId = chat[0].id; });
+  // Una notificación pidió abrir una sala de este grupo.
+  $effect(() => { if (irA.sala && chat.some((r) => r.id === irA.sala)) { salaId = irA.sala; centroVoz = false; irA.sala = null; } });
   // La barrita de llamada pidió volver a la sala.
   $effect(() => { if (navMovil.irASala && voz.salaId && salaVoz) { centroVoz = true; navMovil.irASala = false; } });
 

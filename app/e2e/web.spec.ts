@@ -423,3 +423,24 @@ test('PC: el dueño ordena salas y secciones arrastrando con el mouse (sin Subir
   await p.getByRole('heading', { name: 'Chats' }).dragTo(p.getByRole('heading', { name: 'Salas de voz' }));
   await expect.poll(async () => (await orden())[0]?.startsWith('Sala de chat')).toBe(true);
 });
+
+test('tocar una notificación de mención lleva a ese chat', async ({ browser }) => {
+  const a = await (await browser.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
+  const b = await (await browser.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
+  await crearCuenta(a, 'Ana');
+  const link = await crearGrupo(a, 'Avisame');
+  const nombreAna = (await a.locator('button.yo > span:not(.caja)').first().textContent())!.trim();
+  await crearCuenta(b, 'Beto');
+  await b.getByRole('button', { name: 'Unirme con código' }).click();
+  await b.getByPlaceholder('Código o link de invitación').fill(link);
+  await b.getByRole('button', { name: 'Unirme', exact: true }).click();
+  await b.getByRole('button', { name: 'Sala de chat general' }).click();
+  await a.getByRole('button', { name: 'Inicio' }).first().click(); // Ana fuera del chat
+  await b.getByPlaceholder('Escribí un mensaje').fill(`@${nombreAna} mirá esto`);
+  await b.getByPlaceholder('Escribí un mensaje').press('Escape');
+  await b.getByRole('button', { name: 'Enviar' }).click();
+  await a.getByRole('button', { name: /^Notificaciones/ }).click();
+  await a.locator('#campanita').getByRole('button', { name: /te mencionó/ }).click();
+  await expect(a.getByTestId('mensaje').filter({ hasText: 'mirá esto' })).toBeVisible({ timeout: 10_000 });
+  await expect(a.locator('h2.titulo', { hasText: '# General' })).toBeVisible();
+});

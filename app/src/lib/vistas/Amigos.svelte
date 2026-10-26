@@ -9,6 +9,7 @@
   import Confirmar from './Confirmar.svelte';
   import { UserPlus, Ban, UserMinus } from '@lucide/svelte';
   import { foto } from '../foto';
+  import { irA } from '../ir.svelte';
   import { estado } from '../presencia.svelte';
 
   // Panel fijo a la derecha de la portada. Solo se muestra el estado elegido, nunca en qué grupo o sala está.
@@ -34,6 +35,8 @@
     if (!error) { ok = `Le mandaste una solicitud a ${usuario.trim()}.`; usuario = ''; }
   }
   function abrir(u: RecordModel) { abierto = u; queueMicrotask(() => d?.showModal()); }
+  // Una notificación pidió abrir el privado de este amigo.
+  $effect(() => { const id = irA.privado; const a = id ? amigos.lista.find((x) => x.usuario.id === id) : undefined; if (a) { irA.privado = null; abrir(a.usuario); } });
 </script>
 
 {#snippet lista(titulo: string, gente: typeof amigos.lista)}

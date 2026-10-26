@@ -4,6 +4,7 @@
   import { actualizacion, reiniciarParaActualizar } from '../actualizacion.svelte';
   import { avisos, borrarAvisos, marcarAvisosLeidos } from '../notificaciones.svelte';
   import { horaDe } from '../hora.svelte';
+  import { irAlAviso } from '../ir.svelte';
   import { voz } from '../voz.svelte';
   import Avatar from './Avatar.svelte';
   import Confirmar from './Confirmar.svelte';
@@ -47,7 +48,12 @@
   {/each}
   <ul>
     {#each avisos.lista as a (a.id)}
-      <li class:nuevo={!a.leido}><strong>{a.titulo}</strong><small>{horaDe(a.fecha)}</small><p>{a.texto}</p></li>
+      {@const ir = a.ir}
+      <li class:nuevo={!a.leido}>
+        {#if ir}<button class="plano aviso" onclick={() => { document.getElementById('campanita')?.hidePopover(); irAlAviso(ir); }}>
+          <strong>{a.titulo}</strong><small>{horaDe(a.fecha)}</small><p>{a.texto}</p></button>
+        {:else}<strong>{a.titulo}</strong><small>{horaDe(a.fecha)}</small><p>{a.texto}</p>{/if}
+      </li>
     {/each}
   </ul>
   {#if nada}<p class="tenue">No tenés notificaciones.</p>{/if}
@@ -75,6 +81,11 @@
   ul { max-height: 360px; overflow-y: auto; }
   li { display: grid; grid-template-columns: 1fr auto; gap: 0 8px; padding: 8px; border-radius: var(--radio); }
   li.nuevo { background: var(--hover); }
+  /* Avisos que llevan a un chat: toda la fila se toca. */
+  .aviso { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr auto; gap: 0 8px; padding: 0; text-align: left; font-weight: 450; color: var(--texto); }
+  .aviso:hover:not(:disabled) { background: none; color: var(--texto); }
+  .aviso strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .aviso p { grid-column: 1 / -1; margin: 2px 0 0; color: var(--tenue); overflow-wrap: anywhere; }
   li strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   li p { grid-column: 1 / -1; margin: 2px 0 0; color: var(--tenue); overflow-wrap: anywhere; }
   .fila { display: flex; align-items: center; gap: 8px; margin: 6px 0; }

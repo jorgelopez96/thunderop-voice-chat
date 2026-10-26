@@ -65,7 +65,7 @@ export function iniciarPrivados(): () => void {
     if (e.action !== 'create' || e.record.para !== yo()) return;
     const de = e.record.author as string;
     noLeidos[de] = (noLeidos[de] ?? 0) + 1;
-    if (!silenciadoHasta(de)) pb.collection('users').getOne(de, { fields: 'name' }).then((u) => avisar(de, u.name, resumen(e.record), false, true), () => {});
+    if (!silenciadoHasta(de)) pb.collection('users').getOne(de, { fields: 'name' }).then((u) => avisar(de, u.name, resumen(e.record), false, true, { tipo: 'privado', id: de }), () => {});
   }, { filter: recibidos });
   return () => { sub.then((f) => f()).catch(() => {}); };
 }
