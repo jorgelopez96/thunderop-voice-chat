@@ -30,12 +30,12 @@
 
   const actual = $derived(grupos.lista.find((g) => g.id === grupoActual.id));
   let config = $state(false);
-  // Celular: entrar a un grupo deja una capa en el historial (atrás vuelve a la pestaña).
-  let grupoPrevio: string | null = null;
+  // Celular: un grupo abierto deja una capa en el historial (atrás vuelve a la pestaña). También si se abrió con la
+  // vista de PC y después se giró o achicó la pantalla.
+  let capaGrupo = false;
   $effect(() => {
-    const id = grupoActual.id;
-    if (pantalla.movil && id && !grupoPrevio) conAtras(() => (grupoActual.id = null));
-    grupoPrevio = id;
+    if (!grupoActual.id) { capaGrupo = false; return; }
+    if (pantalla.movil && !capaGrupo) { capaGrupo = true; conAtras(() => { capaGrupo = false; grupoActual.id = null; }); }
   });
   let hostMusica = $state<HTMLElement>();
   // El reproductor vive acá y no en la vista de la sala: cambiar de chat o de grupo no corta la música.

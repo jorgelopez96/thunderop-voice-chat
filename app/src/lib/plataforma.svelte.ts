@@ -3,7 +3,8 @@ import { isTauri } from '@tauri-apps/api/core';
 // Dónde corre la app: escritorio (Tauri) o navegador, y si la pantalla es de celular (768 px o menos).
 export const esEscritorio = isTauri();
 
-const consulta = typeof matchMedia === 'function' ? matchMedia('(max-width: 768px)') : null;
+// Celular: angosto, o pantalla táctil y bajita (celular apaisado). En el escritorio nunca (el zoom no lo cambia).
+const consulta = typeof matchMedia === 'function' && !esEscritorio ? matchMedia('(max-width: 768px), (pointer: coarse) and (max-height: 500px)') : null;
 export const pantalla = $state({ movil: consulta?.matches ?? false });
 consulta?.addEventListener('change', (e) => (pantalla.movil = e.matches));
 

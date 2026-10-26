@@ -294,3 +294,23 @@ test('celular: las cabeceras del chat y la sala y la caja de mensaje reservan el
   await expect(p.locator('section.voz header')).toBeVisible();
   expect(await usa('header', 'padding-top')).toBe(true);
 });
+
+test('entrar al grupo en vista de PC y pasar a celular: atrás vuelve a las pestañas, no sale de la app', async ({ browser }) => {
+  const p = await (await browser.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
+  await crearCuenta(p, 'Ana');
+  await p.getByRole('button', { name: 'Crear mi grupo' }).click();
+  await p.getByPlaceholder('Nombre del grupo nuevo').fill('Rota');
+  await p.getByRole('button', { name: 'Crear grupo' }).click();
+  await p.setViewportSize(CELULAR);
+  await expect(p.locator('h2.titulo', { hasText: '# general' })).toBeVisible();
+  await p.evaluate(() => ((window as unknown as { marca: number }).marca = 1)); // si atrás recarga la página, se pierde
+  await p.goBack();
+  await expect(p.getByRole('navigation', { name: 'Secciones' })).toBeVisible();
+  expect(await p.evaluate(() => (window as unknown as { marca?: number }).marca)).toBe(1);
+});
+
+test('celular apaisado: también usa la vista de celular', async ({ browser }) => {
+  const p = await (await browser.newContext({ viewport: { width: 844, height: 390 }, isMobile: true, hasTouch: true })).newPage();
+  await crearCuenta(p, 'Ana');
+  await expect(p.getByRole('navigation', { name: 'Secciones' })).toBeVisible();
+});
