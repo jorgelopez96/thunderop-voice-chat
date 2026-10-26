@@ -245,7 +245,7 @@
 <style>
   .grupo { flex: 1; min-height: 0; display: grid; grid-template-columns: 248px minmax(0, 1fr) 240px; }
   .grupo.enSalaVoz { grid-template-columns: 248px minmax(0, 1fr); }
-  .grupo.movil { grid-template-columns: minmax(0, 1fr); }
+  .grupo.movil { grid-template-columns: minmax(0, 1fr); touch-action: pan-y; } /* el deslizar de costado es nuestro (cajones) */
   .lado-izq { display: flex; min-height: 0; }
   .lado-izq > .salas { flex: 1; min-width: 0; }
   .mis-grupos { display: flex; flex-direction: column; gap: 8px; padding: 12px 8px; background: var(--fondo); border-right: 1px solid var(--borde); overflow-y: auto; }

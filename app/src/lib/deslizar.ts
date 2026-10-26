@@ -1,11 +1,14 @@
-// Gesto del celular: arrastrar desde el borde abre un cajón (izquierdo: grupos y salas; derecho: participantes).
-const BORDE = 24, RECORRIDO = 60;
+// Gesto del celular: arrastrar de costado abre un cajón (izquierdo: grupos y salas; derecho: participantes).
+// Vale empezar en el primer o el último tercio de la pantalla, no solo en el borde: el borde mismo es el gesto
+// "atrás" de Android e iOS. Quien lo usa pone `touch-action: pan-y` para que el navegador no se quede con el gesto.
+const RECORRIDO = 60;
 
 export function deslizar(nodo: HTMLElement, op: { alAbrirIzq(): void; alAbrirDer(): void }) {
   let inicio: { x: number; y: number; lado: 'izq' | 'der' } | null = null;
   const abajo = (e: PointerEvent) => {
-    inicio = e.clientX <= BORDE ? { x: e.clientX, y: e.clientY, lado: 'izq' }
-      : e.clientX >= innerWidth - BORDE ? { x: e.clientX, y: e.clientY, lado: 'der' } : null;
+    const zona = innerWidth / 3;
+    inicio = e.clientX <= zona ? { x: e.clientX, y: e.clientY, lado: 'izq' }
+      : e.clientX >= innerWidth - zona ? { x: e.clientX, y: e.clientY, lado: 'der' } : null;
   };
   const mueve = (e: PointerEvent) => {
     if (!inicio) return;

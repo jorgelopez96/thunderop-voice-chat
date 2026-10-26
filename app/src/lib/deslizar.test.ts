@@ -33,6 +33,20 @@ describe('deslizar desde el borde', () => {
     expect(der).toHaveBeenCalledOnce();
   });
 
+  it('alcanza con empezar en el primer tercio (el borde mismo es el gesto atrás del sistema)', () => {
+    vi.stubGlobal('innerWidth', 390);
+    const { gesto, izq } = armar();
+    gesto(100, 300, 180, 300);
+    expect(izq).toHaveBeenCalledOnce();
+  });
+
+  it('desde el último tercio hacia la izquierda abre el derecho', () => {
+    vi.stubGlobal('innerWidth', 390);
+    const { gesto, der } = armar();
+    gesto(290, 300, 210, 300);
+    expect(der).toHaveBeenCalledOnce();
+  });
+
   it('lejos del borde no hace nada', () => {
     vi.stubGlobal('innerWidth', 390);
     const { gesto, izq, der } = armar();
