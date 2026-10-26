@@ -11,4 +11,5 @@ export function conAtras(cerrar: () => void) {
   capas.push(cerrar);
 }
 export const cerrarCapa = () => { if (capas.length) history.back(); };
+export const hayCapas = () => capas.length > 0;
 if (typeof window !== 'undefined') addEventListener('popstate', () => capas.pop()?.());

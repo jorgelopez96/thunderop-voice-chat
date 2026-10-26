@@ -14,7 +14,7 @@
   import Avatar from './Avatar.svelte';
   import Cajon from './movil/Cajon.svelte';
   import { pantalla } from '../plataforma.svelte';
-  import { conAtras, cerrarCapa, navMovil } from '../navMovil.svelte';
+  import { conAtras, cerrarCapa, navMovil, hayCapas } from '../navMovil.svelte';
   import { deslizar } from '../deslizar';
   import { mantener } from '../mantener';
   import { abrirEnPunto } from '../menu';
@@ -89,6 +89,8 @@
   // Celular: el chat ocupa la pantalla; las salas y los participantes van en cajones (☰ / 👥 o deslizando desde el borde).
   let cajonIzq = $state(false);
   let cajonDer = $state(false);
+  // ‹ de la cabecera (celular): sale del grupo como el botón atrás; sin capa en el historial, lo cierra directo.
+  const salir = () => (hayCapas() ? cerrarCapa() : (grupoActual.id = null));
   const abrirIzq = () => { if (!pantalla.movil || cajonIzq) return; cajonIzq = true; conAtras(() => (cajonIzq = false)); };
   const abrirDer = () => { if (!pantalla.movil || cajonDer || enSalaVoz) return; cajonDer = true; conAtras(() => (cajonDer = false)); };
   // Al entrar a un grupo en el celular se abre su primer chat (no hay columna de salas a la vista).
@@ -202,8 +204,8 @@
   {#if config}<ConfigGrupo {grupo} cerrar={() => (config = false)} />{/if}
   {#if invitando}<Invitar {grupo} cerrar={() => (invitando = false)} />{/if}
 
-  {#if enSalaVoz && salaVoz}<Voz {grupo} {soyDueno} {salasVoz} sala={salaVoz.name} abrirSalas={pantalla.movil ? abrirIzq : undefined} verParticipantes={() => capaParticipantes?.showPopover()} />
-  {:else if salaAbierta}{#key salaAbierta.id}<Chat titulo={`# ${salaAbierta.name}`} menu={pantalla.movil ? abrirIzq : undefined} gente={pantalla.movil ? abrirDer : undefined} miembros={grupo.expand?.members ?? []} abrir={() => abrirChat(salaAbierta.id)} enviar={(t, f, r) => enviar(salaAbierta.id, t, f, r)} {borrar} silencio={salaAbierta.id} acciones={soyDueno ? accionesSala : undefined}
+  {#if enSalaVoz && salaVoz}<Voz {grupo} {soyDueno} {salasVoz} sala={salaVoz.name} abrirSalas={pantalla.movil ? abrirIzq : undefined} volver={pantalla.movil ? salir : undefined} verParticipantes={() => capaParticipantes?.showPopover()} />
+  {:else if salaAbierta}{#key salaAbierta.id}<Chat titulo={`# ${salaAbierta.name}`} volver={pantalla.movil ? salir : undefined} menu={pantalla.movil ? abrirIzq : undefined} gente={pantalla.movil ? abrirDer : undefined} miembros={grupo.expand?.members ?? []} abrir={() => abrirChat(salaAbierta.id)} enviar={(t, f, r) => enviar(salaAbierta.id, t, f, r)} {borrar} silencio={salaAbierta.id} acciones={soyDueno ? accionesSala : undefined}
     puedeBorrar={(m) => m.author === sesion.usuario?.id || soyDueno} />{/key}
   {:else}<div class="vacio">Elegí una sala de chat</div>{/if}
 

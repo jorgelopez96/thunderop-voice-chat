@@ -2,7 +2,7 @@
   import { lleno } from '../rango';
   import Insignia from './Insignia.svelte';
   import type { RecordModel } from 'pocketbase';
-  import { MicOff, Users, Link, ChevronRight, MessageSquare, Eye, Volume2, Menu } from '@lucide/svelte';
+  import { MicOff, Users, Link, ChevronRight, MessageSquare, Eye, Volume2, Menu, ChevronLeft } from '@lucide/svelte';
   import { pantalla } from '../plataforma.svelte';
   import { mantener } from '../mantener';
   import { navMovil, cerrarCapa } from '../navMovil.svelte';
@@ -19,7 +19,7 @@
   import { abrirEnPunto } from '../menu';
   import { mirar as mirarSala } from '../noLeidos.svelte';
 
-  let { grupo, soyDueno, sala, verParticipantes, salasVoz = [], abrirSalas }: { grupo: RecordModel; soyDueno: boolean; sala: string; verParticipantes: () => void; salasVoz?: RecordModel[]; abrirSalas?: () => void } = $props();
+  let { grupo, soyDueno, sala, verParticipantes, salasVoz = [], abrirSalas, volver }: { grupo: RecordModel; soyDueno: boolean; sala: string; verParticipantes: () => void; salasVoz?: RecordModel[]; abrirSalas?: () => void; volver?: () => void } = $props();
   const miembros = $derived((grupo.expand?.members ?? []) as RecordModel[]);
   const miembro = (id: string) => miembros.find((m) => m.id === id);
   // Silencios recién pedidos, hasta que el grupo se refresque con el valor del servidor.
@@ -85,6 +85,7 @@
 <section class="voz" class:conChat={chatAbierto && !pantalla.movil} class:movil={pantalla.movil}>
   <div class="centro">
     <header>
+      {#if volver}<button class="icono" aria-label="Volver" title="Volver" onclick={volver}><ChevronLeft size={22} strokeWidth={1.75} /></button>{/if}
       {#if abrirSalas}<button class="icono" aria-label="Abrir salas" title="Salas" onclick={abrirSalas}><Menu size={20} strokeWidth={1.75} /></button>{/if}
       <Volume2 size={18} strokeWidth={1.75} color="var(--icono)" />
       <h2>{sala}</h2>

@@ -328,3 +328,20 @@ test('transmitir desde el navegador pide excluir el audio de la propia pestaña 
   await a.getByRole('button', { name: 'Empezar' }).click();
   await expect.poll(() => a.evaluate(() => (window as unknown as { pedido?: { audio?: { restrictOwnAudio?: boolean } } }).pedido?.audio?.restrictOwnAudio)).toBe(true);
 });
+
+test('celular: el botón ‹ de la cabecera sale del grupo a las pestañas', async ({ browser }) => {
+  const p = await (await browser.newContext({ viewport: CELULAR })).newPage();
+  await crearCuenta(p, 'Ana');
+  await p.getByRole('button', { name: 'Crear mi grupo' }).click();
+  await p.getByPlaceholder('Nombre del grupo nuevo').fill('Salida');
+  await p.getByRole('button', { name: 'Crear grupo' }).click();
+  await p.getByRole('button', { name: 'Volver', exact: true }).click();
+  await expect(p.getByRole('navigation', { name: 'Secciones' })).toBeVisible();
+  // También desde la sala de voz.
+  await p.getByRole('navigation', { name: 'Secciones' }).getByRole('button', { name: 'Grupos' }).click();
+  await p.locator('button.grupo', { hasText: 'Salida' }).click();
+  await p.getByRole('button', { name: 'Abrir salas' }).click();
+  await p.getByRole('button', { name: 'Sala de voz General' }).click();
+  await p.locator('section.voz header').getByRole('button', { name: 'Volver', exact: true }).click();
+  await expect(p.getByRole('navigation', { name: 'Secciones' })).toBeVisible();
+});
