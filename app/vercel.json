@@ -11,7 +11,7 @@
       "headers": [
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval' https://www.youtube.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; media-src 'self' blob: https://thunderop.duckdns.org; connect-src 'self' https://thunderop.duckdns.org wss://thunderop.duckdns.org https://www.youtube.com; frame-src https://www.youtube.com; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
+          "value": "frame-ancestors 'none'; object-src 'none'; base-uri 'self'"
         },
         {
           "key": "Strict-Transport-Security",
