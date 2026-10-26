@@ -9,6 +9,7 @@
   import { sesion } from '../sesion.svelte';
   import { fuentes, conNativo, type Fuente } from '../transmisorNativo';
   import { puedeTransmitir, pantalla } from '../plataforma.svelte';
+  import Confirmar from './Confirmar.svelte';
   import { navMovil, conAtras } from '../navMovil.svelte';
   import { elegirFuente } from '../transmision';
 
@@ -79,6 +80,7 @@
   }
   let reloj: ReturnType<typeof setInterval> | undefined;
   let nativoUI = $state(true);
+  let cortando = $state(false); // confirmar antes de dejar de transmitir (un toque sin querer cortaba todo)
   function abrirTransmision() {
     clearInterval(reloj);
     gen++;
@@ -137,7 +139,7 @@
 <div popover id="dock-mas" class="menu mas">
   <button class="plano" popovertarget="dock-sonidos" onclick={ubicarPanel}><AudioWaveform size={18} strokeWidth={1.75} /> Sonidos</button>
   {#if puedeTransmitir()}
-    {#if voz.transmitiendo}<button class="plano" onclick={dejarDeTransmitir}><Monitor size={18} strokeWidth={1.75} /> Dejar de transmitir</button>
+    {#if voz.transmitiendo}<button class="plano" onclick={() => (cortando = true)}><Monitor size={18} strokeWidth={1.75} /> Dejar de transmitir</button>
     {:else}<button class="plano" onclick={abrirTransmision}><Monitor size={18} strokeWidth={1.75} /> Transmitir</button>{/if}
   {/if}
 </div>
@@ -163,7 +165,7 @@
     <span class="separador"></span>
     {#if voz.transmitiendo}
       <div class="doble">
-        <button class="icono vivo" onclick={dejarDeTransmitir} aria-label="Dejar de transmitir" title="Dejar de transmitir"><Monitor size={20} strokeWidth={1.75} /></button>
+        <button class="icono vivo" onclick={() => (cortando = true)} aria-label="Dejar de transmitir" title="Dejar de transmitir"><Monitor size={20} strokeWidth={1.75} /></button>
         <button class="icono flecha" aria-label="Calidad de la transmisión" title="Cambiar la calidad" onpointerdown={() => alTocar(menuCalidad)} onclick={abrirCalidad}><ChevronDown size={14} strokeWidth={1.75} /></button>
       </div>
     {:else}
@@ -219,6 +221,9 @@
     </div>
   {/if}
 {/snippet}
+
+{#if cortando}<Confirmar texto="¿Dejar de transmitir? Los que te están mirando dejan de verte." accion="Dejar de transmitir"
+  cancelar={() => (cortando = false)} confirmar={() => { cortando = false; void dejarDeTransmitir(); }} />{/if}
 
 <dialog bind:this={d} class="fuentes" onclose={alCerrar}>
   <h3>Transmitir pantalla</h3>

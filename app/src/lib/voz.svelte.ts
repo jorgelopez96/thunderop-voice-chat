@@ -3,7 +3,7 @@ import type { LocalAudioTrack, Participant, RemoteTrack, Room, Track } from 'liv
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { pb } from './pb';
 import { mensajeError } from './sesion.svelte';
-import { leerPrefs, guardarPrefs, CALIDADES, type Calidad } from './prefs';
+import { leerPrefs, guardarPrefs, CALIDADES, volumenPantallaDe, guardarVolumenPantalla, type Calidad } from './prefs';
 import { iniciarAudioPantalla, detenerAudioPantalla } from './audioPantalla';
 import { mensajeTransmision } from './transmision';
 import { duenio, esPantallaNativa, iniciarNativo, detenerNativo, calidadNativo, cortarSimulado, SUFIJO_PANTALLA } from './transmisorNativo';
@@ -166,6 +166,8 @@ export async function entrarVoz(roomId: string, salaNombre = '', grupoId: string
     if (t.kind !== Track.Kind.Audio) return;
     const el = t.attach(); el.dataset.voz = ''; document.body.append(el); audios.set(t, el);
     part.setVolume(voz.ensordecido ? 0 : ganancia(leerPrefs().volumenes[part.identity]));
+    // El sonido de una transmisión arranca en el volumen que se le dejó la última vez a esa persona.
+    if (t.source === Track.Source.ScreenShareAudio) part.setVolume(voz.ensordecido ? 0 : volumenPantallaDe(duenio(part.identity)), Track.Source.ScreenShareAudio);
   });
   // LiveKit ya desenganchó la pista de todos sus elementos (también el <video> de la vista): se borra solo el <audio> propio.
   r.on(RoomEvent.TrackUnsubscribed, (t: RemoteTrack) => { audios.get(t)?.remove(); audios.delete(t); });
@@ -514,10 +516,12 @@ export function pistaPantallaPropia(): RemoteTrack | undefined {
 /** Muestra u oculta la vista previa de nuestra transmisión (se guarda). */
 export function vistaPrevia(v: boolean) { voz.vistaPrevia = v; guardarPrefs({ vistaPrevia: v }); actualizar(); }
 
-/** Volumen del sonido de la pantalla de `identidad` (0 a 2). No se guarda. */
+/** Volumen del sonido de la pantalla de `identidad` (0 a 2). Se recuerda por persona para las próximas transmisiones. */
 export function volumenPantalla(identidad: string, v: number) {
   if (!Number.isFinite(v)) return;
-  room?.remoteParticipants.get(identidad)?.setVolume(Math.min(2, Math.max(0, v)), lk.Track.Source.ScreenShareAudio);
+  const n = Math.min(2, Math.max(0, v));
+  guardarVolumenPantalla(duenio(identidad), n);
+  room?.remoteParticipants.get(identidad)?.setVolume(n, lk.Track.Source.ScreenShareAudio);
 }
 
 export async function dispositivos(): Promise<{ entradas: MediaDeviceInfo[]; salidas: MediaDeviceInfo[] }> {

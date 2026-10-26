@@ -38,3 +38,8 @@ export function guardarPrefs(p: Partial<PrefsVoz>): void {
   try { localStorage.setItem(CLAVE, JSON.stringify({ ...actual, ...p, v: VERSION, volumenes: { ...actual.volumenes, ...p.volumenes } })); }
   catch { /* almacenamiento bloqueado: la preferencia dura solo esta sesión */ }
 }
+
+/** Volumen (0 a 2) de la transmisión de `dueno` (id del usuario, también para la pantalla nativa `<id>.pantalla`). */
+export const volumenPantallaDe = (dueno: string) => leerPrefs().volumenes[`pantalla:${dueno}`] ?? 1;
+export const guardarVolumenPantalla = (dueno: string, v: number) =>
+  guardarPrefs({ volumenes: { ...leerPrefs().volumenes, [`pantalla:${dueno}`]: v } });

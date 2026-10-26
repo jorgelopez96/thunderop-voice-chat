@@ -345,3 +345,19 @@ test('celular: el botón ‹ de la cabecera sale del grupo a las pestañas', asy
   await p.locator('section.voz header').getByRole('button', { name: 'Volver', exact: true }).click();
   await expect(p.getByRole('navigation', { name: 'Secciones' })).toBeVisible();
 });
+
+test('dejar de transmitir pide confirmación; la cabecera de la sala no repite el link de invitación', async ({ browser }) => {
+  const { a, b } = await dosEnLaSala(browser, pantallaFalsa);
+  await expect(a.locator('section.voz header').getByRole('button', { name: 'Copiar link de invitación' })).toHaveCount(0);
+  await a.getByRole('button', { name: 'Transmitir', exact: true }).click();
+  await a.getByRole('button', { name: 'Empezar' }).click();
+  const tarjeta = b.locator('section.voz li', { hasText: 'Ana' });
+  await expect(tarjeta.getByText('EN VIVO')).toBeVisible({ timeout: 15_000 });
+  await a.getByRole('button', { name: 'Dejar de transmitir' }).click();
+  await a.getByRole('button', { name: 'Cancelar' }).click();
+  await a.waitForTimeout(800);
+  await expect(tarjeta.getByText('EN VIVO')).toBeVisible();
+  await a.getByRole('button', { name: 'Dejar de transmitir' }).click();
+  await a.getByRole('dialog').getByRole('button', { name: 'Dejar de transmitir' }).click();
+  await expect(tarjeta.getByText('EN VIVO')).toHaveCount(0, { timeout: 15_000 });
+});

@@ -2,13 +2,13 @@
   import { lleno } from '../rango';
   import Insignia from './Insignia.svelte';
   import type { RecordModel } from 'pocketbase';
-  import { MicOff, Users, Link, ChevronRight, MessageSquare, Eye, Volume2, Menu, ChevronLeft } from '@lucide/svelte';
+  import { MicOff, Users, ChevronRight, MessageSquare, Eye, Volume2, Menu, ChevronLeft } from '@lucide/svelte';
   import { pantalla } from '../plataforma.svelte';
   import { mantener } from '../mantener';
   import { navMovil, cerrarCapa } from '../navMovil.svelte';
   import { foto } from '../foto';
   import { mensajeError, sesion } from '../sesion.svelte';
-  import { crearInvitacion, grupos } from '../grupos.svelte';
+  import { grupos } from '../grupos.svelte';
   import { abrirChat, enviar, borrar } from '../chat.svelte';
   import AhoraSuena from './AhoraSuena.svelte';
   import Chat from './Chat.svelte';
@@ -27,7 +27,6 @@
   const silenciado = (id: string) => pedidos[id] ?? ((grupo.silenciados ?? []) as string[]).includes(id);
   let vols = $state<Record<string, number>>({ ...leerPrefs().volumenes });
   let error = $state('');
-  let aviso = $state('');
 
   async function alternar(id: string) {
     menu?.hidePopover();
@@ -40,13 +39,7 @@
     error = '';
     try { await f(); } catch (e) { error = mensajeError(e); }
   }
-  async function copiarLink() {
-    error = '';
-    try {
-      const link = await crearInvitacion(grupo.id);
-      await navigator.clipboard.writeText(link).then(() => (aviso = 'Link de invitación copiado.'), () => (aviso = link));
-    } catch (e) { error = mensajeError(e); }
-  }
+
 
   // Vista previa propia; se recalcula cuando cambian los participantes (llega o se va la pista).
   const propia = $derived((void voz.participantes, voz.transmitiendo && voz.vistaPrevia ? pistaPantallaPropia() : undefined));
@@ -91,13 +84,11 @@
       <h2>{sala}</h2>
       <span class="en-voz num">{voz.participantes.length} en voz</span>
       <button class="plano" onclick={verParticipantes}><Users size={16} strokeWidth={1.75} /> Participantes · {miembros.length}</button>
-      <button class="icono" onclick={copiarLink} aria-label="Copiar link de invitación" title="Copiar link de invitación"><Link size={16} strokeWidth={1.75} /></button>
       {#if !chatAbierto && !pantalla.movil}<button class="icono" onclick={() => plegarChat(true)} aria-label="Abrir chat de la sala" title="Chat de la sala"><MessageSquare size={16} strokeWidth={1.75} /></button>{/if}
     </header>
     {#if avisoLlamada}<p class="aviso-celular">{esIphone ? 'En iPhone, la llamada se corta si bloqueás la pantalla o cambiás de app.' : 'Si bloqueás la pantalla o cambiás de app, la llamada puede cortarse.'}
       <button class="plano" onclick={entendido}>Entendido</button></p>{/if}
     {#if voz.conectando}<p role="status">Conectando…</p>{/if}
-    {#if aviso}<p role="status">{aviso}</p>{/if}
     {#if error}<p role="alert">{error}</p>{/if}
 
     {#if voz.viendo.length}

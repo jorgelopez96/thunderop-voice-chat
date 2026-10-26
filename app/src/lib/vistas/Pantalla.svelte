@@ -3,6 +3,8 @@
   import { Volume2, VolumeX, Maximize, X, Eye } from '@lucide/svelte';
   import { voz, ver, pistaPantalla, volumenPantalla } from '../voz.svelte';
   import Video from './Video.svelte';
+  import { volumenPantallaDe } from '../prefs';
+  import { duenio } from '../transmisorNativo';
   import { isTauri } from '@tauri-apps/api/core';
 
   // Una pantalla que se está mirando: video, quién transmite, espectadores, volumen, pantalla completa y cerrar.
@@ -12,7 +14,9 @@
   const pista = $derived(info?.pista);
   const p = $derived(voz.participantes.find((x) => x.id === info?.identidad));
   let marco = $state<HTMLElement>();
+  // Arranca en el volumen que se le dejó la última vez a esta persona.
   let pct = $state(100);
+  $effect(() => { if (info) pct = Math.round(volumenPantallaDe(duenio(info.identidad)) * 100); });
   let ultimo = 100;
   // La pantalla completa del navegador solo llena la ventana: se lleva también la ventana a pantalla completa
   // (si no, queda una franja abajo, donde estaría la barra de tareas) y se devuelve al salir.

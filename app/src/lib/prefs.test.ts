@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { leerPrefs, guardarPrefs } from './prefs';
+import { leerPrefs, guardarPrefs, volumenPantallaDe, guardarVolumenPantalla } from './prefs';
 import { volumen } from './voz.svelte';
 
 const DEFAULTS = { supresion: true, volumenes: {}, calidad: '1080p60', vistaPrevia: true, volBotonera: 0.8, volMusica: 50, gananciaDb: 0, sonidoMensajes: true, notificaciones: true, avisoMensajes: true, avisoMenciones: true, hora24: true };
@@ -11,6 +11,13 @@ describe('prefs de voz', () => {
     vi.stubGlobal('localStorage', { getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => { m.set(k, v); } });
   });
   afterEach(() => vi.unstubAllGlobals());
+
+  it('el volumen de la transmisión de cada uno se recuerda (1 si nunca se tocó)', () => {
+    expect(volumenPantallaDe('beto')).toBe(1);
+    guardarVolumenPantalla('beto', 0.4);
+    expect(volumenPantallaDe('beto')).toBe(0.4);
+    expect(volumenPantallaDe('caro')).toBe(1);
+  });
 
   it('sin nada guardado devuelve defaults', () => {
     expect(leerPrefs()).toEqual(DEFAULTS);
