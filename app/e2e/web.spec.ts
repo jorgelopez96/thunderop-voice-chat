@@ -276,3 +276,21 @@ for (const [nombre, ua, texto] of [
     await expect(p.getByText(texto)).toHaveCount(0);
   });
 }
+
+test('celular: las cabeceras del chat y la sala y la caja de mensaje reservan el notch y la barra de gestos', async ({ browser }) => {
+  const p = await (await browser.newContext({ viewport: CELULAR })).newPage();
+  await crearCuenta(p, 'Ana');
+  await p.getByRole('button', { name: 'Crear mi grupo' }).click();
+  await p.getByPlaceholder('Nombre del grupo nuevo').fill('Notch');
+  await p.getByRole('button', { name: 'Crear grupo' }).click();
+  await expect(p.locator('h2.titulo')).toBeVisible();
+  // Chromium no simula el notch (env() da 0): se comprueba que las reglas lo usen.
+  const usa = (selector: string, prop: string) => p.evaluate(([sel, pr]) => [...document.styleSheets].flatMap((s) => [...s.cssRules])
+    .some((r) => r instanceof CSSStyleRule && r.selectorText.includes(sel) && r.style.getPropertyValue(pr).includes('safe-area-inset')), [selector, prop]);
+  expect(await usa('.titulo', 'padding-top')).toBe(true);
+  expect(await usa('.composer', 'margin-bottom')).toBe(true);
+  await p.getByRole('button', { name: 'Abrir salas' }).click();
+  await p.getByRole('button', { name: 'Sala de voz General' }).click();
+  await expect(p.locator('section.voz header')).toBeVisible();
+  expect(await usa('header', 'padding-top')).toBe(true);
+});

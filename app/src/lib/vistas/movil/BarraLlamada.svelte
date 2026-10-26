@@ -21,7 +21,7 @@
 </div>
 
 <style>
-  .barra-llamada { flex: none; display: flex; align-items: center; gap: 6px; margin: 0 8px 8px; padding: 4px 6px 4px 4px;
+  .barra-llamada { flex: none; display: flex; align-items: center; gap: 6px; margin: 0 8px calc(8px + env(safe-area-inset-bottom)); padding: 4px 6px 4px 4px;
     background: var(--superficie); border: 1px solid color-mix(in srgb, var(--ok) 35%, var(--borde)); border-radius: var(--radio-grande); }
   .volver { flex: 1; min-width: 0; justify-content: flex-start; gap: 10px; min-height: 44px; padding: 0 10px; color: var(--texto); }
   .punto { width: 9px; height: 9px; border-radius: 50%; background: var(--ok); flex: none; }

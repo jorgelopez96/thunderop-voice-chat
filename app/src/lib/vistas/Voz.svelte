@@ -164,6 +164,7 @@
     background: color-mix(in srgb, var(--ausente) 12%, transparent); border: 1px solid color-mix(in srgb, var(--ausente) 35%, transparent); }
   .aviso-celular button { margin-left: auto; flex: none; color: var(--texto); }
   .voz.movil .franja { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .voz.movil header { height: calc(52px + env(safe-area-inset-top)); padding-top: env(safe-area-inset-top); }
   .voz.movil .chatSala { position: fixed; inset: 0; z-index: 15; padding-top: env(safe-area-inset-top); border: 0; }
   .centro { padding: 0 16px 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
   header { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 8px; height: 52px; flex: none; margin: 0 -16px; padding: 0 12px 0 16px;

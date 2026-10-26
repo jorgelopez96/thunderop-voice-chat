@@ -397,6 +397,9 @@
     border-radius: var(--radio-menu); box-shadow: var(--sombra-2); }
   .msg:hover .herramientas, .herramientas:focus-within { display: flex; }
   .chat.movil .herramientas { display: none; }
+  /* iPhone instalado (barra de estado translúcida): la cabecera baja del notch y la caja sube de la barra de gestos. */
+  .chat.movil .titulo { height: calc(52px + env(safe-area-inset-top)); padding-top: env(safe-area-inset-top); }
+  .chat.movil .composer { margin-bottom: calc(16px + env(safe-area-inset-bottom)); }
   .chat.movil .msg { -webkit-touch-callout: none; }
   .herramientas .icono { width: 30px; min-width: 30px; height: 28px; min-height: 28px; border-radius: var(--radio); }
   .herramientas .borrar:hover { color: var(--peligro); }
