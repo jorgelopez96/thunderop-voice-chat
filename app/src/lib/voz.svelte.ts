@@ -403,7 +403,9 @@ export async function transmitirNavegador(calidad: Calidad) {
   voz.error = '';
   try {
     const pub = await r.localParticipant.setScreenShareEnabled(true,
-      { audio: true, resolution: { width: Math.round((alto * 16) / 9), height: alto, frameRate: fps }, contentHint: 'motion' },
+      // restrictOwnAudio: el audio del sistema no incluye lo que suena en esta pestaña (las voces de la llamada), si no
+      // los demás se escuchan a sí mismos. Los navegadores que no lo conocen lo ignoran.
+      { audio: { restrictOwnAudio: true } as import('livekit-client').AudioCaptureOptions, resolution: { width: Math.round((alto * 16) / 9), height: alto, frameRate: fps }, contentHint: 'motion' },
       { videoEncoding: { maxBitrate: mbps * 1_000_000, maxFramerate: fps } });
     if (!pub) return;
     if (room !== r || mio !== tx) { await r.localParticipant.setScreenShareEnabled(false); return; }

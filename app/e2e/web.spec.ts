@@ -314,3 +314,17 @@ test('celular apaisado: también usa la vista de celular', async ({ browser }) =
   await crearCuenta(p, 'Ana');
   await expect(p.getByRole('navigation', { name: 'Secciones' })).toBeVisible();
 });
+
+test('transmitir desde el navegador pide excluir el audio de la propia pestaña (sin eco de la llamada)', async ({ browser }) => {
+  const { a } = await dosEnLaSala(browser, () => {
+    navigator.mediaDevices.getDisplayMedia = async (c?: DisplayMediaStreamOptions) => {
+      (window as unknown as { pedido: unknown }).pedido = c;
+      const lienzo = Object.assign(document.createElement('canvas'), { width: 320, height: 180 });
+      lienzo.getContext('2d')!.fillRect(0, 0, 320, 180);
+      return lienzo.captureStream(15);
+    };
+  });
+  await a.getByRole('button', { name: 'Transmitir', exact: true }).click();
+  await a.getByRole('button', { name: 'Empezar' }).click();
+  await expect.poll(() => a.evaluate(() => (window as unknown as { pedido?: { audio?: { restrictOwnAudio?: boolean } } }).pedido?.audio?.restrictOwnAudio)).toBe(true);
+});
