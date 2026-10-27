@@ -26,7 +26,7 @@ let intento = 0; // invalida un `entrarVoz` en curso si se sale o se entra a otr
 const audios = new WeakMap<RemoteTrack, HTMLMediaElement>(); // <audio data-voz> creado por cada pista remota
 
 // Ganchos para la botonera (sin lógica de ella acá): contexto/sala actuales y listeners de datos que sobreviven a los cambios de sala.
-type OyenteDatos = (payload: Uint8Array, topic?: string) => void;
+type OyenteDatos = (payload: Uint8Array, topic?: string, de?: string) => void;
 const oyentesDatos = new Set<OyenteDatos>();
 export const contextoVoz = () => ctx;
 /** Publica datos a la sala (false si no hay sala conectada). */
@@ -44,17 +44,30 @@ export function alCambiarSala(f: OyenteSala) { oyentesSala.add(f); return () => 
 
 const microfono = () => room?.localParticipant.getTrackPublication(lk.Track.Source.Microphone)?.track as LocalAudioTrack | undefined;
 
+// "Hablando" se sostiene un rato después de la última vez que LiveKit lo marcó: sin esto titila en cada pausa entre palabras.
+const SOSTENER = 700;
+const hablo = new Map<string, number>();
+let relojHablando: ReturnType<typeof setTimeout> | undefined;
+function hablandoAhora(x: Participant) {
+  const ahora = Date.now();
+  if (x.isSpeaking) hablo.set(x.identity, ahora);
+  return ahora - (hablo.get(x.identity) ?? -Infinity) < SOSTENER;
+}
+
 function actualizar() {
+  clearTimeout(relojHablando);
   if (!room) { voz.participantes = []; voz.sinPermiso = false; return; }
   const r = room;
   const mirando = [...r.remoteParticipants.values()].flatMap(mirandoDe);
   const p = (x: Participant, local: boolean): Participante => {
     const pantalla = pantallaDe(r, x);
-    return { id: x.identity, nombre: x.name || x.identity, hablando: x.isSpeaking, silenciado: !x.isMicrophoneEnabled, local,
+    return { id: x.identity, nombre: x.name || x.identity, hablando: hablandoAhora(x), silenciado: !x.isMicrophoneEnabled, local,
       transmite: !!pantalla || (local && voz.transmitiendo), pantalla, espectadores: mirando.filter((m) => duenio(m) === x.identity).length };
   };
   // El transmisor nativo no es una persona: su pantalla se le muestra a su dueño.
   voz.participantes = [p(r.localParticipant, true), ...[...r.remoteParticipants.values()].filter((x) => !esPantallaNativa(x.identity)).map((x) => p(x, false))];
+  // Alguien quedó "hablando" por el sostén: se vuelve a mirar cuando vence.
+  if (voz.participantes.some((x) => x.hablando)) relojHablando = setTimeout(actualizar, SOSTENER);
   // Misma regla que usa LiveKit para dejar publicar (sin fuentes listadas = todas permitidas).
   const perm = room.localParticipant.permissions;
   voz.sinPermiso = !!perm && (!perm.canPublish || (perm.canPublishSources.length > 0
@@ -191,7 +204,7 @@ export async function entrarVoz(roomId: string, salaNombre = '', grupoId: string
       } catch { /* aviso roto: se ignora */ }
       return;
     }
-    for (const f of oyentesDatos) f(payload, topic);
+    for (const f of oyentesDatos) f(payload, topic, part?.name || part?.identity);
   });
   r.on(RoomEvent.LocalTrackPublished, () => { aplicarProcesador(); actualizar(); });
   r.on(RoomEvent.ParticipantPermissionsChanged, (_prev, part) => {
@@ -524,10 +537,17 @@ export function volumenPantalla(identidad: string, v: number) {
   room?.remoteParticipants.get(identidad)?.setVolume(n, lk.Track.Source.ScreenShareAudio);
 }
 
+/** Windows lista el mismo dispositivo hasta tres veces (Predeterminado, Comunicaciones y con su nombre): queda el
+ *  Predeterminado y el resto de los dispositivos, sin Comunicaciones ni el que ya es el predeterminado. */
+export function sinRepetidos<T extends { deviceId: string; groupId: string }>(lista: T[]): T[] {
+  const pred = lista.find((x) => x.deviceId === 'default');
+  return lista.filter((x) => x.deviceId !== 'communications' && (x.deviceId === 'default' || !pred || x.groupId !== pred.groupId));
+}
+
 export async function dispositivos(): Promise<{ entradas: MediaDeviceInfo[]; salidas: MediaDeviceInfo[] }> {
   try {
     const d = await navigator.mediaDevices.enumerateDevices();
-    return { entradas: d.filter((x) => x.kind === 'audioinput'), salidas: d.filter((x) => x.kind === 'audiooutput') };
+    return { entradas: sinRepetidos(d.filter((x) => x.kind === 'audioinput')), salidas: sinRepetidos(d.filter((x) => x.kind === 'audiooutput')) };
   } catch { return { entradas: [], salidas: [] }; }
 }
 

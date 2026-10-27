@@ -14,12 +14,13 @@
   import Chat from './Chat.svelte';
   import { voz, volumen, silenciar, desconectar, moverA, bloquearVoz, ver, pistaPantallaPropia, vistaPrevia } from '../voz.svelte';
   import Pantalla from './Pantalla.svelte';
+  import { completa } from '../pantallaCompleta.svelte';
   import Video from './Video.svelte';
   import { leerPrefs } from '../prefs';
   import { abrirEnPunto } from '../menu';
   import { mirar as mirarSala } from '../noLeidos.svelte';
 
-  let { grupo, soyDueno, sala, verParticipantes, salasVoz = [], abrirSalas, volver }: { grupo: RecordModel; soyDueno: boolean; sala: string; verParticipantes: () => void; salasVoz?: RecordModel[]; abrirSalas?: () => void; volver?: () => void } = $props();
+  let { grupo, soyDueno, sala, salasVoz = [], abrirSalas, volver }: { grupo: RecordModel; soyDueno: boolean; sala: string; salasVoz?: RecordModel[]; abrirSalas?: () => void; volver?: () => void } = $props();
   const miembros = $derived((grupo.expand?.members ?? []) as RecordModel[]);
   const miembro = (id: string) => miembros.find((m) => m.id === id);
   // Silencios recién pedidos, hasta que el grupo se refresque con el valor del servidor.
@@ -85,7 +86,8 @@
       <h2>{sala}</h2>
       <span class="en-voz num">{voz.participantes.length} en voz</span>
       {#if voz.viendo.length}<button class="plano" onclick={() => (ocultarGente = !ocultarGente)}>{#if ocultarGente}<Eye size={16} strokeWidth={1.75} /> Mostrar participantes{:else}<EyeOff size={16} strokeWidth={1.75} /> Ocultar participantes{/if}</button>{/if}
-      <button class="plano" onclick={verParticipantes}><Users size={16} strokeWidth={1.75} /> Participantes · {miembros.length}</button>
+      <!-- popovertarget: abre y cierra con el mismo botón (con onclick, el clic la cerraba y la volvía a abrir) -->
+      <button class="plano" popovertarget="capa-participantes"><Users size={16} strokeWidth={1.75} /> Participantes · {miembros.length}</button>
       {#if !chatAbierto && !pantalla.movil}<button class="icono" onclick={() => plegarChat(true)} aria-label="Abrir chat de la sala" title="Chat de la sala"><MessageSquare size={16} strokeWidth={1.75} /></button>{/if}
     </header>
     {#if avisoLlamada}<p class="aviso-celular">{esIphone ? 'En iPhone, la llamada se corta si bloqueás la pantalla o cambiás de app.' : 'Si bloqueás la pantalla o cambiás de app, la llamada puede cortarse.'}
@@ -96,14 +98,14 @@
     {#if voz.viendo.length}
       <!-- Una sola: grande. Varias: lado a lado si entran a un tamaño que se distinga, si no una abajo de la otra. -->
       <!-- Todas las que se miran entran en el espacio que hay, sin scroll: 1 = entera, 2 = mitad y mitad, 3-4 = de a dos. -->
-      <div class="escenarios" data-n={Math.min(voz.viendo.length, 5)}>
+      <div class="escenarios" class:completa={completa.sid === 'todas'} data-n={Math.min(voz.viendo.length, 5)}>
         {#each voz.viendo as sid (sid)}<Pantalla {sid} />{/each}
       </div>
     {/if}
     <ul class="franja" class:oculta={ocultarGente && voz.viendo.length > 0}>
       {#each voz.participantes as p, i (p.id)}
         {@const m = miembro(p.id)}
-        <li style:--i={Math.min(i, 5)} class:hablando={p.hablando} class:transmite={p.transmite} style="background:{fondo(m?.color, p.nombre)}" oncontextmenu={(e) => abrirMenu(e, p)} use:mantener={(x, y) => abrirMenu({ clientX: x, clientY: y, preventDefault() {} } as MouseEvent, p)}>
+        <li style:--i={Math.min(i, 5)} class:hablando={p.hablando} class:transmite={p.transmite} style="background:{fondo(m?.color, p.nombre)};--habla:{m?.color || 'var(--acento)'}" oncontextmenu={(e) => abrirMenu(e, p)} use:mantener={(x, y) => abrirMenu({ clientX: x, clientY: y, preventDefault() {} } as MouseEvent, p)}>
           {#if p.transmite}<span class="chips-vivo"><span class="vivo"><span class="punto-vivo"></span>EN VIVO</span>{@render espectadores(p.espectadores)}</span>{/if}
           <img class="avatar" alt="" src={foto(m, '256x256')} />
           {#if p.transmite && !p.local && p.pantalla}{@const sid = p.pantalla}{@const viendo = voz.viendo.includes(sid)}
@@ -173,7 +175,9 @@
   .franja li { position: relative; aspect-ratio: 16 / 9; display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: 24px minmax(0, 1fr) 28px;
     gap: 6px; padding: 8px; border: 2px solid var(--borde); border-radius: var(--radio-grande);
     overflow: hidden; transition: border-color var(--dur-media); }
-  .franja li.hablando { border-color: color-mix(in srgb, var(--ok) 70%, transparent); }
+  /* El borde de quien habla, con el color que eligió esa persona (sin color, el del tema). */
+  .franja li.hablando { border-color: color-mix(in srgb, var(--habla) 85%, transparent); }
+  :global([data-modo='moderno']) .franja li.hablando { box-shadow: 0 0 14px -2px color-mix(in srgb, var(--habla) 60%, transparent), 0 0 24px -4px color-mix(in srgb, var(--habla) 35%, transparent); }
   .franja li.transmite:not(.hablando) { border-color: color-mix(in srgb, var(--cian) 45%, transparent); }
   /* Modo moderno: al entrar a la llamada las tarjetas aparecen escalonadas (tope de 6). */
   :global([data-modo='moderno']) .franja li { animation: entra 240ms var(--curva-salida) backwards; animation-delay: calc(var(--i) * 40ms); }
@@ -199,7 +203,7 @@
   .escenarios[data-n='3'], .escenarios[data-n='4'] { grid-template-columns: 1fr 1fr; }
   .escenarios[data-n='5'] { grid-template-columns: repeat(3, 1fr); }
   .voz.movil .escenarios { grid-template-columns: 1fr; }
-  .escenarios:fullscreen { padding: 4px; gap: 4px; background: #000; }
+  .escenarios.completa { position: fixed; inset: 0; z-index: 100; padding: 4px; gap: 4px; background: #000; }
   /* Pegada abajo, justo arriba del dock, aunque haya pocas tarjetas o muchas (sticky al scrollear). */
   .pie-musica { margin-top: auto; position: sticky; bottom: 0; }
   .pie-musica:empty { display: none; }

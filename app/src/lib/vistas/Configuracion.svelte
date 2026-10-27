@@ -28,6 +28,8 @@
   const MODOS = [['basico', 'Básico', 'Estático y liviano: sin animaciones ni brillos. Rinde más mientras jugás y transmitís.'],
     ['moderno', 'Moderno', 'Sombras, brillos en tu color y animaciones cortas. Para PCs con resto.']] as const;
   let lista = $state<Awaited<ReturnType<typeof dispositivos>>>({ entradas: [], salidas: [] });
+  // El elegido puede no estar en la lista (es el mismo que el predeterminado, o no está conectado): se muestra Predeterminado.
+  const visible = (l: MediaDeviceInfo[], id: string | undefined) => (id && l.some((x) => x.deviceId === id) ? id : 'default');
   const prefs = leerPrefs();
   let pctMic = $state(porcentajeDeDb(prefs.gananciaDb));
   let entrada = $state(prefs.entrada);
@@ -141,13 +143,13 @@
   {:else if solapa === 'audio'}
     <section>
       <label>Entrada
-        <select value={prefs.entrada ?? 'default'} onchange={(e) => { entrada = e.currentTarget.value; elegirEntrada(entrada); }}>
+        <select value={visible(lista.entradas, prefs.entrada)} onchange={(e) => { entrada = e.currentTarget.value; elegirEntrada(entrada); }}>
           <option value="default">Predeterminado</option>
           {#each lista.entradas.filter((x) => x.deviceId !== 'default') as x (x.deviceId)}<option value={x.deviceId}>{x.label || 'Micrófono'}</option>{/each}
         </select>
       </label>
       <label>Salida
-        <select value={prefs.salida ?? 'default'} onchange={(e) => elegirSalida(e.currentTarget.value)}>
+        <select value={visible(lista.salidas, prefs.salida)} onchange={(e) => elegirSalida(e.currentTarget.value)}>
           <option value="default">Predeterminado</option>
           {#each lista.salidas.filter((x) => x.deviceId !== 'default') as x (x.deviceId)}<option value={x.deviceId}>{x.label || 'Altavoz'}</option>{/each}
         </select>

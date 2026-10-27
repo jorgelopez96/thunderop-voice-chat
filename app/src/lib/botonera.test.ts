@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { validarSonido, Limite, mensajeSubida, separarEmoji, unirEmoji } from './botoneraLogica';
+import { validarSonido, mensajeSubida, separarEmoji, unirEmoji } from './botoneraLogica';
 
 const ok = { duracion: 3, tamaño: 1000, tipo: 'audio/mpeg' };
 
@@ -10,25 +10,6 @@ describe('validarSonido', () => {
   it('válido da vacío', () => {
     expect(validarSonido(ok)).toBe('');
     expect(validarSonido({ duracion: 10, tamaño: 1048576, tipo: 'audio/ogg' })).toBe('');
-  });
-});
-
-describe('Limite', () => {
-  it('el límite deja 3 y descarta el cuarto', () => {
-    const l = new Limite(3);
-    expect([l.intentar(), l.intentar(), l.intentar(), l.intentar()]).toEqual([true, true, true, false]);
-  });
-  it('liberar deja lugar', () => {
-    const l = new Limite(3);
-    for (let i = 0; i < 3; i++) l.intentar();
-    l.liberar();
-    expect(l.intentar()).toBe(true);
-    expect(l.intentar()).toBe(false);
-  });
-  it('liberar de más no pasa de cero', () => {
-    const l = new Limite(1);
-    l.liberar(); l.liberar();
-    expect([l.intentar(), l.intentar()]).toEqual([true, false]);
   });
 });
 

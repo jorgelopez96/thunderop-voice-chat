@@ -76,7 +76,7 @@
   {#if abierto}
     {@const u = abierto}
     {#key u.id}
-      <Chat titulo={u.name} foto={foto(u)} cerrar={() => d?.close()} miembros={[sesion.usuario, u].filter((x) => !!x).map((x) => ({ id: x.id, name: x.name }))} abrir={() => abrirPrivado(u.id)} enviar={(t, f, r) => enviarPrivado(u.id, t, f, r)} borrar={borrarPrivado}
+      <Chat titulo={u.name} foto={foto(u)} cerrar={() => d?.close()} miembros={[sesion.usuario, u].filter((x) => !!x)} abrir={() => abrirPrivado(u.id)} enviar={(t, f, r) => enviarPrivado(u.id, t, f, r)} borrar={borrarPrivado}
         puedeBorrar={(m) => m.author === sesion.usuario?.id} alVer={(m) => marcarLeido(u.id, m.created)}
         soloLectura={amistad ? '' : 'Ya no son amigos: no se pueden mandar mensajes.'} silencio={u.id}>
         {#snippet acciones(cerrar: () => void)}

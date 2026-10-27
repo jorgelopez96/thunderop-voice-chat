@@ -39,7 +39,6 @@
   let salaId = $state<string | null>(null);
   let centroVoz = $state(false); // el centro muestra la voz (si no, el chat elegido)
   $effect(() => { if (!voz.salaId) centroVoz = false; }); // salir desde el dock vuelve al chat
-  let capaParticipantes = $state<HTMLElement>(); // en la sala de voz, Participantes se abre encima
   const enSalaVoz = $derived(centroVoz && !!salaVoz);
   const salaAbierta = $derived(chat.find((r) => r.id === salaId));
   $effect(() => { if (salaAbierta && !centroVoz) return mirar(salaAbierta.id); });
@@ -153,13 +152,16 @@
   {/if}
 {/snippet}
 
-<!-- Arrastrar el título de una sección sobre el de la otra las da vuelta (dueño, en la PC). -->
-{#snippet titulo(texto: string, tipo: 'voz' | 'chat')}
-  <div class="seccion-salas" class:sobre={seccionSobre === tipo} role="heading" aria-level="3"
-    draggable={soyDueno && !pantalla.movil} ondragstart={(e) => { arrastreSeccion = tipo; e.dataTransfer?.setData('text/plain', tipo); }}
+<!-- Arrastrar el título de una sección y soltarlo en cualquier parte de la otra las da vuelta (dueño, en la PC). -->
+{#snippet seccion(texto: string, tipo: 'voz' | 'chat', lista: RecordModel[])}
+  <div class="seccion" class:sobre={seccionSobre === tipo} role="group" aria-label={texto}
     ondragover={(e) => { if (arrastreSeccion && arrastreSeccion !== tipo) { e.preventDefault(); seccionSobre = tipo; } }}
-    ondragleave={() => seccionSobre === tipo && (seccionSobre = null)} ondragend={() => (arrastreSeccion = seccionSobre = null)}
-    ondrop={(e) => { e.preventDefault(); const otra = arrastreSeccion; arrastreSeccion = seccionSobre = null; if (otra && otra !== tipo) invertirSecciones(); }}>{texto}</div>
+    ondragleave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null) && seccionSobre === tipo) seccionSobre = null; }}
+    ondrop={(e) => { const otra = arrastreSeccion; if (!otra) return; e.preventDefault(); arrastreSeccion = seccionSobre = null; if (otra !== tipo) invertirSecciones(); }}>
+    <div class="seccion-salas" role="heading" aria-level="3" draggable={soyDueno && !pantalla.movil}
+      ondragstart={(e) => { arrastreSeccion = tipo; e.dataTransfer?.setData('text/plain', tipo); }} ondragend={() => (arrastreSeccion = seccionSobre = null)}>{texto}</div>
+    <ul>{#each lista as r (r.id)}{@render sala(r)}{/each}</ul>
+  </div>
 {/snippet}
 
 <div class="grupo" class:enSalaVoz class:movil={pantalla.movil} class:lista={pantalla.movil && !enSala}>
@@ -175,9 +177,8 @@
     </div>
     {#if error}<p role="alert">{error}</p>{/if}
 
-    {#snippet seccionVoz()}{@render titulo('Salas de voz', 'voz')}<ul>{#each salasVoz as r (r.id)}{@render sala(r)}{/each}</ul>{/snippet}
-    {#snippet seccionChats()}{@render titulo('Chats', 'chat')}<ul>{#each chat as r (r.id)}{@render sala(r)}{/each}</ul>{/snippet}
-    {#if grupo.chatsArriba}{@render seccionChats()}{@render seccionVoz()}{:else}{@render seccionVoz()}{@render seccionChats()}{/if}
+    {#if grupo.chatsArriba}{@render seccion('Chats', 'chat', chat)}{@render seccion('Salas de voz', 'voz', salasVoz)}
+    {:else}{@render seccion('Salas de voz', 'voz', salasVoz)}{@render seccion('Chats', 'chat', chat)}{/if}
 
   </nav>
   </div>
@@ -204,12 +205,12 @@
   {#if invitando}<Invitar {grupo} cerrar={() => (invitando = false)} />{/if}
 
   {#if pantalla.movil && !enSala}<!-- celular: se ve la lista -->
-  {:else if enSalaVoz && salaVoz}<Voz {grupo} {soyDueno} {salasVoz} sala={salaVoz.name} volver={pantalla.movil ? aLaLista : undefined} verParticipantes={() => capaParticipantes?.showPopover()} />
+  {:else if enSalaVoz && salaVoz}<Voz {grupo} {soyDueno} {salasVoz} sala={salaVoz.name} volver={pantalla.movil ? aLaLista : undefined} />
   {:else if salaAbierta}{#key salaAbierta.id}<Chat titulo={`# ${salaAbierta.name}`} volver={pantalla.movil ? aLaLista : undefined} gente={pantalla.movil ? abrirDer : undefined} miembros={grupo.expand?.members ?? []} abrir={() => abrirChat(salaAbierta.id)} enviar={(t, f, r) => enviar(salaAbierta.id, t, f, r)} {borrar} silencio={salaAbierta.id} acciones={soyDueno ? accionesSala : undefined}
     puedeBorrar={(m) => m.author === sesion.usuario?.id || soyDueno} />{/key}
   {:else}<div class="vacio">Elegí una sala de chat</div>{/if}
 
-  {#if enSalaVoz && !pantalla.movil}<div popover class="capa" bind:this={capaParticipantes}><Participantes {grupo} /></div>
+  {#if enSalaVoz && !pantalla.movil}<div popover id="capa-participantes" class="capa"><Participantes {grupo} /></div>
   {:else}<Cajon lado="der" abierto={cajonDer}><Participantes {grupo} /></Cajon>{/if}
   <div popover class="menu" bind:this={menuSalaEl}>
     {#if menuSala}{@const r = menuSala}
@@ -261,7 +262,8 @@
   .seccion-salas { display: flex; align-items: center; justify-content: space-between; margin: 16px 0 4px; padding: 0 0 0 8px; }
   .seccion-salas { font-size: 11.5px; font-weight: 650; text-transform: uppercase; letter-spacing: .06em; color: var(--apagado); border-radius: var(--radio); }
   .seccion-salas[draggable='true'] { cursor: grab; }
-  .seccion-salas.sobre { box-shadow: inset 0 2px var(--acento); }
+  .seccion { display: flex; flex-direction: column; gap: 2px; border-radius: var(--radio); }
+  .seccion.sobre { box-shadow: inset 0 0 0 2px var(--acento); }
   .sala { display: flex; flex-wrap: wrap; align-items: center; border-radius: var(--radio); }
   .sala:hover { background: var(--hover); }
   .sala.activa { background: var(--activo); }

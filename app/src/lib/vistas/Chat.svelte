@@ -33,7 +33,7 @@
     titulo: string; foto?: string; cerrar?: () => void; volver?: () => void; menu?: () => void; gente?: () => void; abrir: () => ChatAbierto; enviar: (texto: string, archivo?: File, respondeA?: string) => Promise<unknown>;
     borrar: (id: string) => Promise<unknown>; puedeBorrar: (m: RecordModel) => boolean; soloLectura?: string;
     alVer?: (ultimo: RecordModel) => void; // se llama con el último mensaje visible (privados: marcar leído)
-    silencio?: string; acciones?: Snippet<[() => void]>; miembros?: { id: string; name: string }[];
+    silencio?: string; acciones?: Snippet<[() => void]>; miembros?: RecordModel[];
   } = $props();
   const nombres = $derived(miembros.map((m) => m.name).filter(Boolean));
   const nombreDe = (id: string) => miembros.find((m) => m.id === id)?.name ?? 'Ex miembro';
@@ -75,7 +75,8 @@
     if (id !== ultimoId) { ultimoId = id; pegado = true; tick().then(bajar); }
   });
 
-  const autor = (m: RecordModel) => m.expand?.author as RecordModel | undefined;
+  // Si el mensaje llegó sin el autor expandido (falló el pedido del realtime), se lo busca entre los miembros.
+  const autor = (m: RecordModel) => (m.expand?.author ?? miembros.find((x) => x.id === m.author)) as RecordModel | undefined;
   const hora = (m: RecordModel) => horaDe(m.created);
   const esVideo = (m: RecordModel) => /\.(mp4|webm)$/i.test(m.file);
   const fecha = (m: RecordModel) => new Date(m.created.replace(' ', 'T')).getTime();
@@ -268,7 +269,7 @@
           </header>{/if}
           {#if m.respondeA}
             <button class="plano cita" onclick={() => cita && irA(cita.id)} disabled={!cita}>
-              {#if cita}<img class="avatar mini" alt="" src={foto(cita.expand?.author as RecordModel | undefined)} /><strong>{(cita.expand?.author as RecordModel | undefined)?.name ?? 'Ex miembro'}</strong> <span>{resumen(cita)}</span>
+              {#if cita}<img class="avatar mini" alt="" src={foto(autor(cita))} /><strong>{autor(cita)?.name ?? 'Ex miembro'}</strong> <span>{resumen(cita)}</span>
               {:else}<span>Mensaje borrado</span>{/if}
             </button>
           {/if}

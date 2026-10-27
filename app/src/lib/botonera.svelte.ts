@@ -2,13 +2,20 @@ import type { RecordModel } from 'pocketbase';
 import { pb } from './pb';
 import { leerPrefs } from './prefs';
 import { contextoVoz, publicarDatos, alRecibirDatos, voz } from './voz.svelte';
-import { validarSonido, Limite, mensajeSubida } from './botoneraLogica';
+import { validarSonido, mensajeSubida } from './botoneraLogica';
 
 const TOPIC = 'botonera';
 const buffers = new Map<string, { group: string; b: AudioBuffer }>(); // ponytail: sin tope de tamaño; 50 sonidos × ≤10 s por grupo es acotado
-// Un cupo por contexto: al cerrarse el de la voz (onended no es fiable ahí) su cupo se descarta con él.
-const cupos = new WeakMap<AudioContext, Limite>();
 const codificar = (o: unknown) => new TextEncoder().encode(JSON.stringify(o));
+
+/** Quién tocó qué, para el cartelito de la llamada: los últimos 5, cada uno dura 2,5 s. */
+export const tocados = $state<{ lista: { n: number; quien: string; sonido: string }[] }>({ lista: [] });
+let contador = 0;
+function anotar(quien: string, sonido: string) {
+  const n = ++contador;
+  tocados.lista = [...tocados.lista.slice(-4), { n, quien, sonido }];
+  setTimeout(() => { tocados.lista = tocados.lista.filter((x) => x.n !== n); }, 2500);
+}
 
 /** Sonidos de un grupo, reactivos (realtime). Llamar `parar()` al terminar. */
 export function sonidos(grupoId: string) {
@@ -62,24 +69,20 @@ async function buffer(id: string, c: AudioContext) {
   return e.b;
 }
 
-/** Reproduce localmente por el contexto de la voz; si ya hay 3 sonando, se descarta. Sin voz no hay contexto: no suena. */
+/** Reproduce localmente por el contexto de la voz, sin tope: se pueden pisar y mezclar todos los que quieran.
+ *  Sin voz no hay contexto: no suena. */
 async function reproducir(id: string, base: number) {
   const c = contextoVoz();
   if (!c || voz.ensordecido) return; // ensordecido no escucha nada, tampoco la botonera
-  let cupo = cupos.get(c);
-  if (!cupo) cupos.set(c, cupo = new Limite(3));
-  if (!cupo.intentar()) return;
-  let tomado = true;
-  const soltar = () => { if (tomado) { tomado = false; cupo.liberar(); } };
   try {
     const b = await buffer(id, c);
-    if (c.state === 'closed') return soltar();
+    if (c.state === 'closed') return;
     const fuente = c.createBufferSource(), vol = c.createGain();
     fuente.buffer = b; vol.gain.value = leerPrefs().volBotonera * base;
     fuente.connect(vol).connect(c.destination);
-    fuente.onended = () => { fuente.disconnect(); vol.disconnect(); soltar(); };
+    fuente.onended = () => { fuente.disconnect(); vol.disconnect(); };
     fuente.start();
-  } catch { return soltar(); }
+  } catch { return; }
   if (import.meta.env.DEV) (globalThis as unknown as { __botonera?: { reproducidos: number } }).__botonera!.reproducidos++;
 }
 
@@ -89,13 +92,16 @@ export async function tocar(rec: RecordModel) {
   if (!voz.salaId) return;
   const vol = volumenDe(rec);
   void reproducir(rec.id, vol);
-  await publicarDatos(codificar({ id: rec.id, vol }), TOPIC);
+  anotar('Vos', rec.name);
+  await publicarDatos(codificar({ id: rec.id, vol, nombre: rec.name }), TOPIC);
 }
 
-alRecibirDatos((payload, topic) => {
+alRecibirDatos((payload, topic, de) => {
   if (topic !== TOPIC) return;
   try {
-    const { id, vol } = JSON.parse(new TextDecoder().decode(payload));
+    const { id, vol, nombre } = JSON.parse(new TextDecoder().decode(payload));
+    // Las versiones viejas no mandan el nombre del sonido.
+    if (typeof id === 'string') anotar(de ?? 'Alguien', typeof nombre === 'string' ? nombre.slice(0, 60) : 'un sonido');
     // Mismo rango que la colección: un par no puede mandar un sonido a todo volumen.
     if (typeof id === 'string') void reproducir(id, typeof vol === 'number' ? Math.min(2, Math.max(0.05, vol)) : 1);
   } catch { /* dato ajeno o roto */ }

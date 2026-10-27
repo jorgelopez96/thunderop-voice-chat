@@ -31,7 +31,7 @@
   --acento-hover: color-mix(in srgb, var(--acento) 86%, white);
   --foco: var(--acento);
 
-  --ok: #5BC77A; /* solo presencia, hablando, en voz, en vivo */
+  --ok: #5BC77A; /* solo presencia, en voz, en vivo */
   --ok-suave: color-mix(in srgb, var(--ok) 16%, transparent);
   --ausente: #E5B84B;
   --peligro: #E25C6F; /* solo apagado y destructivo (y el punto de Ocupado) */

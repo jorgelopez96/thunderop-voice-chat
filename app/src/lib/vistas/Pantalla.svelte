@@ -5,7 +5,7 @@
   import Video from './Video.svelte';
   import { volumenPantallaDe } from '../prefs';
   import { duenio } from '../transmisorNativo';
-  import { isTauri } from '@tauri-apps/api/core';
+  import { completa, entrarPantallaCompleta, salirPantallaCompleta } from '../pantallaCompleta.svelte';
 
   // Una pantalla que se está mirando: video, quién transmite, espectadores, volumen, pantalla completa y cerrar.
   let { sid }: { sid: string } = $props();
@@ -13,29 +13,16 @@
   const info = $derived((void voz.participantes, pistaPantalla(sid)));
   const pista = $derived(info?.pista);
   const p = $derived(voz.participantes.find((x) => x.id === info?.identidad));
-  let marco = $state<HTMLElement>();
   // Arranca en el volumen que se le dejó la última vez a esta persona.
   let pct = $state(100);
   $effect(() => { if (info) pct = Math.round(volumenPantallaDe(duenio(info.identidad)) * 100); });
   let ultimo = 100;
-  // La pantalla completa del navegador solo llena la ventana: se lleva también la ventana a pantalla completa y se
-  // devuelve al salir. Sin bordes de Windows (0.7), la sombra de la ventana dejaba una franja negra abajo: se apaga
-  // mientras dura la pantalla completa.
-  $effect(() => {
-    if (!isTauri()) return;
-    const cambio = () => import('@tauri-apps/api/window').then(async ({ getCurrentWindow }) => {
-      const w = getCurrentWindow(), lleno = !!document.fullscreenElement?.contains(marco ?? null);
-      await w.setShadow(!lleno);
-      await w.setFullscreen(lleno);
-    }).catch(() => {});
-    document.addEventListener('fullscreenchange', cambio);
-    return () => document.removeEventListener('fullscreenchange', cambio);
-  });
   // Con varias a la vez, pantalla completa muestra todas juntas (cada una ocupa su parte); con una, solo esa.
+  // Si deja de existir (dejó de transmitir, cerraste esta o colgaste) mientras está agrandada, se sale de la pantalla completa.
+  $effect(() => () => { if (completa.sid === sid || (completa.sid === 'todas' && !voz.viendo.length)) void salirPantallaCompleta(); });
   function pantallaCompleta() {
-    if (document.fullscreenElement) { void document.exitFullscreen().catch(() => {}); return; }
-    const todas = voz.viendo.length > 1 ? marco?.closest<HTMLElement>('.escenarios') : null;
-    void (todas ?? marco)?.requestFullscreen().catch(() => {});
+    if (completa.sid !== null) void salirPantallaCompleta();
+    else void entrarPantallaCompleta(voz.viendo.length > 1 ? 'todas' : sid);
   }
   function sonar(v: number) {
     if (v) ultimo = v;
@@ -45,7 +32,7 @@
 </script>
 
 <!-- Pantalla completa sobre el contenedor (no el <video>): el mute nativo del video no toca el audio, que va por otra pista. -->
-<div class="escenario" bind:this={marco}>
+<div class="escenario" class:completa={completa.sid === sid}>
   {#if pista}<Video {pista} etiqueta={`Pantalla de ${p?.nombre ?? ''}`} />{/if}
   <span class="arriba"><span class="vivo"><span class="punto"></span>EN VIVO</span>
     <span class="espectadores num" title="Personas mirando"><Eye size={14} strokeWidth={1.75} />{p?.espectadores ?? 0}</span></span>
@@ -66,7 +53,8 @@
   @keyframes aparece { from { opacity: 0; transform: scale(.985); } }
   /* El alto lo pone quien la usa (--alto): con una sola pantalla es más alta que con varias. */
   .escenario { height: 100%; min-height: 0; }
-  .escenario :global(video) { display: block; width: 100%; height: 100%; object-fit: contain; }
+  /* Absoluto: dentro del grid, height:100% no se resolvía y el video tomaba su alto natural (se recortaba arriba y abajo). */
+  .escenario :global(video) { position: absolute; inset: 0; display: block; width: 100%; height: 100%; object-fit: contain; }
   .arriba { position: absolute; top: 12px; left: 12px; display: flex; gap: 6px; }
   .vivo, .espectadores { display: inline-flex; align-items: center; gap: 5px; height: 24px; padding: 0 8px; border-radius: var(--radio); font-size: 11.5px; font-weight: 750; }
   .vivo { color: #07210F; background: var(--ok); letter-spacing: .03em; }
@@ -82,6 +70,9 @@
   .cerrar { position: absolute; top: 12px; right: 12px; background: rgb(8 9 13 / .75); }
   .controles { position: absolute; right: 12px; bottom: 12px; display: flex; align-items: center; gap: 4px; padding: 2px 6px; background: rgb(8 9 13 / .75); border-radius: var(--radio-menu); }
   .controles input { width: 100px; }
-  .escenario:fullscreen { border: 0; border-radius: 0; background: #000; }
+  /* Varias en pantalla completa: la barrita de la llamada va abajo al centro y tapaba el volumen de la de la izquierda. */
+  :global(.escenarios.completa) .controles { bottom: 92px; }
+  /* Pantalla completa (la página entera va a pantalla completa): tapa todo lo demás. */
+  .escenario.completa { position: fixed; inset: 0; z-index: 100; height: auto; border: 0; border-radius: 0; background: #000; }
 
 </style>

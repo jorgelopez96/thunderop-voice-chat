@@ -1,10 +1,11 @@
 <script lang="ts">
   import { alTocar, estabaAbierto } from '../menu';
   import { Mic, MicOff, Headphones, HeadphoneOff, ChevronDown, Monitor, AudioWaveform, Music, PhoneOff, MessageSquare, Ellipsis } from '@lucide/svelte';
-  import { voz, alternarMute, ensordecer, cambiarSupresion, salirVoz, transmitir, transmitirNavegador, dejarDeTransmitir, cambiarCalidad, dispositivos, elegirEntrada, elegirSalida } from '../voz.svelte';
+  import { voz, alternarMute, ensordecer, salirVoz, transmitir, transmitirNavegador, dejarDeTransmitir, cambiarCalidad, dispositivos, elegirEntrada, elegirSalida } from '../voz.svelte';
   import { grupos } from '../grupos.svelte';
   import { CALIDADES, leerPrefs, type Calidad } from '../prefs';
   import Botonera from './Botonera.svelte';
+  import { tocados } from '../botonera.svelte';
   import Musica from './Musica.svelte';
   import { sesion } from '../sesion.svelte';
   import { fuentes, conNativo, type Fuente } from '../transmisorNativo';
@@ -12,6 +13,7 @@
   import Confirmar from './Confirmar.svelte';
   import { navMovil, conAtras } from '../navMovil.svelte';
   import { elegirFuente } from '../transmision';
+  import { completa } from '../pantallaCompleta.svelte';
 
   const g = $derived(grupos.lista.find((x) => x.id === voz.grupoId));
 
@@ -39,6 +41,7 @@
     const d = await dispositivos();
     lista = t === 'entrada' ? d.entradas : d.salidas;
     elegido = leerPrefs()[t] ?? 'default';
+    if (!lista.some((x) => x.deviceId === elegido)) elegido = 'default'; // el elegido es el predeterminado (no se lista dos veces) o no está
     menu?.showPopover();
   }
   function elegir(id: string) {
@@ -121,8 +124,57 @@
     posCalidad = { x: r.left, y: innerHeight - r.top + 8 };
     menuCalidad?.showPopover();
   }
+  // Pantalla completa de una transmisión: la isla de controles flota abajo y se esconde a los 3 s sin mover el mouse.
+  let flotante = $state<HTMLElement>();
+  let quieto = $state(false);
+  $effect(() => {
+    if (completa.sid === null) { if (flotante?.matches(':popover-open')) flotante.hidePopover(); return; }
+    if (!flotante?.matches(':popover-open')) flotante?.showPopover();
+    let t: ReturnType<typeof setTimeout> | undefined;
+    const mover = () => { quieto = false; clearTimeout(t); t = setTimeout(() => (quieto = true), 3000); };
+    mover();
+    document.addEventListener('mousemove', mover);
+    return () => { clearTimeout(t); document.removeEventListener('mousemove', mover); };
+  });
+  // Cartelito de quién tocó cada sonido (popover: queda encima de todo, también de la pantalla completa).
+  let cartel = $state<HTMLElement>();
+  $effect(() => {
+    const hay = tocados.lista.length > 0, abierto = !!cartel?.matches(':popover-open');
+    if (hay && !abierto) cartel?.showPopover();
+    else if (!hay && abierto) cartel?.hidePopover();
+  });
   const TEXTO_SENAL = { buena: 'Buena conexión', regular: 'Conexión inestable', mala: 'Mala conexión' };
 </script>
+
+{#snippet isla()}
+  <div class="centro">
+    <div class="doble" class:apagado={voz.muteado || voz.sinPermiso}>
+      <button class="icono" onclick={alternarMute} disabled={voz.sinPermiso} aria-label={voz.muteado ? 'Activar micrófono' : 'Silenciarme'} title={voz.sinPermiso ? 'El dueño te silenció' : voz.muteado ? 'Activar micrófono' : 'Silenciarme'}>
+        {#key voz.muteado || voz.sinPermiso}<span class="ico pop">{#if voz.muteado || voz.sinPermiso}<MicOff size={20} strokeWidth={1.75} />{:else}<Mic size={20} strokeWidth={1.75} />{/if}</span>{/key}
+      </button>
+      <button class="icono flecha" aria-label="Opciones del micrófono" title="Micrófono" onpointerdown={() => alTocar(menu)} onclick={(e) => abrirMenu(e, 'entrada')}><ChevronDown size={14} strokeWidth={1.75} /></button>
+    </div>
+    <div class="doble" class:apagado={voz.ensordecido}>
+      <button class="icono" onclick={() => ensordecer(!voz.ensordecido)} aria-label={voz.ensordecido ? 'Activar sonido' : 'Ensordecerme'} title={voz.ensordecido ? 'Activar sonido' : 'Ensordecerme'}>
+        {#key voz.ensordecido}<span class="ico pop">{#if voz.ensordecido}<HeadphoneOff size={20} strokeWidth={1.75} />{:else}<Headphones size={20} strokeWidth={1.75} />{/if}</span>{/key}
+      </button>
+      <button class="icono flecha" aria-label="Opciones del sonido" title="Salida de audio" onpointerdown={() => alTocar(menu)} onclick={(e) => abrirMenu(e, 'salida')}><ChevronDown size={14} strokeWidth={1.75} /></button>
+    </div>
+    <span class="separador"></span>
+    {#if voz.transmitiendo}
+      <div class="doble">
+        <button class="icono vivo" onclick={() => (cortando = true)} aria-label="Dejar de transmitir" title="Dejar de transmitir"><Monitor size={20} strokeWidth={1.75} /></button>
+        <button class="icono flecha" aria-label="Calidad de la transmisión" title="Cambiar la calidad" onpointerdown={() => alTocar(menuCalidad)} onclick={abrirCalidad}><ChevronDown size={14} strokeWidth={1.75} /></button>
+      </div>
+    {:else}
+    {#if puedeTransmitir()}<button class="icono cian" onclick={abrirTransmision} disabled={voz.conectando} aria-label="Transmitir" title="Transmitir pantalla"><Monitor size={20} strokeWidth={1.75} /></button>{/if}
+    {/if}
+    <button class="icono magenta" aria-pressed={abiertoSonidos} popovertarget="dock-sonidos" onclick={ubicarPanel} aria-label="Sonidos" title="Sonidos"><AudioWaveform size={20} strokeWidth={1.75} /></button>
+    <button class="icono violeta" aria-pressed={abiertoMusica} popovertarget="dock-musica" onclick={ubicarPanel} aria-label="Música" title="Música"><Music size={20} strokeWidth={1.75} /></button>
+    <span class="separador"></span>
+    <button class="icono colgar" onclick={salirVoz} aria-label="Desconectarse" title="Desconectarse"><PhoneOff size={20} strokeWidth={1.75} /></button>
+  </div>
+{/snippet}
 
 {#if pantalla.movil}
 <!-- Celular: una fila con lo esencial; sonidos y transmitir en "Más". -->
@@ -149,36 +201,16 @@
     <span class="senal {voz.conectando ? 'regular' : voz.senal}" title={TEXTO_SENAL[voz.conectando ? 'regular' : voz.senal]}></span>
     <span><strong>{voz.conectando ? 'Conectando…' : 'Conectado'}</strong><small>{voz.salaNombre}{g ? ` · ${g.name}` : ''}</small></span>
   </div>
-  <div class="centro">
-    <div class="doble" class:apagado={voz.muteado || voz.sinPermiso}>
-      <button class="icono" onclick={alternarMute} disabled={voz.sinPermiso} aria-label={voz.muteado ? 'Activar micrófono' : 'Silenciarme'} title={voz.sinPermiso ? 'El dueño te silenció' : voz.muteado ? 'Activar micrófono' : 'Silenciarme'}>
-        {#key voz.muteado || voz.sinPermiso}<span class="ico pop">{#if voz.muteado || voz.sinPermiso}<MicOff size={20} strokeWidth={1.75} />{:else}<Mic size={20} strokeWidth={1.75} />{/if}</span>{/key}
-      </button>
-      <button class="icono flecha" aria-label="Opciones del micrófono" title="Micrófono y supresión" onpointerdown={() => alTocar(menu)} onclick={(e) => abrirMenu(e, 'entrada')}><ChevronDown size={14} strokeWidth={1.75} /></button>
-    </div>
-    <div class="doble" class:apagado={voz.ensordecido}>
-      <button class="icono" onclick={() => ensordecer(!voz.ensordecido)} aria-label={voz.ensordecido ? 'Activar sonido' : 'Ensordecerme'} title={voz.ensordecido ? 'Activar sonido' : 'Ensordecerme'}>
-        {#key voz.ensordecido}<span class="ico pop">{#if voz.ensordecido}<HeadphoneOff size={20} strokeWidth={1.75} />{:else}<Headphones size={20} strokeWidth={1.75} />{/if}</span>{/key}
-      </button>
-      <button class="icono flecha" aria-label="Opciones del sonido" title="Salida de audio" onpointerdown={() => alTocar(menu)} onclick={(e) => abrirMenu(e, 'salida')}><ChevronDown size={14} strokeWidth={1.75} /></button>
-    </div>
-    <span class="separador"></span>
-    {#if voz.transmitiendo}
-      <div class="doble">
-        <button class="icono vivo" onclick={() => (cortando = true)} aria-label="Dejar de transmitir" title="Dejar de transmitir"><Monitor size={20} strokeWidth={1.75} /></button>
-        <button class="icono flecha" aria-label="Calidad de la transmisión" title="Cambiar la calidad" onpointerdown={() => alTocar(menuCalidad)} onclick={abrirCalidad}><ChevronDown size={14} strokeWidth={1.75} /></button>
-      </div>
-    {:else}
-    {#if puedeTransmitir()}<button class="icono cian" onclick={abrirTransmision} disabled={voz.conectando} aria-label="Transmitir" title="Transmitir pantalla"><Monitor size={20} strokeWidth={1.75} /></button>{/if}
-    {/if}
-    <button class="icono magenta" aria-pressed={abiertoSonidos} popovertarget="dock-sonidos" onclick={ubicarPanel} aria-label="Sonidos" title="Sonidos"><AudioWaveform size={20} strokeWidth={1.75} /></button>
-    <button class="icono violeta" aria-pressed={abiertoMusica} popovertarget="dock-musica" onclick={ubicarPanel} aria-label="Música" title="Música"><Music size={20} strokeWidth={1.75} /></button>
-    <span class="separador"></span>
-    <button class="icono colgar" onclick={salirVoz} aria-label="Desconectarse" title="Desconectarse"><PhoneOff size={20} strokeWidth={1.75} /></button>
-  </div>
+  {@render isla()}
   <span></span>
 </footer>
 {/if}
+
+<div popover="manual" class="flotante" class:quieto bind:this={flotante} role="toolbar" aria-label="Llamada">{@render isla()}</div>
+
+<div popover="manual" class="tocados" bind:this={cartel} aria-live="polite">
+  {#each tocados.lista as t (t.n)}<span><strong>{t.quien}</strong> tocó {t.sonido}</span>{/each}
+</div>
 
 <div popover id="dock-sonidos" class="panel" style="left:{posPanel.x}px;bottom:{posPanel.y}px" ontoggle={(e) => (abiertoSonidos = e.newState === 'open')}>
   {#if g}{#key g.id}<Botonera grupoId={g.id} userId={sesion.usuario?.id} soyDueno={g.owner === sesion.usuario?.id} />{/key}{/if}
@@ -192,10 +224,6 @@
   {#each lista as x (x.deviceId)}
     <button class="plano" aria-pressed={x.deviceId === elegido} onclick={() => elegir(x.deviceId)}>{x.label || 'Dispositivo sin nombre'}</button>
   {:else}<small>No se ven dispositivos (falta el permiso del micrófono).</small>{/each}
-  {#if tipo === 'entrada'}
-    <hr />
-    <button class="plano" aria-pressed={voz.supresion} onclick={() => cambiarSupresion(!voz.supresion)}>Supresión de ruido</button>
-  {/if}
 </div>
 
 <div popover bind:this={menuCalidad} class="menu" style="left:{posCalidad.x}px;bottom:{posCalidad.y}px">
@@ -257,6 +285,16 @@
     background: var(--panel); border-top: 1px solid var(--borde); }
   :global([data-modo='moderno']) .dock { animation: sube 280ms var(--curva-salida); }
   @keyframes sube { from { opacity: 0; transform: translateY(100%); } }
+  .tocados { position: fixed; inset: auto auto 96px 16px; margin: 0; padding: 0; border: 0; background: none; overflow: visible;
+    display: flex; flex-direction: column; gap: 6px; pointer-events: none; }
+  .tocados span { padding: 6px 12px; border-radius: var(--radio-pildora); font-size: 13px; color: var(--texto);
+    background: var(--elevado); border: 1px solid var(--borde-fuerte); box-shadow: var(--sombra-2); }
+  :global([data-modo='moderno']) .tocados span { animation: aparece-cartel 200ms var(--curva-salida); }
+  @keyframes aparece-cartel { from { opacity: 0; transform: translateY(6px); } }
+  /* Barrita sobre la pantalla completa: abajo al centro. */
+  .flotante { position: fixed; inset: auto 0 24px; margin: 0 auto; width: fit-content; padding: 0; border: 0; background: none; overflow: visible;
+    transition: opacity var(--dur-media); }
+  .flotante.quieto:not(:hover):not(:focus-within) { opacity: 0; }
   .estado { display: flex; align-items: center; gap: 10px; min-width: 0; }
   .estado span { display: flex; flex-direction: column; min-width: 0; line-height: 1.3; }
   .estado strong { font-weight: 650; font-size: 13.5px; }
@@ -306,7 +344,6 @@
   .menu h3 { margin: 4px 8px 6px; }
   .menu button { justify-content: flex-start; text-align: left; padding: 6px 8px; }
   .menu button:not(.peligro) { color: var(--texto); }
-  .menu hr { border: 0; border-top: 1px solid var(--borde); margin: 6px 0; width: 100%; }
   .menu small { padding: 4px 8px; }
   dialog { flex-direction: column; gap: 12px; min-width: 300px; }
   .tenue-web { margin: 0; color: var(--tenue); font-size: 13px; }
