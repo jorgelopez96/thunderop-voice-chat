@@ -23,6 +23,18 @@ describe('ColaPcm', () => {
     c.meter(f(1, 2, 3)); c.meter(f(4, 5, 6));
     expect(sacar(c, 4)).toEqual([3, 4, 5, 6]);
   });
+  it('con arranque, espera a juntar muestras al empezar y después de vaciarse', () => {
+    const c = new ColaPcm(8, 3);
+    c.meter(f(1, 2));
+    expect(sacar(c, 2)).toEqual([0, 0]);
+    c.meter(f(3));
+    expect(sacar(c, 2)).toEqual([1, 2]);
+    expect(sacar(c, 2)).toEqual([3, 0]);
+    c.meter(f(4, 5));
+    expect(sacar(c, 2)).toEqual([0, 0]);
+    c.meter(f(6));
+    expect(sacar(c, 3)).toEqual([4, 5, 6]);
+  });
   it('lote más grande que el máximo conserva solo el final', () => {
     const c = new ColaPcm(3);
     c.meter(f(1, 2, 3, 4, 5));

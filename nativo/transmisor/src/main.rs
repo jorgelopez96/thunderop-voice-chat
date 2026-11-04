@@ -39,6 +39,8 @@ struct Fuente {
     cuadros: u64,
     bytes: u64,
     aviso: Instant,
+    /// cuadros y bytes al último aviso, para los números de los últimos 5 s
+    antes: (u64, u64),
 }
 
 impl EncodedVideoSource for Fuente {
@@ -66,9 +68,18 @@ impl EncodedVideoSource for Fuente {
         self.cuadros += 1;
         self.bytes += s.datos.len() as u64;
         if self.aviso.elapsed() > Duration::from_secs(5) {
+            let dt = self.aviso.elapsed().as_secs_f64();
             self.aviso = Instant::now();
             let t = self.inicio.elapsed().as_secs_f64();
-            println!("{} cuadros, {:.1} fps, {:.1} Mbps (promedio), LiveKit permite {:.1}", self.cuadros, self.cuadros as f64 / t, self.bytes as f64 * 8.0 / t / 1e6, self.pedidos.permitido.load(Ordering::Relaxed) as f64 / 1e6);
+            let (fps, mbps) = ((self.cuadros - self.antes.0) as f64 / dt, (self.bytes - self.antes.1) as f64 * 8.0 / dt / 1e6);
+            self.antes = (self.cuadros, self.bytes);
+            let permite = self.pedidos.permitido.load(Ordering::Relaxed) as f64 / 1e6;
+            println!("{} cuadros, {:.1} fps, {:.1} Mbps (promedio); últimos 5 s: {fps:.0} fps, {mbps:.1} Mbps; LiveKit permite {permite:.1}", self.cuadros, self.cuadros as f64 / t, self.bytes as f64 * 8.0 / t / 1e6);
+            let mut m = self.pedidos.ultimo_minuto.lock().unwrap();
+            m.push_back(format!("{fps:.0}/{mbps:.1}/{permite:.1}"));
+            if m.len() > 12 {
+                m.pop_front();
+            }
         }
         let tipo = if s.clave { EncodedFrameType::Key } else { EncodedFrameType::Delta };
         Ok(Some(OwnedEncodedAccessUnit::new(EncodedVideoCodec::H264, s.datos, s.us, tipo, self.resolution())))
@@ -148,6 +159,8 @@ impl Tuberia {
             println!("codificador: {} (hardware)", cod.nombre);
         }
         println!("capturando {nombre} a {}x{}, {} fps, {} Mbps con {}", salida.0, salida.1, fps, c.mbps, cod.nombre);
+        *pedidos.equipo.lock().unwrap() = format!("{} | {} ({}) | {nombre} {}x{} {} fps, tope {} Mbps", String::from_utf16_lossy(&placa.Description[..n]),
+            cod.nombre, if cod.software { "software" } else { "hardware" }, salida.0, salida.1, fps, c.mbps);
         let (tx_tex, rx_tex) = sync_channel(2);
         let parar = Arc::new(AtomicBool::new(false));
         let (p, a, pd) = (parar.clone(), avisos.clone(), pedidos.clone());
@@ -298,7 +311,7 @@ async fn main() {
         let token = AccessToken::with_api_key(&env("LIVEKIT_API_KEY"), &env("LIVEKIT_API_SECRET"))
             .with_identity("nativo-prueba")
             .with_name("Prueba nativa")
-            .with_grants(VideoGrants { room_join: true, room: sala.clone(), can_publish: Some(true), can_subscribe: Some(false), ..Default::default() })
+            .with_grants(VideoGrants { room_join: true, room: sala.clone(), can_publish: Some(true), can_subscribe: Some(false), can_update_own_metadata: Some(true), ..Default::default() })
             .to_jwt()
             .unwrap();
         (env("LIVEKIT_URL"), token)
@@ -312,7 +325,7 @@ async fn main() {
     });
     println!("conectado a la sala {sala}");
 
-    let fuente = Fuente { rx: rx_h264, pedidos: pedidos.clone(), inicio: Instant::now(), cuadros: 0, bytes: 0, aviso: Instant::now() };
+    let fuente = Fuente { rx: rx_h264, pedidos: pedidos.clone(), inicio: Instant::now(), cuadros: 0, bytes: 0, aviso: Instant::now(), antes: (0, 0) };
     let pump = EncodedVideoPump::new(fuente);
     let pista = LocalVideoTrack::create_video_track("pantalla", pump.rtc_source());
     // sin video_encoding, LiveKit usa sus presets de pantalla (1,5-3 Mbps, pensados para documentos) y
@@ -339,6 +352,19 @@ async fn main() {
                     println!("estimador en {:.1} Mbps, se lo arranca de nuevo en {:.1}", ahora as f64 / 1e6, tope as f64 / 1e6);
                     let _ = room.set_publisher_start_bitrate(tope);
                 }
+            }
+        });
+    }
+    // Cada 10 s, cómo está saliendo, en los atributos de esta conexión: se leen desde el servidor (ListParticipants).
+    {
+        let (room, pedidos) = (room.clone(), pedidos.clone());
+        tokio::spawn(async move {
+            loop {
+                tokio::time::sleep(Duration::from_secs(10)).await;
+                let equipo = pedidos.equipo.lock().unwrap().clone();
+                let minuto = pedidos.ultimo_minuto.lock().unwrap().iter().cloned().collect::<Vec<_>>().join(" ");
+                let a = std::collections::HashMap::from([("equipo".to_string(), equipo), ("fps/Mbps/permite".to_string(), minuto)]);
+                let _ = room.local_participant().set_attributes(a).await;
             }
         });
     }

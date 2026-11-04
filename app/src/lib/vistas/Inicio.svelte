@@ -9,10 +9,9 @@
   import { foto } from '../foto';
   import Avatar from './Avatar.svelte';
   import Novedades from './Novedades.svelte';
-  import Amigos from './Amigos.svelte';
   import { pantalla } from '../plataforma.svelte';
 
-  // `vista: 'grupos'`: la pestaña Grupos del celular (solo la lista de grupos).
+  // Inicio del celular (en la PC va InicioPaneles). `vista: 'grupos'`: la pestaña Grupos (solo la lista de grupos).
   let { vista = 'todo' }: { vista?: 'todo' | 'grupos' } = $props();
 
 
@@ -167,11 +166,10 @@
       {#if vista !== 'grupos'}<Novedades />{/if}
     </div>
   </div>
-  {#if !pantalla.movil}<Amigos />{/if}
 </div>
 
 <style>
-  .inicio { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 280px; }
+  .inicio { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr); }
   .inicio.movil { grid-template-columns: minmax(0, 1fr); }
   .movil .cabecera { padding: 0 16px; }
   .movil .contenido { padding: 16px 16px 24px; gap: 24px; }

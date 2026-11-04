@@ -46,7 +46,7 @@ test('tres personas en una sala de voz', async ({ browser }) => {
   await expect(tarjeta(c, 'Beto').getByLabel('Silenciado')).toBeVisible({ timeout: 5000 });
   await expect.poll(async () => de((await stats(c)).remotos, 'Beto')?.mic, { timeout: 5000 }).toBe(false);
   await expect.poll(async () => (await stats(b)).mic, { timeout: 5000 }).toBe(false);
-  await expect(b.getByTitle('El dueño te silenció')).toBeDisabled();
+  await expect(b.getByTitle('El dueño te silenció').first()).toBeDisabled(); // el dock y su barrita flotante (popover) repiten la isla
   expect(await audioLlega(c, 'Beto')).toBe(false);
 
   // Beto sale y vuelve: sigue silenciado y no puede publicar.
@@ -61,7 +61,7 @@ test('tres personas en una sala de voz', async ({ browser }) => {
   expect((await stats(b)).mic).toBe(false);
   expect(de((await stats(c)).remotos, 'Beto')?.mic).toBe(false);
   expect(await audioLlega(c, 'Beto')).toBe(false);
-  await expect(b.getByTitle('El dueño te silenció')).toBeDisabled();
+  await expect(b.getByTitle('El dueño te silenció').first()).toBeDisabled(); // el dock y su barrita flotante (popover) repiten la isla
 
   // Ana echa a Caro: Caro queda fuera de la llamada en menos de 15 s.
   await a.getByRole('button', { name: /^Participantes · / }).click();
@@ -80,14 +80,14 @@ test('tres personas en una sala de voz', async ({ browser }) => {
   await expect.poll(() => audioLlega(a, 'Beto'), { timeout: 10_000 }).toBe(true);
 
   // Ana (supresión prendida por defecto) la apaga y la vuelve a prender: el audio sigue fluyendo en los dos sentidos.
-  await a.getByRole('button', { name: 'Opciones del micrófono' }).click();
-  const supresion = a.getByRole('button', { name: 'Supresión de ruido' });
-  await expect(supresion).toHaveAttribute('aria-pressed', 'true');
-  await supresion.click();
-  await expect(supresion).toHaveAttribute('aria-pressed', 'false');
+  // La supresión vive en Configuración → Audio (salió del menú del micrófono del dock).
+  await a.getByRole('button', { name: 'Configuración' }).click();
+  await a.getByRole('tab', { name: 'Audio' }).click();
+  const supresion = a.getByRole('checkbox', { name: 'Supresión de ruido' });
+  await expect(supresion).toBeChecked();
+  await supresion.uncheck();
   expect(await audioLlega(b, 'Ana')).toBe(true);
-  await supresion.click();
-  await expect(supresion).toHaveAttribute('aria-pressed', 'true');
+  await supresion.check();
   expect(await audioLlega(a, 'Beto')).toBe(true);
   expect(await audioLlega(b, 'Ana')).toBe(true);
   await expect(a.getByRole('alert')).toHaveCount(0);
@@ -95,7 +95,8 @@ test('tres personas en una sala de voz', async ({ browser }) => {
   // Desde otra página (Ana, sin entrar a la voz), la presencia lista a los conectados.
   const otra = await a.context().newPage();
   await otra.goto('/');
-  await otra.getByRole('button', { name: 'Voces' }).click();
+  await otra.getByRole('option', { name: /Voces/ }).click(); // en el inicio de la PC, tocar el grupo muestra su vista previa
+  await otra.getByRole('button', { name: 'Abrir el grupo' }).click();
   const presencia = otra.locator('li.sala', { has: otra.getByRole('button', { name: 'Sala de voz General' }) }).locator('.quienes');
   await expect.poll(async () => (await presencia.getByRole('listitem').evaluateAll((li) => li.map((x) => x.querySelector(':scope > span:not(.caja)')?.textContent ?? ''))).map((t) => t.slice(0, -4)).sort(), { timeout: 10_000 }).toEqual(['Ana', 'Beto']); // sin el sufijo de crearCuenta
 });

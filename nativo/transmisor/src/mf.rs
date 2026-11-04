@@ -37,6 +37,10 @@ pub struct Pedidos {
     pub tope: AtomicU32,
     /// tamaño del video que sale, ancho << 32 | alto (cambia si cambia la calidad en vivo)
     pub tamano: std::sync::atomic::AtomicU64,
+    /// placa y codificador en uso, y "fps/Mbps/permite" de cada 5 s del último minuto: van a los atributos de la
+    /// pista en LiveKit para ver desde el servidor cómo sale sin pedir el registro
+    pub equipo: std::sync::Mutex<String>,
+    pub ultimo_minuto: std::sync::Mutex<std::collections::VecDeque<String>>,
 }
 
 /// El compresor que se encontró, todavía sin configurar.
@@ -175,8 +179,10 @@ impl Codificador {
         }
         // para probar que el supervisor se recupera: TRANSMISOR_FALLAR=segundos hace fallar al codificador
         let fallar = std::env::var("TRANSMISOR_FALLAR").ok().and_then(|s| s.parse().ok()).map(|s| Instant::now() + Duration::from_secs(s));
-        // el de software no da abasto con todo lo que manda la captura: como mucho `fps` por segundo
-        let minimo = if self.software { Duration::from_secs(1) / self.fps } else { Duration::ZERO };
+        // como mucho `fps` por segundo: el bitrate está calculado para esos fps (un juego a 60 con 30 elegidos salía al
+        // doble de Mbps y llenaba la subida), y el de software tampoco da abasto con más. Un 10 % de margen para que
+        // 60 elegidos con la captura a 60 no pierda cuadros por el temblor de los tiempos.
+        let minimo = Duration::from_secs(1) * 9 / (self.fps * 10);
         let mut ultimo: Option<(ID3D11Texture2D, i64, Instant)> = None;
         loop {
             if let Some(eventos) = &self.eventos {
@@ -223,7 +229,13 @@ impl Codificador {
             }
             let b = p.bitrate.swap(0, Ordering::Relaxed);
             if b > 0 {
-                let _ = self.codec.SetValue(&CODECAPI_AVEncCommonMeanBitRate, &VARIANT::from(b));
+                if let Err(e) = self.codec.SetValue(&CODECAPI_AVEncCommonMeanBitRate, &VARIANT::from(b)) {
+                    // sospecha con AMD: no cambia el bitrate en el aire y sigue al de arranque
+                    static AVISADO: AtomicBool = AtomicBool::new(false);
+                    if !AVISADO.swap(true, Ordering::Relaxed) {
+                        println!("{} no acepta cambiar el bitrate en el aire: {e}", self.nombre);
+                    }
+                }
             }
         }
     }

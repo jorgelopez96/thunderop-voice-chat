@@ -9,6 +9,7 @@
   import { navMovil, conAtras } from '../navMovil.svelte';
   import { grupos, grupoActual, iniciarGrupos, miga } from '../grupos.svelte';
   import Inicio from './Inicio.svelte';
+  import InicioPaneles from './InicioPaneles.svelte';
   import MenuPerfil from './MenuPerfil.svelte';
   import Configuracion from './Configuracion.svelte';
   import { Settings } from '@lucide/svelte';
@@ -78,7 +79,7 @@
     {:else if navMovil.pestana === 'perfil'}<PerfilMovil />
     {:else}<Inicio />{/if}
   {:else}
-    <Inicio />
+    <InicioPaneles />
   {/if}
   <!-- Celular: en la sala, el dock de la llamada; en cualquier otra pantalla, la barrita. -->
   {#if voz.salaId}{#if pantalla.movil && !(actual && miga.voz)}<BarraLlamada />{:else}<Dock />{/if}{/if}

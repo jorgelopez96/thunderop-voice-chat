@@ -1,10 +1,13 @@
-/** Cola FIFO acotada de muestras PCM intercaladas (anillo): al pasarse descarta lo más viejo. */
+/** Cola FIFO acotada de muestras PCM intercaladas (anillo): al pasarse descarta lo más viejo.
+ *  `arranque`: al empezar y después de quedarse sin muestras, espera a juntar eso antes de volver a soltar. Con la
+ *  PC al límite los lotes llegan a los tirones; sin esto cada tirón sonaba como muchos cortecitos seguidos. */
 export class ColaPcm {
   private buf: Float32Array;
   private ini = 0;
   private n = 0;
+  private esperando = true;
 
-  constructor(private max: number) { this.buf = new Float32Array(max); }
+  constructor(private max: number, private arranque = 0) { this.buf = new Float32Array(max); }
 
   get largo(): number { return this.n; }
 
@@ -19,7 +22,9 @@ export class ColaPcm {
 
   /** Rellena `destino` con lo más viejo; si falta, ceros (silencio). */
   sacar(destino: Float32Array): void {
+    if (this.esperando && this.n < this.arranque) { destino.fill(0); return; }
     const k = Math.min(destino.length, this.n);
+    this.esperando = k < destino.length;
     for (let i = 0; i < k; i++) destino[i] = this.buf[(this.ini + i) % this.max];
     destino.fill(0, k);
     this.ini = (this.ini + k) % this.max;

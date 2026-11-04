@@ -7,11 +7,13 @@ declare class AudioWorkletProcessor {
 }
 declare function registerProcessor(nombre: string, ctor: new () => AudioWorkletProcessor): void;
 
-// 0,1 s de audio estéreo intercalado a 48 kHz: tope de latencia del puente.
-const MAX_MUESTRAS = 9600;
+// Audio estéreo intercalado a 48 kHz: 0,3 s de tope de latencia del puente (con 0,1 s, en una PC al límite los
+// tirones del hilo principal se pasaban y se tiraba audio) y 50 ms de colchón al arrancar y después de cada corte.
+const MAX_MUESTRAS = 28800;
+const ARRANQUE = 4800;
 
 class PcmEntrada extends AudioWorkletProcessor {
-  private cola = new ColaPcm(MAX_MUESTRAS);
+  private cola = new ColaPcm(MAX_MUESTRAS, ARRANQUE);
   private tmp = new Float32Array(0);
 
   constructor() {

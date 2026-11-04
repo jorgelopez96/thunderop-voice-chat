@@ -1,15 +1,19 @@
-// npm run release -- midominio.duckdns.org: arma el instalador apuntando al servidor.
-// Deja en app/release/ el instalador y latest.json: se copian a /opt/thunderop/descargas del servidor.
-// Para publicar una actualización, subí antes "version" en src-tauri/tauri.conf.json.
+// npm run release -- midominio.duckdns.org [--beta]: arma el instalador apuntando al servidor.
+// Deja en app/release/ el instalador y sus .json de actualizaciones: se copian a /opt/thunderop/descargas del servidor.
+// Con --beta la app busca sus actualizaciones en latest-beta.json (thunderop-setup-beta.exe); la estable, en latest.json,
+// que también se escribe como latest-beta.json para que los de la beta reciban las estables nuevas.
+// Para publicar una actualización (beta o estable), subí antes "version" en src-tauri/tauri.conf.json.
 import { copyFileSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const dominio = process.argv[2];
+const beta = process.argv.includes('--beta');
+const sufijo = beta ? '-beta' : '';
+const dominio = process.argv.slice(2).find((x) => !x.startsWith('--'));
 if (!dominio) {
-  console.error('Uso: npm run release -- midominio.duckdns.org');
+  console.error('Uso: npm run release -- midominio.duckdns.org [--beta]');
   process.exit(1);
 }
 const conf = JSON.parse(readFileSync(new URL('../src-tauri/tauri.conf.json', import.meta.url), 'utf8'));
@@ -19,7 +23,7 @@ const csp = conf.app.security.csp
 const extra = join(tmpdir(), 'thunderop-release.json');
 writeFileSync(extra, JSON.stringify({
   app: { security: { csp } },
-  plugins: { updater: { endpoints: [`https://${dominio}/descargas/latest.json`] } },
+  plugins: { updater: { endpoints: [`https://${dominio}/descargas/latest${sufijo}.json`] } },
 }));
 
 // Transmisor nativo: se compila y se copia donde lo busca `bundle.externalBin` (el target-dir .lkt de la raíz sale de nativo/transmisor/.cargo/config.toml).
@@ -45,15 +49,17 @@ const nsis = fileURLToPath(new URL('../src-tauri/target/release/bundle/nsis/', i
 const exe = readdirSync(nsis).find((f) => f.endsWith(`_${conf.version}_x64-setup.exe`));
 const salida = fileURLToPath(new URL('../release/', import.meta.url));
 mkdirSync(salida, { recursive: true });
-copyFileSync(join(nsis, exe), join(salida, 'thunderop-setup.exe'));
-writeFileSync(join(salida, 'latest.json'), JSON.stringify({
+copyFileSync(join(nsis, exe), join(salida, `thunderop-setup${sufijo}.exe`));
+const json = JSON.stringify({
   version: conf.version,
   pub_date: new Date().toISOString(),
   platforms: {
     'windows-x86_64': {
       signature: readFileSync(join(nsis, `${exe}.sig`), 'utf8'),
-      url: `https://${dominio}/descargas/thunderop-setup.exe`,
+      url: `https://${dominio}/descargas/thunderop-setup${sufijo}.exe`,
     },
   },
-}, null, 2));
-console.log(`\nListo: ${salida}\nDescarga para tus amigos: https://${dominio}/descargas/thunderop-setup.exe`);
+}, null, 2);
+writeFileSync(join(salida, 'latest-beta.json'), json);
+if (!beta) writeFileSync(join(salida, 'latest.json'), json);
+console.log(`\nListo: ${salida}\nDescarga para tus amigos: https://${dominio}/descargas/thunderop-setup${sufijo}.exe`);

@@ -25,9 +25,15 @@
   });
   onMount(() => {
     buscarActualizacion();
-    // Con la bandeja la app casi no se reabre: se vuelve a buscar cada hora, pero nunca en plena llamada.
-    const t = setInterval(() => { if (!voz.salaId) buscarActualizacion(true); }, 60 * 60_000);
-    return () => clearInterval(t);
+    // Con la bandeja la app casi no se reabre: se vuelve a buscar a cada hora en punto, pero nunca en plena llamada.
+    let t: ReturnType<typeof setTimeout>;
+    const programar = () => {
+      const enPunto = new Date();
+      enPunto.setHours(enPunto.getHours() + 1, 0, 0, 0);
+      t = setTimeout(() => { if (!voz.salaId) buscarActualizacion(true); programar(); }, enPunto.getTime() - Date.now());
+    };
+    programar();
+    return () => clearTimeout(t);
   });
 </script>
 
