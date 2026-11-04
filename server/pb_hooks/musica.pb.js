@@ -1,6 +1,7 @@
 /// <reference path="../pb_data/types.d.ts" />
 // Música sincronizada por sala de voz: cola en `canciones`, estado en `reproducciones`.
 // Cualquier miembro del grupo la maneja. Posición = pausaS ?? (ahora - inicioMs) / 1000.
+// La cola va por `orden` (único por sala, creciente al agregar); la siguiente es la primera en espera.
 // Cada acción corre en una transacción, así varios `termino` del mismo tema avanzan una sola vez.
 
 // Solo lectura: estado actual (null si la sala nunca tuvo música) y la hora del servidor, para que el cliente mida su desfase.
@@ -21,7 +22,7 @@ routerAdd("POST", "/api/rooms/{id}/musica", (e) => {
   const body = e.requestInfo().body;
   const accion = body.accion;
   const cancionId = typeof body.cancionId === "string" ? body.cancionId : "";
-  if (!["agregar", "agregarLista", "pausar", "reanudar", "saltar", "termino", "error", "quitar", "vaciar"].includes(accion)) {
+  if (!["agregar", "agregarLista", "pausar", "reanudar", "saltar", "termino", "error", "quitar", "vaciar", "ordenar"].includes(accion)) {
     throw new BadRequestError("Acción desconocida.");
   }
 
@@ -94,12 +95,14 @@ routerAdd("POST", "/api/rooms/{id}/musica", (e) => {
       const c = tx.findRecordById("canciones", actual);
       c.set("estado", estado);
       tx.save(c);
-      const sig = tx.findRecordsByFilter("canciones", "room = {:r} && estado = 'cola'", "created,orden", 1, 0, { r: room.id });
+      const sig = tx.findRecordsByFilter("canciones", "room = {:r} && estado = 'cola'", "orden,created", 1, 0, { r: room.id });
       sonar(sig[0]);
     };
 
     if (nuevas.length) {
       const col = tx.findCollectionByNameOrId("canciones");
+      const ultima = tx.findRecordsByFilter("canciones", "room = {:r}", "-orden", 1, 0, { r: room.id })[0];
+      const base = ultima ? ultima.getInt("orden") + 1 : 0;
       let primera = null;
       nuevas.forEach((n, i) => {
         const c = new Record(col);
@@ -108,7 +111,7 @@ routerAdd("POST", "/api/rooms/{id}/musica", (e) => {
         c.set("titulo", n.titulo);
         c.set("agregadoPor", e.auth.id);
         c.set("estado", "cola");
-        c.set("orden", i);
+        c.set("orden", base + i);
         tx.save(c);
         primera = primera || c;
       });
@@ -129,6 +132,23 @@ routerAdd("POST", "/api/rooms/{id}/musica", (e) => {
         tx.save(c);
         sonar(null);
       }
+    } else if (accion === "ordenar") {
+      // Nuevo orden de la que suena y las que esperan: se reparten los mismos lugares que ya ocupaban
+      // (las que dieron error quedan donde estaban). Tiene que ser exactamente esa cola, si no alguien la cambió antes.
+      const ids = Array.isArray(body.ids) ? body.ids : [];
+      const cola = tx.findRecordsByFilter("canciones", "room = {:r} && (estado = 'cola' || estado = 'sonando')", "orden,created", 0, 0, { r: room.id });
+      const porId = new Map(cola.map((c) => [c.id, c]));
+      if (ids.length !== cola.length || new Set(ids).size !== ids.length || !ids.every((id) => porId.has(id))) {
+        throw new BadRequestError("La cola cambió mientras la ordenabas. Probá de nuevo.");
+      }
+      const lugares = cola.map((c) => c.getInt("orden"));
+      ids.forEach((id, i) => {
+        const c = porId.get(id);
+        if (c.getInt("orden") !== lugares[i]) {
+          c.set("orden", lugares[i]);
+          tx.save(c);
+        }
+      });
     } else if (cancionId && cancionId === actual) {
       // saltar, termino, error y quitar de la actual; el id viejo de otro cliente no hace nada
       avanzar(accion === "error" ? "error" : "hecha");

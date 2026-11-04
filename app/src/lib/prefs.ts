@@ -43,3 +43,7 @@ export function guardarPrefs(p: Partial<PrefsVoz>): void {
 export const volumenPantallaDe = (dueno: string) => leerPrefs().volumenes[`pantalla:${dueno}`] ?? 1;
 export const guardarVolumenPantalla = (dueno: string, v: number) =>
   guardarPrefs({ volumenes: { ...leerPrefs().volumenes, [`pantalla:${dueno}`]: v } });
+
+/** Volumen (0 a 100) de YouTube juntos, aparte del de la música. */
+export const volumenYoutube = () => leerPrefs().volumenes.youtube ?? 70;
+export const guardarVolumenYoutube = (v: number) => guardarPrefs({ volumenes: { youtube: v } });

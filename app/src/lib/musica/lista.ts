@@ -68,3 +68,11 @@ export function mezclar<T>(xs: T[]): T[] {
   for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
   return a;
 }
+
+/** Copia de `xs` con el elemento de la posición `de` llevado a la posición `a` (queda ahí; los del medio se corren). */
+export function mover<T>(xs: T[], de: number, a: number): T[] {
+  const ys = [...xs];
+  if (de < 0 || de >= ys.length || a < 0 || a >= ys.length) return ys;
+  ys.splice(a, 0, ...ys.splice(de, 1));
+  return ys;
+}

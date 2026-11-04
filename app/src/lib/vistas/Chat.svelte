@@ -7,7 +7,6 @@
   import { mantener } from '../mantener';
   import { pantalla } from '../plataforma.svelte';
   import { conAtras, cerrarCapa } from '../navMovil.svelte';
-  import { EMOJIS } from '../emojis';
   import { tick } from 'svelte';
   import type { RecordModel } from 'pocketbase';
   import { pb } from '../pb';
@@ -19,6 +18,7 @@
   import MenuChat from './MenuChat.svelte';
   import VistaPrevia from './VistaPrevia.svelte';
   import Gifs from './Gifs.svelte';
+  import MenuEmojis from './MenuEmojis.svelte';
   import { partirEnLinks, primerLink, abrirLink, esGif } from '../links';
   import { extraerCodigo } from '../invitacion';
   import { unirse } from '../grupos.svelte';
@@ -190,9 +190,9 @@
     if (estabaAbierto(menuEmojis) && destino === para) return;
     const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
     destino = para;
-    // Arriba del botón si entra (~310 px de menú); si no (mensaje pegado arriba), abajo.
-    const x = Math.max(8, Math.min(r.left, innerWidth - 304));
-    posMenu = r.top > 320 ? `left:${x}px;bottom:${innerHeight - r.top + 4}px` : `left:${x}px;top:${r.bottom + 4}px`;
+    // Arriba del botón si entra (~410 px de menú); si no (mensaje pegado arriba), abajo sin salirse de la ventana.
+    const x = Math.max(8, Math.min(r.left, innerWidth - 360));
+    posMenu = r.top > 412 ? `left:${x}px;bottom:${innerHeight - r.top + 4}px` : `left:${x}px;top:${Math.max(8, Math.min(r.bottom + 4, innerHeight - 408))}px`;
     menuEmojis?.showPopover();
   }
   // GIFs: panel arriba del botón; elegir uno lo manda enseguida (respondiendo, si había una respuesta en curso).
@@ -338,9 +338,7 @@
   <div popover class="panel-gifs" bind:this={panelGifs} style={posGifs} ontoggle={(e) => (gifsAbierto = e.newState === 'open')}>
     {#if gifsAbierto}<Gifs elegir={mandarGif} />{/if}
   </div>
-  <div popover class="emojis" bind:this={menuEmojis} style={posMenu}>
-    {#each EMOJIS as emoji (emoji)}<button class="plano" onclick={() => elegirEmoji(emoji)}>{emoji}</button>{/each}
-  </div>
+  <MenuEmojis bind:menu={menuEmojis} estilo={posMenu} elegir={elegirEmoji} />
   <dialog class="visor" bind:this={visor} onclose={() => (grande = null)} onclick={(e) => e.target === visor && visor.close()}>
     {#if grande}
       <div class="acciones">
@@ -425,10 +423,6 @@
   .gif { display: block; max-width: min(280px, 100%); max-height: 240px; border-radius: var(--radio); margin-top: 2px; }
   .gif-boton { font-size: 12px; font-weight: 750; letter-spacing: .04em; color: var(--icono); }
   .panel-gifs { position: fixed; inset: auto; margin: 0; padding: 10px; background: var(--elevado); color: var(--texto); border: 1px solid var(--borde-fuerte); border-radius: var(--radio-menu); box-shadow: var(--sombra-2); }
-  .emojis { position: fixed; inset: auto; margin: 0; padding: 6px; width: 296px; flex-wrap: wrap; gap: 2px;
-    background: var(--elevado); color: var(--texto); border: 1px solid var(--borde-fuerte); border-radius: var(--radio-menu); box-shadow: var(--sombra-2); }
-  .emojis:popover-open { display: flex; }
-  .emojis button { font-size: 20px; padding: 2px; min-height: 0; width: 34px; height: 34px; }
   .visor { max-width: none; width: 70vw; height: 70vh; padding: 0; overflow: hidden; background: var(--hondo); }
   .visor[open] { display: flex; flex-direction: column; }
   .acciones { display: flex; justify-content: flex-end; gap: 4px; padding: 6px; }

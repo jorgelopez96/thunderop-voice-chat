@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from 'svelte';
   import LogoThunderop from './LogoThunderop.svelte';
   import BarraTitulo from './BarraTitulo.svelte';
   import Amigos from './Amigos.svelte';
@@ -20,6 +21,7 @@
   import { iniciarAmigos } from '../amigos.svelte';
   import { iniciarPrivados } from '../privados.svelte';
   import { iniciarNoLeidos } from '../noLeidos.svelte';
+  import { iniciarBarraTareas } from '../barraTareas.svelte';
   import Campanita from './Campanita.svelte';
   import { ubicarReproductor } from '../musica/musica.svelte';
 
@@ -28,6 +30,7 @@
   $effect(iniciarAmigos);
   $effect(iniciarPrivados);
   $effect(iniciarNoLeidos);
+  $effect(iniciarBarraTareas);
 
   const actual = $derived(grupos.lista.find((g) => g.id === grupoActual.id));
   let config = $state(false);
@@ -42,8 +45,9 @@
   // El reproductor vive acá y no en la vista de la sala: cambiar de chat o de grupo no corta la música.
   $effect(() => {
     if (!hostMusica) return;
-    ubicarReproductor(hostMusica);
-    return () => ubicarReproductor(null);
+    const el = hostMusica;
+    untrack(() => ubicarReproductor(el)); // sin untrack, el efecto seguiría la cola y recrearía el reproductor con cada cambio
+    return () => untrack(() => ubicarReproductor(null));
   });
 
 </script>

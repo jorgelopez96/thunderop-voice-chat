@@ -83,6 +83,15 @@ export const quitar = (id: string) => enviar('quitar', { cancionId: id });
 /** Quitar todas: vacía la cola y corta la que suena (para todos). */
 export const vaciar = () => enviar('vaciar');
 
+/** La que suena y las que esperan se pueden reordenar; las que dieron error quedan en su lugar. */
+export const movible = (c: Cancion) => c.estado === 'cola' || c.estado === 'sonando';
+/** Nuevo orden de las movibles. Se ve al toque; si el servidor lo rechaza, se relee el de verdad. */
+export async function ordenar(nuevas: Cancion[]) {
+  let i = 0;
+  musica.cola = musica.cola.map((c) => (movible(c) ? nuevas[i++] : c));
+  if (!(await enviar('ordenar', { ids: nuevas.map((c) => c.id) }))) await cargar();
+}
+
 /** Volumen de la música (0 a 100), aparte del de las voces. Se guarda en prefs. */
 /** Ensordecido no escucha nada, tampoco la música (el volumen elegido se conserva para cuando vuelva). */
 const oido = (v: number) => (voz.ensordecido ? 0 : v);
@@ -122,7 +131,7 @@ async function cargar() {
     { r: s, desde: new Date(ahoraServidor() - ERROR_VISIBLE_MS) });
   try {
     const [cola, r] = await Promise.all([
-      pb.collection('canciones').getFullList<Cancion>({ filter: filtro, sort: 'created,orden', requestKey: null }),
+      pb.collection('canciones').getFullList<Cancion>({ filter: filtro, sort: 'orden,created', requestKey: null }),
       pb.collection('reproducciones').getFirstListItem<Rep>(pb.filter('room = {:r}', { r: s }), { requestKey: null })
         .catch((e) => { if (e?.status === 404) return null; throw e; }), // sin música todavía
     ]);

@@ -1,7 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import { grupoDeTres } from './cuentas';
 
-/** WAV mono de 8 kHz con un tono de `segundos` (11 s pesan ~176 KB: pasa el tope de 1 MB y falla solo por duración). */
+/** WAV mono de 8 kHz con un tono de `segundos` (11 s pesan ~176 KB). */
 function wav(segundos: number) {
   const sr = 8000, n = sr * segundos;
   const b = Buffer.alloc(44 + n * 2);
@@ -43,9 +43,13 @@ test('un sonido de la botonera lo escuchan los de la sala', async ({ browser }) 
   expect(await reproducidos(c)).toBe(antesC);
   expect(await reproducidos(b)).toBe(antesB + 1);
 
-  // Uno de 11 s no pasa.
-  await subir(a, 'Larguísimo', 11);
-  await expect(a.locator('dialog').getByRole('alert')).toHaveText('El sonido dura más de 10 segundos.');
-  await a.getByRole('button', { name: 'Cancelar' }).click();
-  await expect(a.getByRole('button', { name: 'Larguísimo', exact: true })).toHaveCount(0);
+  // Uno de 11 s se recorta a los primeros 10 s y se sube.
+  await a.getByRole('button', { name: 'Nuevo sonido' }).click();
+  await a.getByLabel('Nombre del sonido').fill('Larguísimo');
+  await a.getByLabel('Archivo de audio').setInputFiles({ name: 'Larguísimo.wav', mimeType: 'audio/wav', buffer: wav(11) });
+  await expect(a.getByRole('slider', { name: 'Fin del recorte' })).toHaveAttribute('aria-valuenow', '10');
+  await a.getByRole('slider', { name: 'Fin del recorte' }).press('ArrowRight');
+  await expect(a.getByRole('slider', { name: 'Inicio del recorte' })).toHaveAttribute('aria-valuenow', '0.1');
+  await a.getByRole('button', { name: 'Subir' }).click();
+  await expect(a.getByRole('button', { name: 'Larguísimo', exact: true })).toBeVisible({ timeout: 5000 });
 });

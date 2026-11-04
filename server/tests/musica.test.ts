@@ -162,6 +162,34 @@ describe('música', () => {
     expect((await canciones(b, voz)).map((c: any) => c.id)).toEqual([c1.id]);
   });
 
+  it('ordenar mueve la cola (también la que suena, sin cortarla) y la siguiente es la primera en espera', async () => {
+    const { a, b, c, voz } = await setup();
+    const canciones = ['OOOOOOOOOO1', 'OOOOOOOOOO2', 'OOOOOOOOOO3'].map((videoId) => ({ videoId, titulo: videoId }));
+    await musica(b, voz, { accion: 'agregarLista', canciones });
+    await musica(b, voz, { accion: 'agregar', url: yt('OOOOOOOOOO4') });
+    const cola = () => b.collection('canciones').getFullList({ filter: `room = "${voz}"`, sort: 'orden,created' });
+    const [c1, c2, c3, c4] = await cola();
+    const r0 = (await b.collection('reproducciones').getFullList())[0];
+
+    const r = await musica(a, voz, { accion: 'ordenar', ids: [c3.id, c1.id, c4.id, c2.id] });
+    expect((await cola()).map((x: any) => x.id)).toEqual([c3.id, c1.id, c4.id, c2.id]);
+    expect(r.reproduccion).toMatchObject({ actual: c1.id, inicioMs: r0.inicioMs });
+
+    // termina la que suena: sigue la primera en espera de la lista
+    const t = await musica(b, voz, { accion: 'termino', cancionId: c1.id });
+    expect(t.reproduccion.actual).toBe(c3.id);
+    // lo nuevo va al final
+    await musica(b, voz, { accion: 'agregar', url: yt('OOOOOOOOOO5') });
+    expect((await cola()).at(-1).videoId).toBe('OOOOOOOOOO5');
+
+    const rechazo = { status: 400, response: { message: 'La cola cambió mientras la ordenabas. Probá de nuevo.' } };
+    const vigentes = (await cola()).filter((x: any) => x.estado !== 'hecha').map((x: any) => x.id);
+    for (const ids of [vigentes.slice(1), [...vigentes, c1.id], [vigentes[0], ...vigentes.slice(0, -1)], 'x', [...vigentes.slice(0, -1), '__proto__']]) {
+      await expect(musica(b, voz, { accion: 'ordenar', ids }), String(ids)).rejects.toMatchObject(rechazo);
+    }
+    await expect(musica(c, voz, { accion: 'ordenar', ids: vigentes })).rejects.toMatchObject({ status: 403 });
+  });
+
   it('la última que termina deja actual vacío', async () => {
     const { b, voz } = await setup();
     await musica(b, voz, { accion: 'agregar', url: yt('GGGGGGGGGG1') });

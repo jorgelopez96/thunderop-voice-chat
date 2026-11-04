@@ -18,6 +18,8 @@
     "core:window:allow-maximize",
     "core:window:allow-unmaximize",
     "core:window:allow-set-shadow",
+    "core:window:allow-request-user-attention",
+    "core:window:allow-set-overlay-icon",
     "updater:default",
     "notification:default",
     "opener:default"

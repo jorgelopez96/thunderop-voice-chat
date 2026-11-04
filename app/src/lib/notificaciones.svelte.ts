@@ -3,9 +3,11 @@ import { pb } from './pb';
 import { leerPrefs } from './prefs';
 import { esGif } from './links';
 import { mostrar } from './notifNavegador';
+import { queAvisar } from './reglasAviso';
 import type { Ir } from './ir.svelte';
 
-// Aviso de mensaje nuevo (privados y salas): sonido y, si la ventana no está a la vista, notificación de Windows.
+// Aviso de mensaje nuevo (privados y salas): sonido y, si la ventana no está a la vista, notificación de Windows
+// y el ícono de la barra de tareas destacado (barraTareas.svelte.ts).
 // Cada chat se puede silenciar hasta una fecha o para siempre; se guarda en este dispositivo:
 // `localStorage['dm.silencio.<usuario>']` = { chat: hasta (ms) }.
 const SIEMPRE = Number.MAX_SAFE_INTEGER;
@@ -58,6 +60,9 @@ export function ver(chat: string) {
   return () => viendo.delete(chat);
 }
 
+/** Avisos que llegaron con la ventana sin foco; la barra de tareas los muestra hasta que se vuelve a la app. */
+export const atencion = $state({ nuevos: 0 });
+
 let ctx: AudioContext | undefined;
 function ding() {
   ctx ??= new AudioContext();
@@ -78,12 +83,13 @@ function ding() {
 export async function avisar(chat: string, titulo: string, texto: string, aunSilenciado = false, guardar = false, ir?: Ir) {
   const aLaVista = document.visibilityState === 'visible' && document.hasFocus();
   const p = leerPrefs();
-  const porMencion = aunSilenciado && p.avisoMenciones;
-  const porMensaje = p.avisoMensajes && !silenciadoHasta(chat);
-  if ((!porMencion && !porMensaje) || (aLaVista && viendo.has(chat))) return;
+  const q = queAvisar({ mencion: aunSilenciado, avisoMenciones: p.avisoMenciones, avisoMensajes: p.avisoMensajes, notificaciones: p.notificaciones,
+    silenciado: !!silenciadoHasta(chat), aLaVista, viendoChat: viendo.has(chat) });
+  if (!q.avisa) return;
   if (guardar) anotar(titulo, texto, ir);
   if (p.sonidoMensajes) ding();
-  if (aLaVista || !p.notificaciones) return;
+  if (q.destacar) atencion.nuevos++;
+  if (!q.notificar) return;
   if (!isTauri()) { mostrar(titulo, texto); return; }
   try {
     const n = await import('@tauri-apps/plugin-notification');

@@ -2,7 +2,7 @@ import type { RecordModel } from 'pocketbase';
 import { pb } from './pb';
 import { leerPrefs } from './prefs';
 import { contextoVoz, publicarDatos, alRecibirDatos, voz } from './voz.svelte';
-import { validarSonido, mensajeSubida } from './botoneraLogica';
+import { validarSonido, mensajeSubida, recortarMono, codificarWav, MAX_BYTES_ORIGINAL, TASA, type Seleccion } from './botoneraLogica';
 
 const TOPIC = 'botonera';
 const buffers = new Map<string, { group: string; b: AudioBuffer }>(); // ponytail: sin tope de tamaño; 50 sonidos × ≤10 s por grupo es acotado
@@ -44,6 +44,21 @@ export async function subir(grupoId: string, nombre: string, archivo: File, volu
   const dueño = pb.authStore.record?.id;
   try { await pb.collection('sonidos').create({ group: grupoId, name: nombre.trim(), file: archivo, owner: dueño, volumen }); }
   catch (e) { throw new Error(mensajeSubida((e as { response?: Parameters<typeof mensajeSubida>[0] })?.response)); }
+}
+
+/** Decodifica el archivo elegido (cualquier duración) a la tasa del WAV que se sube. Tira Error con el mensaje para mostrar. */
+export async function decodificar(archivo: File) {
+  if (archivo.size > MAX_BYTES_ORIGINAL) throw new Error('El archivo pesa más de 30 MB.');
+  // Un contexto offline no abre la placa de audio y decodeAudioData remuestrea a su tasa.
+  try { return await new OfflineAudioContext(1, 1, TASA).decodeAudioData(await archivo.arrayBuffer()); }
+  catch { throw new Error('No se pudo leer el audio.'); }
+}
+
+/** El pedazo elegido como WAV mono, listo para `subir`. */
+export function recorteWav(audio: AudioBuffer, sel: Seleccion, nombre: string) {
+  const canales = Array.from({ length: audio.numberOfChannels }, (_, i) => audio.getChannelData(i));
+  const wav = codificarWav(recortarMono(canales, audio.sampleRate, sel), audio.sampleRate);
+  return new File([wav], `${nombre.replace(/\.[^.]*$/, '') || 'sonido'}.wav`, { type: 'audio/wav' });
 }
 
 export const editar = (id: string, cambios: { name?: string; volumen?: number }) => pb.collection('sonidos').update(id, cambios);

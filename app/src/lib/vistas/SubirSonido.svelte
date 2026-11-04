@@ -2,10 +2,11 @@
   import { lleno } from '../rango';
   import type { RecordModel } from 'pocketbase';
   import { Upload, X } from '@lucide/svelte';
-  import { subir, editar } from '../botonera.svelte';
+  import { subir, editar, decodificar, recorteWav } from '../botonera.svelte';
   import { mensajeError } from '../sesion.svelte';
   import BotonEmoji from './BotonEmoji.svelte';
-  import { separarEmoji, unirEmoji } from '../botoneraLogica';
+  import RecorteSonido from './RecorteSonido.svelte';
+  import { separarEmoji, unirEmoji, seleccionInicial } from '../botoneraLogica';
 
   // Modal para subir un sonido al grupo, o para editar `sonido` (emoji, nombre y volumen).
   // El emoji va al principio del nombre ("🔥 Bruh"): no hay campo aparte en el servidor. Quien lo usa lo monta con {#if} y lo desmonta en `cerrar`.
@@ -17,6 +18,8 @@
   let emoji = $state(e0);
   let nombre = $state(t0);
   let archivo = $state<File>();
+  let audio = $state<AudioBuffer>();
+  let sel = $state({ inicio: 0, fin: 0 });
   // svelte-ignore state_referenced_locally
   let volumen = $state(sonido?.volumen || 100);
   let error = $state('');
@@ -25,9 +28,19 @@
   async function enviar(e: SubmitEvent) {
     e.preventDefault();
     if (sonido) return guardar(() => editar(sonido.id, { name: unirEmoji(emoji, nombre), volumen }));
-    if (!archivo) return (error = 'Elegí un archivo de audio.');
-    const a = archivo;
-    await guardar(() => subir(grupoId, unirEmoji(emoji, nombre), a, volumen));
+    if (!archivo || !audio) return (error = 'Elegí un archivo de audio.');
+    const f = recorteWav(audio, sel, archivo.name);
+    await guardar(() => subir(grupoId, unirEmoji(emoji, nombre), f, volumen));
+  }
+  // Se sube solo el pedazo elegido en el editor, recodificado a WAV: así entra cualquier duración y casi cualquier formato.
+  async function elegir(f: File | undefined) {
+    archivo = f; audio = undefined; error = '';
+    if (!f) return;
+    try {
+      const a = await decodificar(f);
+      if (archivo !== f) return; // eligió otro mientras se leía
+      sel = seleccionInicial(a.duration); audio = a;
+    } catch (e) { if (archivo === f) error = e instanceof Error ? e.message : 'No se pudo leer el audio.'; }
   }
   async function guardar(f: () => Promise<unknown>) {
     error = ''; subiendo = true;
@@ -50,8 +63,9 @@
           <Upload size={18} strokeWidth={1.75} />
           <span class="nombre-archivo" class:tenue={!archivo}>{archivo?.name ?? 'Elegí un archivo'}</span>
           <span class="explorar">Explorar</span>
-          <input type="file" accept="audio/*" hidden aria-label="Archivo de audio" onchange={(e) => (archivo = e.currentTarget.files?.[0])} />
+          <input type="file" accept="audio/*" hidden aria-label="Archivo de audio" onchange={(e) => elegir(e.currentTarget.files?.[0])} />
         </label>
+        {#if audio}<RecorteSonido {audio} bind:sel />{/if}
       </div>
     {/if}
     <div class="dos">
@@ -65,7 +79,7 @@
     {#if error}<p role="alert">{error}</p>{/if}
     <div class="botones">
       <button type="button" onclick={() => dlg?.close()}>Cancelar</button>
-      <button type="submit" class="primario" disabled={subiendo || !nombre.trim() || (!sonido && !archivo)}>{sonido ? 'Guardar' : 'Subir'}</button>
+      <button type="submit" class="primario" disabled={subiendo || !nombre.trim() || (!sonido && !audio)}>{sonido ? 'Guardar' : 'Subir'}</button>
     </div>
   </form>
 </dialog>

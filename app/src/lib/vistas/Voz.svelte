@@ -14,6 +14,8 @@
   import Chat from './Chat.svelte';
   import { voz, volumen, silenciar, desconectar, moverA, bloquearVoz, ver, pistaPantallaPropia, vistaPrevia } from '../voz.svelte';
   import Pantalla from './Pantalla.svelte';
+  import EscenarioYoutube from './EscenarioYoutube.svelte';
+  import { youtube } from '../youtube/youtube.svelte';
   import { completa } from '../pantallaCompleta.svelte';
   import Video from './Video.svelte';
   import { leerPrefs } from '../prefs';
@@ -68,6 +70,7 @@
   let avisoLlamada = $state(pantalla.movil && (() => { try { return !sessionStorage.getItem('dm.avisoLlamada'); } catch { return true; } })());
   function entendido() { avisoLlamada = false; try { sessionStorage.setItem('dm.avisoLlamada', '1'); } catch { /* sin almacenamiento: dura esta vista */ } }
   let ocultarGente = $state(false); // mientras se mira una transmisión, las tarjetas de la gente se pueden esconder
+  const enEscena = $derived(voz.viendo.length + (youtube.actual ? 1 : 0)); // transmisiones que se miran + el video de YouTube juntos
   // En el celular el chat de la sala se abre a pantalla completa desde el dock (navMovil.chatSala).
   const verChat = $derived(pantalla.movil ? navMovil.chatSala : chatAbierto);
   function plegarChat(a: boolean) { chatAbierto = a; try { localStorage.setItem('dm.chatSala', a ? '1' : '0'); } catch { /* sin almacenamiento */ } }
@@ -85,7 +88,7 @@
       <Volume2 size={18} strokeWidth={1.75} color="var(--icono)" />
       <h2>{sala}</h2>
       <span class="en-voz num">{voz.participantes.length} en voz</span>
-      {#if voz.viendo.length}<button class="plano" onclick={() => (ocultarGente = !ocultarGente)}>{#if ocultarGente}<Eye size={16} strokeWidth={1.75} /> Mostrar participantes{:else}<EyeOff size={16} strokeWidth={1.75} /> Ocultar participantes{/if}</button>{/if}
+      {#if enEscena}<button class="plano" onclick={() => (ocultarGente = !ocultarGente)}>{#if ocultarGente}<Eye size={16} strokeWidth={1.75} /> Mostrar participantes{:else}<EyeOff size={16} strokeWidth={1.75} /> Ocultar participantes{/if}</button>{/if}
       <!-- popovertarget: abre y cierra con el mismo botón (con onclick, el clic la cerraba y la volvía a abrir) -->
       <button class="plano" popovertarget="capa-participantes"><Users size={16} strokeWidth={1.75} /> Participantes · {miembros.length}</button>
       {#if !chatAbierto && !pantalla.movil}<button class="icono" onclick={() => plegarChat(true)} aria-label="Abrir chat de la sala" title="Chat de la sala"><MessageSquare size={16} strokeWidth={1.75} /></button>{/if}
@@ -95,14 +98,15 @@
     {#if voz.conectando}<p role="status">Conectando…</p>{/if}
     {#if error}<p role="alert">{error}</p>{/if}
 
-    {#if voz.viendo.length}
+    {#if enEscena}
       <!-- Una sola: grande. Varias: lado a lado si entran a un tamaño que se distinga, si no una abajo de la otra. -->
       <!-- Todas las que se miran entran en el espacio que hay, sin scroll: 1 = entera, 2 = mitad y mitad, 3-4 = de a dos. -->
-      <div class="escenarios" class:completa={completa.sid === 'todas'} data-n={Math.min(voz.viendo.length, 5)}>
+      <div class="escenarios" class:completa={completa.sid === 'todas'} data-n={Math.min(enEscena, 5)}>
         {#each voz.viendo as sid (sid)}<Pantalla {sid} />{/each}
+        {#if youtube.actual}<EscenarioYoutube />{/if}
       </div>
     {/if}
-    <ul class="franja" class:oculta={ocultarGente && voz.viendo.length > 0}>
+    <ul class="franja" class:oculta={ocultarGente && enEscena > 0}>
       {#each voz.participantes as p, i (p.id)}
         {@const m = miembro(p.id)}
         <li style:--i={Math.min(i, 5)} class:hablando={p.hablando} class:transmite={p.transmite} style="background:{fondo(m?.color, p.nombre)};--habla:{m?.color || 'var(--acento)'}" oncontextmenu={(e) => abrirMenu(e, p)} use:mantener={(x, y) => abrirMenu({ clientX: x, clientY: y, preventDefault() {} } as MouseEvent, p)}>

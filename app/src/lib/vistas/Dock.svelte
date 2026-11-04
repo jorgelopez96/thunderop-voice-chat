@@ -1,12 +1,13 @@
 <script lang="ts">
   import { alTocar, estabaAbierto } from '../menu';
-  import { Mic, MicOff, Headphones, HeadphoneOff, ChevronDown, Monitor, AudioWaveform, Music, PhoneOff, MessageSquare, Ellipsis } from '@lucide/svelte';
+  import { Mic, MicOff, Headphones, HeadphoneOff, ChevronDown, Monitor, AudioWaveform, Music, TvMinimalPlay, PhoneOff, MessageSquare, Ellipsis } from '@lucide/svelte';
   import { voz, alternarMute, ensordecer, salirVoz, transmitir, transmitirNavegador, dejarDeTransmitir, cambiarCalidad, dispositivos, elegirEntrada, elegirSalida } from '../voz.svelte';
   import { grupos } from '../grupos.svelte';
   import { CALIDADES, leerPrefs, type Calidad } from '../prefs';
   import Botonera from './Botonera.svelte';
   import { tocados } from '../botonera.svelte';
   import Musica from './Musica.svelte';
+  import YoutubeJuntos from './YoutubeJuntos.svelte';
   import { sesion } from '../sesion.svelte';
   import { fuentes, conNativo, type Fuente } from '../transmisorNativo';
   import { puedeTransmitir, pantalla } from '../plataforma.svelte';
@@ -17,9 +18,10 @@
 
   const g = $derived(grupos.lista.find((x) => x.id === voz.grupoId));
 
-  // Panelcitos de Sonidos y Música, pegados a su botón.
+  // Panelcitos de Sonidos, Música y YouTube juntos, pegados a su botón.
   let abiertoSonidos = $state(false);
   let abiertoMusica = $state(false);
+  let abiertoYoutube = $state(false);
   let posPanel = $state({ x: 0, y: 0 });
   // popovertarget abre y cierra (y no se pelea con el cierre al tocar afuera); acá solo se ubica.
   function ubicarPanel(e: MouseEvent) {
@@ -171,6 +173,7 @@
     {/if}
     <button class="icono magenta" aria-pressed={abiertoSonidos} popovertarget="dock-sonidos" onclick={ubicarPanel} aria-label="Sonidos" title="Sonidos"><AudioWaveform size={20} strokeWidth={1.75} /></button>
     <button class="icono violeta" aria-pressed={abiertoMusica} popovertarget="dock-musica" onclick={ubicarPanel} aria-label="Música" title="Música"><Music size={20} strokeWidth={1.75} /></button>
+    <button class="icono rojo-yt" aria-pressed={abiertoYoutube} popovertarget="dock-youtube" onclick={ubicarPanel} aria-label="YouTube juntos" title="Ver un video de YouTube juntos"><TvMinimalPlay size={20} strokeWidth={1.75} /></button>
     <span class="separador"></span>
     <button class="icono colgar" onclick={salirVoz} aria-label="Desconectarse" title="Desconectarse"><PhoneOff size={20} strokeWidth={1.75} /></button>
   </div>
@@ -190,6 +193,7 @@
 </div>
 <div popover id="dock-mas" class="menu mas">
   <button class="plano" popovertarget="dock-sonidos" onclick={ubicarPanel}><AudioWaveform size={18} strokeWidth={1.75} /> Sonidos</button>
+  <button class="plano" popovertarget="dock-youtube" onclick={ubicarPanel}><TvMinimalPlay size={18} strokeWidth={1.75} /> YouTube juntos</button>
   {#if puedeTransmitir()}
     {#if voz.transmitiendo}<button class="plano" onclick={() => (cortando = true)}><Monitor size={18} strokeWidth={1.75} /> Dejar de transmitir</button>
     {:else}<button class="plano" onclick={abrirTransmision}><Monitor size={18} strokeWidth={1.75} /> Transmitir</button>{/if}
@@ -217,6 +221,9 @@
 </div>
 <div popover id="dock-musica" class="panel" style="left:{posPanel.x}px;bottom:{posPanel.y}px" ontoggle={(e) => (abiertoMusica = e.newState === 'open')}>
   <Musica />
+</div>
+<div popover id="dock-youtube" class="panel" style="left:{posPanel.x}px;bottom:{posPanel.y}px" ontoggle={(e) => (abiertoYoutube = e.newState === 'open')}>
+  <YoutubeJuntos />
 </div>
 
 <div popover bind:this={menu} class="menu" style="left:{pos.x}px;bottom:{pos.y}px">
@@ -322,6 +329,7 @@
   .cian { color: var(--cian); }
   .magenta { color: var(--magenta); }
   .violeta { color: var(--acento-texto); }
+  .rojo-yt { color: var(--rojo-yt); }
   .centro .vivo { background: var(--cian-suave); color: var(--cian); box-shadow: 0 0 14px -4px var(--cian); }
   .centro .colgar { width: 56px; background: var(--peligro); color: #fff; }
   .centro .colgar:hover:not(:disabled) { background: var(--peligro-hover); color: #fff; }
@@ -334,6 +342,7 @@
   :global([data-modo='moderno']) .cian:hover :global(svg), :global([data-modo='moderno']) .vivo:hover :global(svg) { transform: translateY(-2px); }
   :global([data-modo='moderno']) .magenta:hover :global(svg) { transform: scaleY(1.2); }
   :global([data-modo='moderno']) .violeta:hover :global(svg) { transform: rotate(-12deg) scale(1.06); }
+  :global([data-modo='moderno']) .rojo-yt:hover :global(svg) { transform: scale(1.12); }
   :global([data-modo='moderno']) .colgar { box-shadow: 0 4px 14px -4px color-mix(in srgb, var(--peligro) 70%, transparent); }
   :global([data-modo='moderno']) .colgar:hover :global(svg) { transform: rotate(-12deg); }
   .panel { position: fixed; inset: auto; margin: 0; padding: 16px; width: 440px; max-width: calc(100vw - 16px);

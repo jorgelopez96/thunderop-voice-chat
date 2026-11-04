@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { idDeLista, mezclar } from './lista';
+import { idDeLista, mezclar, mover } from './lista';
 
 describe('idDeLista', () => {
   it('saca la lista de YouTube y YouTube Music', () => {
@@ -18,4 +18,15 @@ describe('idDeLista', () => {
 it('mezclar no pierde ni repite elementos', () => {
   const xs = Array.from({ length: 50 }, (_, i) => i);
   expect(mezclar(xs).sort((a, b) => a - b)).toEqual(xs);
+});
+
+it('mover lleva el elemento a la posición pedida, para arriba o para abajo, sin tocar el original', () => {
+  const xs = ['a', 'b', 'c', 'd'];
+  expect(mover(xs, 0, 3)).toEqual(['b', 'c', 'd', 'a']);
+  expect(mover(xs, 3, 0)).toEqual(['d', 'a', 'b', 'c']);
+  expect(mover(xs, 1, 2)).toEqual(['a', 'c', 'b', 'd']);
+  expect(mover(xs, 2, 2)).toEqual(xs);
+  expect(mover(xs, 0, 4)).toEqual(xs);
+  expect(mover(xs, -1, 0)).toEqual(xs);
+  expect(xs).toEqual(['a', 'b', 'c', 'd']);
 });

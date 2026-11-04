@@ -4,7 +4,12 @@ export type Novedad = { version: string; fecha: string; cambios: { tipo: 'nuevo'
 
 export const NOVEDADES: Novedad[] = [
   {
-    version: '0.7.3', fecha: '2026-11-04', cambios: [
+    version: '0.7.4', fecha: '2026-11-04', cambios: [
+      { tipo: 'nuevo', texto: 'YouTube juntos: un botón nuevo en la llamada. Pegás el link de un video y lo ven todos los de la sala al mismo tiempo; si alguien pausa o adelanta, les pasa a todos.' },
+      { tipo: 'nuevo', texto: 'Botonera: ahora podés recortar el sonido antes de subirlo. Elegí el pedazo que quieras con las manijas (hasta 10 segundos), escuchalo y subilo, aunque el archivo original sea largo.' },
+      { tipo: 'nuevo', texto: 'Música: acomodá las canciones de la sala como quieras, arrastrándolas o con las flechitas, y el orden nuevo lo ven todos al toque.' },
+      { tipo: 'nuevo', texto: 'Todos los emojis, ordenados por categoría, con buscador en español, tus recientes a mano y tono de piel para las manos y las personas.' },
+      { tipo: 'nuevo', texto: 'Si te escriben mientras tenés Thunderop minimizado o en segundo plano, el ícono de la barra de tareas titila y te muestra un globito con los mensajes sin leer.' },
       { tipo: 'nuevo', texto: 'Inicio nuevo en la PC: tus grupos a la izquierda con buscador y filtros, al centro quién está en voz y la charla reciente del grupo que marques, y tus amigos a la derecha.' },
       { tipo: 'nuevo', texto: 'La app se fija si hay una versión nueva a cada hora en punto, sin tener que cerrarla.' },
       { tipo: 'nuevo', texto: 'En pantalla completa aparece la barrita de la llamada (silenciarte, ensordecerte, transmitir, sonidos, música y cortar).' },
