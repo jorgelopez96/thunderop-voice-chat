@@ -73,31 +73,33 @@ export function mover(largos: number[], [s, i]: [number, number], tecla: string,
 function seDibuja(ctx: CanvasRenderingContext2D, emoji: string, ancho: number): boolean {
   ctx.clearRect(0, 0, 32, 32);
   ctx.fillText(emoji, 0, 0);
-  if (ctx.measureText(emoji).width > ancho * 1.5) return false;
+  if (ctx.measureText(emoji).width > ancho * 1.25) return false; // dos letras de bandera sueltas miden ~1,45 emojis
   const d = ctx.getImageData(0, 0, 32, 32).data;
   for (let k = 0; k < d.length; k += 4) if (d[k + 3] && (d[k] !== d[k + 1] || d[k + 1] !== d[k + 2])) return true;
   return false;
 }
 
-/** Cuáles de las muestras (versión → emoji) sabe dibujar el sistema. Sin canvas, todas. */
-function versionesQueSeVen(muestras: Record<string, string>): Set<string> {
+/** Si el sistema sabe dibujar un emoji. Sin canvas, se asume que sí. */
+function dibujante(): (emoji: string) => boolean {
   const ctx = document.createElement('canvas').getContext('2d', { willReadFrequently: true });
-  if (!ctx) return new Set(Object.keys(muestras));
+  if (!ctx) return () => true;
   ctx.canvas.width = ctx.canvas.height = 32;
-  ctx.font = '24px sans-serif';
+  ctx.font = '24px Banderas, sans-serif';
   ctx.textBaseline = 'top';
   ctx.fillStyle = '#000';
   const ancho = ctx.measureText('\u{1F600}').width;
-  return new Set(Object.keys(muestras).filter((v) => seDibuja(ctx, muestras[v], ancho)));
+  return (emoji) => seDibuja(ctx, emoji, ancho);
 }
 
 let cargando: Promise<Emoji[][]> | undefined;
 /** Las 9 categorías, sin los emojis que este sistema mostraría rotos. Una sola vez por sesión. */
-export const cargarEmojis = () => (cargando ??= import('./emojisDatos').then(({ CATEGORIAS, VERSIONES }) => {
-  // Windows no trae banderas de países (muestra las dos letras) ni las de Inglaterra/Escocia/Gales: ahí se esconden.
-  const ok = versionesQueSeVen({ ...VERSIONES, paises: '🇦🇷' });
+export const cargarEmojis = () => (cargando ??= Promise.all([import('./emojisDatos'), document.fonts?.load('24px Banderas', '🇦🇷').catch(() => {})]).then(([{ CATEGORIAS, VERSIONES }]) => {
+  // Las banderas las pone la fuente Banderas de app.css y se prueban una por una: a la fuente le faltan las más
+  // nuevas (Sark) y, si no cargó, Windows mostraría las dos letras.
+  const seVe = dibujante();
+  const ok = new Set(Object.keys(VERSIONES).filter((v) => seVe(VERSIONES[v])));
   const bandera = /^\p{RI}|\u{E007F}/u;
-  return CATEGORIAS.map((c) => leerCategoria(c).filter((x) => (!x.version || ok.has(x.version)) && (ok.has('paises') || !bandera.test(x.e))));
+  return CATEGORIAS.map((c) => leerCategoria(c).filter((x) => (!x.version || ok.has(x.version)) && (!bandera.test(x.e) || seVe(x.e))));
 }));
 
 /** Sin tono ni FE0F: para encontrar un reciente (guardado con su tono) entre los emojis base. */

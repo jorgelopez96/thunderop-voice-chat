@@ -4,7 +4,8 @@ export type Novedad = { version: string; fecha: string; cambios: { tipo: 'nuevo'
 
 export const NOVEDADES: Novedad[] = [
   {
-    version: '0.7.4', fecha: '2026-11-04', cambios: [
+    version: '0.7.5', fecha: '2026-11-04', cambios: [
+      { tipo: 'nuevo', texto: 'Ahora se ven las banderas de los países en los emojis, también en Windows.' },
       { tipo: 'nuevo', texto: 'YouTube juntos: un botón nuevo en la llamada. Pegás el link de un video y lo ven todos los de la sala al mismo tiempo; si alguien pausa o adelanta, les pasa a todos.' },
       { tipo: 'nuevo', texto: 'Botonera: ahora podés recortar el sonido antes de subirlo. Elegí el pedazo que quieras con las manijas (hasta 10 segundos), escuchalo y subilo, aunque el archivo original sea largo.' },
       { tipo: 'nuevo', texto: 'Música: acomodá las canciones de la sala como quieras, arrastrándolas o con las flechitas, y el orden nuevo lo ven todos al toque.' },

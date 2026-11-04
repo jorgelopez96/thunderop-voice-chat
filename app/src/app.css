@@ -90,7 +90,11 @@
 
 * { box-sizing: border-box; }
 html, body { height: 100%; margin: 0; }
-body { background: var(--fondo); color: var(--texto); font: 450 14px/1.45 'Inter Variable', system-ui, 'Segoe UI', sans-serif; }
+/* Windows no trae banderas de países: esta fuente solo cubre las banderas (indicadores regionales y las de Inglaterra/Escocia/Gales).
+   Subconjunto de Twemoji (gráficos de Twitter, CC-BY 4.0) armado por country-flag-emoji-polyfill (MIT). */
+@font-face { font-family: 'Banderas'; src: url('/fuentes/banderas.woff2') format('woff2'); font-display: swap;
+  unicode-range: U+1F1E6-1F1FF, U+1F3F4, U+E0062-E0063, U+E0065, U+E0067, U+E006C, U+E006E, U+E0073-E0074, U+E0077, U+E007F; }
+body { background: var(--fondo); color: var(--texto); font: 450 14px/1.45 'Banderas', 'Inter Variable', system-ui, 'Segoe UI', sans-serif; }
 h1, h2, h3 { margin: 0; }
 h1, h2 { font-weight: 700; letter-spacing: -.015em; }
 h3 { font-size: 11.5px; font-weight: 650; text-transform: uppercase; letter-spacing: .06em; color: var(--apagado); margin: 16px 0 4px; }
