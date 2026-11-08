@@ -10,6 +10,7 @@
   import { abrirEnPunto } from '../menu';
   import { enLinea } from '../presencia.svelte';
   import { amigos, solicitarA } from '../amigos.svelte';
+  import { privado } from '../privados.svelte';
   import Avatar from './Avatar.svelte';
   import Insignia from './Insignia.svelte';
   import Confirmar from './Confirmar.svelte';
@@ -87,6 +88,7 @@
   {#if elegido}
     {@const m = elegido}
     <button class="plano" onclick={() => { menu?.hidePopover(); viendo = m; perfil?.showModal(); }}>Ver perfil</button>
+    {#if amigos.lista.some((a) => a.usuario.id === m.id)}<button class="plano" onclick={() => { menu?.hidePopover(); privado.con = amigos.lista.find((a) => a.usuario.id === m.id)!.usuario; }}>Enviar mensaje</button>{/if}
     {#if puedoAgregar(m.id)}<button class="plano" onclick={() => hacer(() => solicitarA(m.id))}>Agregar amigo</button>{/if}
     {#if m.id !== sesion.usuario?.id}
       <label class="vol">Volumen · {vol} %

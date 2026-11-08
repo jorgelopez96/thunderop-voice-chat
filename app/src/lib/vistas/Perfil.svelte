@@ -5,7 +5,7 @@
   import { validarAdjunto } from '../adjuntos';
   import { sesion, mensajeError } from '../sesion.svelte';
 
-  const MAX_AVATAR = 2 * 1024 * 1024;
+  const MAX_AVATAR = 5 * 1024 * 1024;
   const u = sesion.usuario!;
   let name = $state<string>(u.name ?? '');
   let descripcion = $state<string>(u.status ?? ''); // se guarda en `status`
@@ -30,7 +30,7 @@
     const v = validarAdjunto(f);
     if (!v.ok) error = v.motivo;
     else if (!f.type.startsWith('image/')) error = 'La foto debe ser una imagen.';
-    else if (f.size > MAX_AVATAR) error = 'La foto supera los 2 MB.';
+    else if (f.size > MAX_AVATAR) error = 'La foto supera los 5 MB.';
     else { foto = f; if (previa) URL.revokeObjectURL(previa); previa = URL.createObjectURL(f); }
   }
 

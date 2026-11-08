@@ -65,7 +65,7 @@ export function mensajeError(e: unknown): string {
   if (en('name')) return 'El nombre debe tener entre 1 y 32 caracteres.';
   if (en('color')) return 'El color no es válido.';
   if (en('status')) return 'El estado puede tener hasta 80 caracteres.';
-  if (en('avatar')) return 'La foto no es válida (imagen, hasta 2 MB).';
+  if (en('avatar')) return 'La foto no es válida (imagen o GIF, hasta 5 MB).';
   if (en('file')) return 'El archivo no es válido (imagen o video, hasta 25 MB).';
   if (e.status === 400 && /authenticate/i.test(e.message)) return 'Usuario, email o contraseña incorrectos.';
   if (e.status === 429) return 'Demasiados intentos, esperá un momento.';

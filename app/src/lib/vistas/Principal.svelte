@@ -3,6 +3,7 @@
   import LogoThunderop from './LogoThunderop.svelte';
   import BarraTitulo from './BarraTitulo.svelte';
   import Amigos from './Amigos.svelte';
+  import ChatPrivado from './ChatPrivado.svelte';
   import Pestanas from './movil/Pestanas.svelte';
   import PerfilMovil from './movil/PerfilMovil.svelte';
   import BarraLlamada from './movil/BarraLlamada.svelte';
@@ -69,6 +70,7 @@
   </BarraTitulo>
   {/if}
   {#if config}<Configuracion cerrar={() => (config = false)} />{/if}
+  <ChatPrivado />
   {#if voz.error}
     <p class="aviso" role="alert">{voz.error} <button class="plano" aria-label="Cerrar aviso" onclick={() => (voz.error = '')}>✕</button></p>
   {/if}

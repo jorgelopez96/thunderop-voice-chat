@@ -11,6 +11,8 @@ export function avatarDeLetra(nombre: string): string {
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 }
 
-/** Foto de perfil de un usuario; sin foto, la inicial de su nombre. Los grupos no la usan. */
+/** Foto de perfil de un usuario; sin foto, la inicial de su nombre. Los grupos no la usan.
+ *  Los GIF van enteros: la miniatura de PocketBase se queda con el primer cuadro y dejaba de moverse.
+ *  ponytail: un GIF pesado se baja entero en cada avatar (el navegador lo cachea); generar miniaturas animadas si molesta. */
 export const foto = (u: RecordModel | null | undefined, thumb = '64x64') =>
-  u?.avatar ? pb.files.getURL(u, u.avatar, { thumb }) : avatarDeLetra(u?.name ?? '');
+  u?.avatar ? pb.files.getURL(u, u.avatar, /\.gif$/i.test(u.avatar) ? {} : { thumb }) : avatarDeLetra(u?.name ?? '');

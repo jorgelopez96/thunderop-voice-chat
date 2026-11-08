@@ -21,6 +21,8 @@
   import { leerPrefs } from '../prefs';
   import { abrirEnPunto } from '../menu';
   import { mirar as mirarSala } from '../noLeidos.svelte';
+  import { amigos } from '../amigos.svelte';
+  import { privado } from '../privados.svelte';
 
   let { grupo, soyDueno, sala, salasVoz = [], abrirSalas, volver }: { grupo: RecordModel; soyDueno: boolean; sala: string; salasVoz?: RecordModel[]; abrirSalas?: () => void; volver?: () => void } = $props();
   const miembros = $derived((grupo.expand?.members ?? []) as RecordModel[]);
@@ -74,13 +76,28 @@
   // En el celular el chat de la sala se abre a pantalla completa desde el dock (navMovil.chatSala).
   const verChat = $derived(pantalla.movil ? navMovil.chatSala : chatAbierto);
   function plegarChat(a: boolean) { chatAbierto = a; try { localStorage.setItem('dm.chatSala', a ? '1' : '0'); } catch { /* sin almacenamiento */ } }
+
+  // Ancho del chat de la sala: se arrastra el borde izquierdo (o flechas con el foco), se guarda en esta PC; doble clic vuelve al de siempre.
+  // El de siempre es también el mínimo: más angosto se rompe el chat (Jorge, 2026-11-08).
+  const ANCHO = 296, MIN = ANCHO, MAX = 720;
+  const limitar = (a: number) => Math.round(Math.min(MAX, Math.max(MIN, a)));
+  let anchoChat = $state((() => { try { const a = Number(localStorage.getItem('dm.anchoChatSala')); return a ? limitar(a) : ANCHO; } catch { return ANCHO; } })());
+  function fijarAncho(a: number) { anchoChat = limitar(a); try { localStorage.setItem('dm.anchoChatSala', String(anchoChat)); } catch { /* sin almacenamiento */ } }
+  function arrastrar(e: PointerEvent) {
+    e.preventDefault(); // sin seleccionar texto al arrastrar
+    const borde = e.currentTarget as HTMLElement, x0 = e.clientX, a0 = anchoChat;
+    borde.setPointerCapture(e.pointerId);
+    const mover = (m: PointerEvent) => fijarAncho(a0 + x0 - m.clientX);
+    borde.addEventListener('pointermove', mover);
+    borde.addEventListener('lostpointercapture', () => borde.removeEventListener('pointermove', mover), { once: true });
+  }
 </script>
 
 {#snippet espectadores(n: number)}
   <span class="espectadores num" title={`${n} ${n === 1 ? 'persona mirando' : 'personas mirando'}`}><Eye size={14} strokeWidth={1.75} />{n}</span>
 {/snippet}
 
-<section class="voz" class:conChat={chatAbierto && !pantalla.movil} class:movil={pantalla.movil}>
+<section class="voz" class:conChat={chatAbierto && !pantalla.movil} class:movil={pantalla.movil} style:--ancho-chat="{anchoChat}px">
   <div class="centro">
     <header>
       {#if volver}<button class="icono" aria-label="Volver" title="Volver" onclick={volver}><ChevronLeft size={22} strokeWidth={1.75} /></button>{/if}
@@ -134,7 +151,11 @@
   {#if verChat && voz.salaId}
     {@const id = voz.salaId}
     <aside class="chatSala">
-      {#if !pantalla.movil}<button class="icono plegar" onclick={() => plegarChat(false)} aria-label="Plegar chat de la sala" title="Plegar"><ChevronRight size={16} strokeWidth={1.75} /></button>{/if}
+      {#if !pantalla.movil}<!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
+        <div class="borde-chat" role="separator" aria-orientation="vertical" aria-label="Ancho del chat" aria-valuenow={anchoChat} aria-valuemin={MIN} aria-valuemax={MAX} tabindex="0"
+          title="Arrastrá para cambiar el ancho · doble clic: el de siempre" onpointerdown={arrastrar} ondblclick={() => fijarAncho(ANCHO)}
+          onkeydown={(e) => { if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); fijarAncho(anchoChat + (e.key === 'ArrowLeft' ? 16 : -16)); } }}></div>
+        <button class="icono plegar" onclick={() => plegarChat(false)} aria-label="Plegar chat de la sala" title="Plegar"><ChevronRight size={16} strokeWidth={1.75} /></button>{/if}
       {#key id}<Chat titulo="Chat de la sala" cerrar={pantalla.movil ? cerrarCapa : undefined} miembros={grupos.lista.find((g) => g.id === voz.grupoId)?.expand?.members ?? []} abrir={() => abrirChat(id)} enviar={(t, f, r) => enviar(id, t, f, r)} {borrar} silencio={id}
         puedeBorrar={(m) => m.author === sesion.usuario?.id || soyDueno} />{/key}
     </aside>
@@ -144,6 +165,8 @@
 <div popover bind:this={menu} class="menu">
   {#if elegido}
     {@const p = elegido}
+    {@const amigo = amigos.lista.find((a) => a.usuario.id === p.id)?.usuario}
+    {#if amigo}<button class="plano" onclick={() => { menu?.hidePopover(); privado.con = amigo; }}><MessageSquare size={16} strokeWidth={1.75} /> Enviar mensaje</button><hr />{/if}
     <label>Volumen · {Math.round((vols[p.id] ?? 1) * 100)} %
       <input type="range" min="0" max="200" step="5" value={Math.round((vols[p.id] ?? 1) * 100)} style={lleno((vols[p.id] ?? 1) * 100, 0, 200)}
         aria-label={`Volumen de ${p.nombre}`} oninput={(e) => cambiar(p.id, +e.currentTarget.value)} />
@@ -159,7 +182,9 @@
 
 <style>
   .voz { display: grid; grid-template-columns: 1fr; min-height: 0; min-width: 0; }
-  .voz.conChat { grid-template-columns: minmax(0, 1fr) 296px; }
+  .voz.conChat { grid-template-columns: minmax(0, 1fr) clamp(296px, var(--ancho-chat), 60%); }
+  .borde-chat { position: absolute; inset: 0 auto 0 -4px; width: 8px; z-index: 2; cursor: col-resize; touch-action: none; }
+  .borde-chat:hover, .borde-chat:focus-visible, .borde-chat:active { background: linear-gradient(to right, transparent 3px, var(--acento) 3px 5px, transparent 5px); outline: none; }
   /* Celular: tarjetas de a 2 y el chat de la sala encima de todo, a pantalla completa. */
   .aviso-celular { display: flex; align-items: center; gap: 8px; margin: 0; padding: 10px 12px; font-size: 13px; border-radius: var(--radio-menu);
     background: color-mix(in srgb, var(--ausente) 12%, transparent); border: 1px solid color-mix(in srgb, var(--ausente) 35%, transparent); }

@@ -29,7 +29,8 @@
     ['moderno', 'Moderno', 'Sombras, brillos en tu color y animaciones cortas. Para PCs con resto.']] as const;
   let lista = $state<Awaited<ReturnType<typeof dispositivos>>>({ entradas: [], salidas: [] });
   // El elegido puede no estar en la lista (es el mismo que el predeterminado, o no está conectado): se muestra Predeterminado.
-  const visible = (l: MediaDeviceInfo[], id: string | undefined) => (id && l.some((x) => x.deviceId === id) ? id : 'default');
+  const visible = (l: { deviceId: string }[], id: string | undefined) => (id && l.some((x) => x.deviceId === id) ? id : 'default');
+  const conPredeterminado = <T extends { deviceId: string }>(l: T[]) => (l.some((x) => x.deviceId === 'default') ? l : [{ deviceId: 'default', label: 'Predeterminado' }, ...l]);
   const prefs = leerPrefs();
   let pctMic = $state(porcentajeDeDb(prefs.gananciaDb));
   let entrada = $state(prefs.entrada);
@@ -144,14 +145,12 @@
     <section>
       <label>Entrada
         <select value={visible(lista.entradas, prefs.entrada)} onchange={(e) => { entrada = e.currentTarget.value; elegirEntrada(entrada); }}>
-          <option value="default">Predeterminado</option>
-          {#each lista.entradas.filter((x) => x.deviceId !== 'default') as x (x.deviceId)}<option value={x.deviceId}>{x.label || 'Micrófono'}</option>{/each}
+          {#each conPredeterminado(lista.entradas) as x (x.deviceId)}<option value={x.deviceId}>{x.label || 'Micrófono'}</option>{/each}
         </select>
       </label>
       <label>Salida
         <select value={visible(lista.salidas, prefs.salida)} onchange={(e) => elegirSalida(e.currentTarget.value)}>
-          <option value="default">Predeterminado</option>
-          {#each lista.salidas.filter((x) => x.deviceId !== 'default') as x (x.deviceId)}<option value={x.deviceId}>{x.label || 'Altavoz'}</option>{/each}
+          {#each conPredeterminado(lista.salidas) as x (x.deviceId)}<option value={x.deviceId}>{x.label || 'Altavoz'}</option>{/each}
         </select>
       </label>
       <label class="casilla"><input type="checkbox" class="switch" checked={voz.supresion} onchange={(e) => cambiarSupresion(e.currentTarget.checked)} /> Supresión de ruido</label>
@@ -207,10 +206,15 @@
       <div class="item"><span>Movimiento</span><span class="pronto">Si en Windows desactivás «Efectos de animación», el modo Moderno deja de animar.</span></div>
     </section>
   {/if}
+  <!-- Todo se guarda al cambiarlo; el botón confirma y cierra (lo pidieron para quedarse tranquilos). -->
+  <div class="pie-modal"><button class="primario" onclick={() => d.close()}>Guardar</button></div>
 </dialog>
 
 <style>
   h3 { margin: 0; }
+  .pie-modal { position: sticky; bottom: -24px; display: flex; justify-content: flex-end; margin: auto -24px -24px; padding: 10px 24px 12px;
+    background: var(--panel); border-top: 1px solid var(--borde); }
+  @media (max-width: 768px) { .pie-modal { bottom: calc(-16px - env(safe-area-inset-bottom)); margin: auto -16px calc(-16px - env(safe-area-inset-bottom)); padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); } }
   section { display: flex; flex-direction: column; gap: 12px; }
   form { display: flex; flex-direction: column; gap: 10px; max-width: 360px; }
   .casilla { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 8px; }
@@ -242,7 +246,7 @@
   .modo[aria-checked='true'] { border-color: var(--acento); box-shadow: 0 0 0 1px var(--acento), var(--brillo); }
   .modo strong { font-size: 14.5px; font-weight: 650; color: var(--texto); margin-top: 8px; }
   .modo small { font-size: 12.5px; line-height: 1.4; }
-  .mini { display: grid; grid-template-columns: 28% 1fr; grid-template-rows: 1fr 30%; gap: 6px; height: 108px; padding: 8px;
+  .mini { display: grid; grid-template-columns: 28% 1fr; grid-template-rows: 1fr 30%; gap: 6px; height: 80px; padding: 8px;
     background: var(--hondo); border-radius: var(--radio-menu); }
   .mini span { background: var(--panel); border-radius: 4px; }
   .mini span:first-child { grid-row: 1 / 3; }

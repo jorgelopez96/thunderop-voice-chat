@@ -12,7 +12,7 @@ describe('mensajeError', () => {
     expect(mensajeError(err({ file: { code: 'validation_file_size_limit', message: 'x' } }))).toBe('El archivo no es válido (imagen o video, hasta 25 MB).');
   });
   it('avatar inválido en español', () => {
-    expect(mensajeError(err({ avatar: { code: 'validation_invalid_mime_type', message: 'x' } }))).toBe('La foto no es válida (imagen, hasta 2 MB).');
+    expect(mensajeError(err({ avatar: { code: 'validation_invalid_mime_type', message: 'x' } }))).toBe('La foto no es válida (imagen o GIF, hasta 5 MB).');
   });
   it('usuario repetido', () => {
     expect(mensajeError(err({ username: { code: 'validation_not_unique', message: 'x' } }))).toBe('Ese usuario ya existe, probá con otro.');

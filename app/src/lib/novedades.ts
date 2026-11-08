@@ -4,7 +4,12 @@ export type Novedad = { version: string; fecha: string; cambios: { tipo: 'nuevo'
 
 export const NOVEDADES: Novedad[] = [
   {
-    version: '0.7.5', fecha: '2026-11-04', cambios: [
+    version: '0.7.6', fecha: '2026-11-08', cambios: [
+      { tipo: 'nuevo', texto: 'En la sala de voz, clic derecho sobre un amigo → «Enviar mensaje»: se abre su chat privado sin salir de la llamada.' },
+      { tipo: 'nuevo', texto: 'El chat de la sala se puede agrandar o achicar arrastrando su borde izquierdo. Queda guardado en tu PC; con doble clic en el borde vuelve al tamaño de siempre.' },
+      { tipo: 'nuevo', texto: 'Configuración: se ve todo de una, sin bajar, y tiene botón Guardar.' },
+      { tipo: 'arreglo', texto: 'Al elegir el micrófono o los auriculares se ve cuál estás usando: el Predeterminado dice cuál es y el elegido tiene una tilde.' },
+      { tipo: 'nuevo', texto: 'Foto de perfil de hasta 5 MB, y ahora los GIF se ven animados.' },
       { tipo: 'nuevo', texto: 'Ahora se ven las banderas de los países en los emojis, también en Windows.' },
       { tipo: 'nuevo', texto: 'YouTube juntos: un botón nuevo en la llamada. Pegás el link de un video y lo ven todos los de la sala al mismo tiempo; si alguien pausa o adelanta, les pasa a todos.' },
       { tipo: 'nuevo', texto: 'Botonera: ahora podés recortar el sonido antes de subirlo. Elegí el pedazo que quieras con las manijas (hasta 10 segundos), escuchalo y subilo, aunque el archivo original sea largo.' },

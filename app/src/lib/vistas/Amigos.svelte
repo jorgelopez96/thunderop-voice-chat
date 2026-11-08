@@ -1,14 +1,10 @@
 <script lang="ts">
   import type { RecordModel } from 'pocketbase';
-  import { sesion } from '../sesion.svelte';
-  import { amigos, solicitarPorUsuario, quitar, bloquear } from '../amigos.svelte';
-  import { noLeidos, abrirPrivado, enviarPrivado, borrarPrivado, marcarLeido } from '../privados.svelte';
+  import { amigos, solicitarPorUsuario } from '../amigos.svelte';
+  import { noLeidos, privado } from '../privados.svelte';
   import Avatar from './Avatar.svelte';
   import Insignia from './Insignia.svelte';
-  import Chat from './Chat.svelte';
-  import Confirmar from './Confirmar.svelte';
-  import { UserPlus, Ban, UserMinus } from '@lucide/svelte';
-  import { foto } from '../foto';
+  import { UserPlus } from '@lucide/svelte';
   import { irA } from '../ir.svelte';
   import { estado } from '../presencia.svelte';
 
@@ -21,12 +17,6 @@
   let usuario = $state('');
   let error = $state('');
   let ok = $state('');
-  let abierto = $state<RecordModel | null>(null);
-  let eliminar = $state(false);
-  let bloqueando = $state(false);
-  let d = $state<HTMLDialogElement>();
-  // La amistad puede desaparecer con el chat abierto (el otro la eliminó): el historial queda en solo lectura.
-  const amistad = $derived(abierto ? amigos.lista.find((a) => a.usuario.id === abierto!.id) : undefined);
 
   async function agregar(e: SubmitEvent) {
     e.preventDefault();
@@ -34,7 +24,7 @@
     error = await solicitarPorUsuario(usuario);
     if (!error) { ok = `Le mandaste una solicitud a ${usuario.trim()}.`; usuario = ''; }
   }
-  function abrir(u: RecordModel) { abierto = u; queueMicrotask(() => d?.showModal()); }
+  const abrir = (u: RecordModel) => (privado.con = u);
   // Una notificación pidió abrir el privado de este amigo.
   $effect(() => { const id = irA.privado; const a = id ? amigos.lista.find((x) => x.usuario.id === id) : undefined; if (a) { irA.privado = null; abrir(a.usuario); } });
 </script>
@@ -72,31 +62,6 @@
   </div>
 </aside>
 
-<dialog class="privado" bind:this={d} onclose={() => (abierto = null)} onclick={(e) => e.target === d && d.close()}>
-  {#if abierto}
-    {@const u = abierto}
-    {#key u.id}
-      <Chat titulo={u.name} foto={foto(u)} cerrar={() => d?.close()} miembros={[sesion.usuario, u].filter((x) => !!x)} abrir={() => abrirPrivado(u.id)} enviar={(t, f, r) => enviarPrivado(u.id, t, f, r)} borrar={borrarPrivado}
-        puedeBorrar={(m) => m.author === sesion.usuario?.id} alVer={(m) => marcarLeido(u.id, m.created)}
-        soloLectura={amistad ? '' : 'Ya no son amigos: no se pueden mandar mensajes.'} silencio={u.id}>
-        {#snippet acciones(cerrar: () => void)}
-          <button class="plano" onclick={() => { cerrar(); bloqueando = true; }}><Ban size={16} strokeWidth={1.75} /> Bloquear</button>
-          {#if amistad}<button class="plano peligro" onclick={() => { cerrar(); eliminar = true; }}><UserMinus size={16} strokeWidth={1.75} /> Eliminar amigo</button>{/if}
-        {/snippet}
-      </Chat>
-    {/key}
-  {/if}
-</dialog>
-
-{#if bloqueando && abierto}{@const u = abierto}
-  <Confirmar texto={`¿Bloquear a ${u.name}? Deja de ser tu amigo, no puede escribirte ni mandarte solicitudes y no ve si estás conectado. Lo podés desbloquear desde Configuración → Cuenta.`}
-    accion="Bloquear" cancelar={() => (bloqueando = false)} confirmar={() => { bloqueando = false; d?.close(); void bloquear(u.id); }} />
-{/if}
-{#if eliminar && amistad && abierto}
-  <Confirmar texto={`¿Eliminar a ${abierto.name} de tus amigos? El historial queda, pero no van a poder escribirse.`}
-    cancelar={() => (eliminar = false)} confirmar={() => { eliminar = false; void quitar(amistad.amistad); }} />
-{/if}
-
 <style>
   .amigos { flex: 1; display: flex; flex-direction: column; min-height: 0; background: var(--panel); border-left: 1px solid var(--borde); --anillo: var(--panel); }
   .cabecera { display: flex; align-items: center; justify-content: space-between; gap: 8px; height: 52px; padding: 0 12px 0 16px; flex: none; border-bottom: 1px solid var(--borde); }
@@ -115,7 +80,4 @@
   form { margin: 12px 8px 0; flex-wrap: nowrap; }
   form input { flex: 1; min-width: 0; }
   [role='alert'], [role='status'] { margin: 8px; font-size: 13px; }
-  .privado { width: min(640px, 90vw); height: 80vh; max-width: none; padding: 0; flex-direction: column; }
-  .privado[open] { display: flex; }
-  .privado :global(.chat) { flex: 1; }
 </style>

@@ -1,3 +1,4 @@
+import type { RecordModel } from 'pocketbase';
 import { pb } from './pb';
 import { abrirLista } from './chat.svelte';
 import { avisar, silenciadoHasta, resumen } from './notificaciones.svelte';
@@ -35,6 +36,9 @@ const filtroPar = (amigoId: string) =>
   pb.filter('(author = {:yo} && para = {:otro}) || (author = {:otro} && para = {:yo})', { yo: yo(), otro: amigoId });
 
 export const abrirPrivado = (amigoId: string) => abrirLista('privados', filtroPar(amigoId));
+
+/** Amigo con el chat privado abierto (el modal vive en Principal: se abre desde Amigos, la sala o los participantes). */
+export const privado = $state<{ con: RecordModel | null }>({ con: null });
 
 export async function enviarPrivado(amigoId: string, texto: string, archivo?: File, respondeA?: string) {
   const d = new FormData();

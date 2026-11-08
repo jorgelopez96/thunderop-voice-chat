@@ -1,7 +1,7 @@
 <script lang="ts">
   import { alTocar, estabaAbierto } from '../menu';
-  import { Mic, MicOff, Headphones, HeadphoneOff, ChevronDown, Monitor, AudioWaveform, Music, TvMinimalPlay, PhoneOff, MessageSquare, Ellipsis } from '@lucide/svelte';
-  import { voz, alternarMute, ensordecer, salirVoz, transmitir, transmitirNavegador, dejarDeTransmitir, cambiarCalidad, dispositivos, elegirEntrada, elegirSalida } from '../voz.svelte';
+  import { Mic, MicOff, Headphones, HeadphoneOff, ChevronDown, Monitor, AudioWaveform, Music, TvMinimalPlay, PhoneOff, MessageSquare, Ellipsis, Check } from '@lucide/svelte';
+  import { voz, alternarMute, ensordecer, salirVoz, transmitir, transmitirNavegador, dejarDeTransmitir, cambiarCalidad, dispositivos, elegirEntrada, elegirSalida, type Dispositivo } from '../voz.svelte';
   import { grupos } from '../grupos.svelte';
   import { CALIDADES, leerPrefs, type Calidad } from '../prefs';
   import Botonera from './Botonera.svelte';
@@ -32,7 +32,7 @@
   // Menú de dispositivos (la flechita al lado de Mic y Sonido).
   let menu = $state<HTMLElement>();
   let tipo = $state<'entrada' | 'salida'>('entrada');
-  let lista = $state<MediaDeviceInfo[]>([]);
+  let lista = $state<Dispositivo[]>([]);
   let elegido = $state('');
   let pos = $state({ x: 0, y: 0 });
   async function abrirMenu(e: MouseEvent, t: 'entrada' | 'salida') {
@@ -229,14 +229,14 @@
 <div popover bind:this={menu} class="menu" style="left:{pos.x}px;bottom:{pos.y}px">
   <h3>{tipo === 'entrada' ? 'Micrófono' : 'Salida de audio'}</h3>
   {#each lista as x (x.deviceId)}
-    <button class="plano" aria-pressed={x.deviceId === elegido} onclick={() => elegir(x.deviceId)}>{x.label || 'Dispositivo sin nombre'}</button>
+    <button class="plano" aria-pressed={x.deviceId === elegido} onclick={() => elegir(x.deviceId)}>{x.label || 'Dispositivo sin nombre'}{#if x.deviceId === elegido}<Check size={16} strokeWidth={2.25} />{/if}</button>
   {:else}<small>No se ven dispositivos (falta el permiso del micrófono).</small>{/each}
 </div>
 
 <div popover bind:this={menuCalidad} class="menu" style="left:{posCalidad.x}px;bottom:{posCalidad.y}px">
   <h3>Calidad</h3>
   {#each Object.keys(CALIDADES) as c (c)}
-    <button class="plano" aria-pressed={c === voz.calidadEnVivo} onclick={() => { menuCalidad?.hidePopover(); cambiarCalidad(c as Calidad); }}>{nombreCalidad(c as Calidad)}</button>
+    <button class="plano" aria-pressed={c === voz.calidadEnVivo} onclick={() => { menuCalidad?.hidePopover(); cambiarCalidad(c as Calidad); }}>{nombreCalidad(c as Calidad)}{#if c === voz.calidadEnVivo}<Check size={16} strokeWidth={2.25} />{/if}</button>
   {/each}
 </div>
 
@@ -353,6 +353,9 @@
   .menu h3 { margin: 4px 8px 6px; }
   .menu button { justify-content: flex-start; text-align: left; padding: 6px 8px; }
   .menu button:not(.peligro) { color: var(--texto); }
+  /* El elegido: en el color de la app y con tilde a la derecha (el fondo suave solo se confundía con el hover). */
+  .menu button[aria-pressed='true'] { color: var(--acento); font-weight: 650; }
+  .menu button > :global(svg) { flex: none; margin-left: auto; padding-left: 8px; box-sizing: content-box; }
   .menu small { padding: 4px 8px; }
   dialog { flex-direction: column; gap: 12px; min-width: 300px; }
   .tenue-web { margin: 0; color: var(--tenue); font-size: 13px; }

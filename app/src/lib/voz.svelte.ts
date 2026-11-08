@@ -544,10 +544,24 @@ export function sinRepetidos<T extends { deviceId: string; groupId: string }>(li
   return lista.filter((x) => x.deviceId !== 'communications' && (x.deviceId === 'default' || !pred || x.groupId !== pred.groupId));
 }
 
-export async function dispositivos(): Promise<{ entradas: MediaDeviceInfo[]; salidas: MediaDeviceInfo[] }> {
+export type Dispositivo = { deviceId: string; groupId: string; label: string };
+
+/** Sin repetidos y con el nombre del dispositivo real en el Predeterminado ("Predeterminado · Micrófono (Realtek)"). */
+export function conNombres(lista: Dispositivo[]): Dispositivo[] {
+  const pred = lista.find((x) => x.deviceId === 'default');
+  const real = pred && lista.find((x) => x.deviceId !== 'default' && x.deviceId !== 'communications' && x.groupId === pred.groupId);
+  // Sin el real, Chromium a veces lo trae en la etiqueta: "Predeterminado - Micrófono (...)".
+  // Windows agrega el código USB al final ("Micrófono (Yeti Orb) (046d:0ad5)"): no le dice nada a nadie.
+  const limpio = (l: string) => l.replace(/\s*\([0-9a-f]{4}:[0-9a-f]{4}\)$/i, '');
+  const nombre = limpio(real?.label || pred?.label.split(' - ').slice(1).join(' - ') || '');
+  return sinRepetidos(lista).map(({ deviceId, groupId, label }) =>
+    ({ deviceId, groupId, label: deviceId === 'default' ? (nombre ? `Predeterminado · ${nombre}` : 'Predeterminado') : limpio(label) }));
+}
+
+export async function dispositivos(): Promise<{ entradas: Dispositivo[]; salidas: Dispositivo[] }> {
   try {
     const d = await navigator.mediaDevices.enumerateDevices();
-    return { entradas: sinRepetidos(d.filter((x) => x.kind === 'audioinput')), salidas: sinRepetidos(d.filter((x) => x.kind === 'audiooutput')) };
+    return { entradas: conNombres(d.filter((x) => x.kind === 'audioinput')), salidas: conNombres(d.filter((x) => x.kind === 'audiooutput')) };
   } catch { return { entradas: [], salidas: [] }; }
 }
 
