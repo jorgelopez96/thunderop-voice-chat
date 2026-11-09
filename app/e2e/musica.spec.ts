@@ -15,6 +15,9 @@ test('cola de música compartida', async ({ browser }) => {
   for (const p of [a, b]) await entrar(p);
   for (const p of [a, b]) await expect(p.locator('section.voz .franja li')).toHaveCount(2, { timeout: 10_000 });
 
+  // Sin música no hay reproductor.
+  await expect(a.getByLabel('Ahora suena')).toHaveCount(0);
+
   // Ana agrega dos links (el título viene del stub de oEmbed: no se salió a internet).
   const link = a.getByLabel('Pegá un link de YouTube');
   const agregar = a.getByRole('button', { name: 'Agregar' });
@@ -29,8 +32,14 @@ test('cola de música compartida', async ({ browser }) => {
   await expect(link).toHaveValue('');
   await panel(false);
 
-  // Beto ve la cola y la que suena.
+  // Beto ve la cola y la que suena: en la píldora del dock, y tocando el título se abre la cola.
   await expect(actual(b)).toHaveText('Tema aaaaaaaaaaa', { timeout: 5000 });
+  await expect(b.locator('footer.dock').getByLabel('Ahora suena')).toBeVisible();
+  await expect(b.locator('section.voz').getByLabel('Ahora suena')).toHaveCount(0);
+  await b.locator('footer.dock').getByRole('button', { name: /Tema aaaaaaaaaaa/ }).click();
+  await expect(b.locator('#dock-musica')).toBeVisible();
+  await b.screenshot({ path: 'test-results/z-musica-dock.png' });
+  await b.keyboard.press('Escape');
   await expect(b.locator('#dock-musica li span.titulo')).toHaveText(['Tema aaaaaaaaaaa', 'Tema bbbbbbbbbbb']);
   for (const p of [a, b]) await expect.poll(() => videoId(p), { timeout: 5000 }).toBe('aaaaaaaaaaa');
   await expect.poll(() => tiempo(a), { timeout: 5000 }).toBeGreaterThan(0.5);

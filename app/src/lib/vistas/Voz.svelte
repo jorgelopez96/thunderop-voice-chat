@@ -145,7 +145,8 @@
       {:else}<button class="plano" onclick={() => vistaPrevia(true)}>Mostrar vista previa</button>{/if}
     </div>{/if}
 
-    <div class="pie-musica"><AhoraSuena /></div>
+    <!-- En la compu va en el dock. -->
+    {#if pantalla.movil}<div class="pie-musica"><AhoraSuena /></div>{/if}
   </div>
 
   {#if verChat && voz.salaId}
@@ -236,6 +237,7 @@
   /* Pegada abajo, justo arriba del dock, aunque haya pocas tarjetas o muchas (sticky al scrollear). */
   .pie-musica { margin-top: auto; position: sticky; bottom: 0; }
   .pie-musica:empty { display: none; }
+  .pie-musica :global(.titulo) { flex: 1; max-width: none; }
   .propia { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
   .propia :global(.previa) { width: 240px; max-width: 100%; aspect-ratio: 16 / 9; background: var(--hondo); border-radius: var(--radio); }
   .chatSala { position: relative; display: flex; flex-direction: column; min-height: 0; border-left: 1px solid var(--borde); background: var(--fondo); }

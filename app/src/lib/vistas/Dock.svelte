@@ -7,6 +7,7 @@
   import Botonera from './Botonera.svelte';
   import { tocados } from '../botonera.svelte';
   import Musica from './Musica.svelte';
+  import AhoraSuena from './AhoraSuena.svelte';
   import YoutubeJuntos from './YoutubeJuntos.svelte';
   import { sesion } from '../sesion.svelte';
   import { fuentes, conNativo, type Fuente } from '../transmisorNativo';
@@ -206,7 +207,7 @@
     <span><strong>{voz.conectando ? 'Conectando…' : 'Conectado'}</strong><small>{voz.salaNombre}{g ? ` · ${g.name}` : ''}</small></span>
   </div>
   {@render isla()}
-  <span></span>
+  <div class="derecha"><AhoraSuena cola={ubicarPanel} /></div>
 </footer>
 {/if}
 
@@ -288,7 +289,7 @@
   .dock-movil .colgar { width: 56px; background: var(--peligro); color: #fff; }
   .mas { min-width: 220px; }
   .mas:popover-open { inset: auto 8px calc(70px + env(safe-area-inset-bottom)) auto; }
-  .dock { flex: none; height: 64px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 16px; padding: 0 16px;
+  .dock { flex: none; height: 64px; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 16px; padding: 0 16px;
     background: var(--panel); border-top: 1px solid var(--borde); }
   :global([data-modo='moderno']) .dock { animation: sube 280ms var(--curva-salida); }
   @keyframes sube { from { opacity: 0; transform: translateY(100%); } }
@@ -302,6 +303,7 @@
   .flotante { position: fixed; inset: auto 0 24px; margin: 0 auto; width: fit-content; padding: 0; border: 0; background: none; overflow: visible;
     transition: opacity var(--dur-media); }
   .flotante.quieto:not(:hover):not(:focus-within) { opacity: 0; }
+  .derecha { display: flex; justify-content: flex-end; min-width: 0; }
   .estado { display: flex; align-items: center; gap: 10px; min-width: 0; }
   .estado span { display: flex; flex-direction: column; min-width: 0; line-height: 1.3; }
   .estado strong { font-weight: 650; font-size: 13.5px; }

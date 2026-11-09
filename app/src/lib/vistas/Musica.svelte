@@ -7,7 +7,7 @@
   import { voz } from '../voz.svelte';
   import { pantalla } from '../plataforma.svelte';
 
-  // Contenido del panelcito de Música del dock: agregar links y ver la cola. Lo que suena va en la barra de la sala.
+  // Contenido del panelcito de Música del dock: agregar links y ver la cola. Lo que suena va en la píldora del dock (AhoraSuena).
   let url = $state('');
   let aleatorio = $state(false);
   let leyendo = $state(''); // progreso al agregar una lista
