@@ -53,6 +53,9 @@ rtc:
   tcp_port: ${tcp}
   udp_port: ${udp}
   use_external_ip: false
+audio:
+  update_interval: 150
+  smooth_intervals: 1
 `],
     { cwd: raiz, stdio: 'ignore', env: { ...process.env, LIVEKIT_KEYS: `${key}: ${secret}` } },
   );

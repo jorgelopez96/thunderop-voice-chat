@@ -5,3 +5,7 @@ rtc:
   port_range_start: 50000
   port_range_end: 50100
   use_external_ip: false
+# Igual que en producción (instalar-servidor.sh): el borde de "hablando" se prende rápido.
+audio:
+  update_interval: 150
+  smooth_intervals: 1

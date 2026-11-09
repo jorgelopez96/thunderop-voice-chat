@@ -2,6 +2,7 @@ import { ClientResponseError, type RecordModel } from 'pocketbase';
 import { pb } from './pb';
 import { extraerCodigo, linkInvitacion } from './invitacion';
 import { salirVoz, voz } from './voz.svelte';
+import { alCambiarUsuario, parchear } from './presencia.svelte';
 
 export const grupos = $state<{ lista: RecordModel[]; cargado: boolean }>({ lista: [], cargado: false });
 // Svelte no permite reasignar un $state exportado: se expone como propiedad.
@@ -46,6 +47,7 @@ async function verificarActual() {
 export function iniciarGrupos(): () => void {
   recargarGrupos();
   const parar = pb.collection('groups').subscribe('*', () => { recargarGrupos(); });
+  const sinOyente = alCambiarUsuario((u) => { for (const g of grupos.lista) for (const m of g.expand?.members ?? []) parchear(m, u); });
   // ponytail: un miembro echado no recibe evento realtime; sondeo cada 10 s (retraso máx. 10 s) y al enfocar.
   // Mejora: que el servidor publique un evento propio al usuario echado.
   const t = setInterval(verificarActual, 10_000);
@@ -53,6 +55,7 @@ export function iniciarGrupos(): () => void {
   return () => {
     clearInterval(t);
     window.removeEventListener('focus', verificarActual);
+    sinOyente();
     parar.then((f) => f()).catch(() => {});
   };
 }

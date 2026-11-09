@@ -4,7 +4,10 @@ export type Novedad = { version: string; fecha: string; cambios: { tipo: 'nuevo'
 
 export const NOVEDADES: Novedad[] = [
   {
-    version: '0.7.6', fecha: '2026-11-08', cambios: [
+    version: '0.7.7', fecha: '2026-11-09', cambios: [
+      { tipo: 'arreglo', texto: 'Si alguien cambia la foto, el nombre o la descripción, se ve al toque en todos lados, sin tener que reiniciar.' },
+      { tipo: 'arreglo', texto: 'El borde de quien habla se prende mucho más rápido.' },
+      { tipo: 'nuevo', texto: 'La foto del grupo también puede ser un GIF animado de hasta 5 MB.' },
       { tipo: 'nuevo', texto: 'En la sala de voz, clic derecho sobre un amigo → «Enviar mensaje»: se abre su chat privado sin salir de la llamada.' },
       { tipo: 'nuevo', texto: 'El chat de la sala se puede agrandar o achicar arrastrando su borde izquierdo. Queda guardado en tu PC; con doble clic en el borde vuelve al tamaño de siempre.' },
       { tipo: 'nuevo', texto: 'Configuración: se ve todo de una, sin bajar, y tiene botón Guardar.' },

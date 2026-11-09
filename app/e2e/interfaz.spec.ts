@@ -87,4 +87,21 @@ test('en la sala: mensaje privado a un amigo, ancho del chat y configuración co
   }
   await config.getByRole('button', { name: 'Guardar' }).click();
   await expect(config).toBeHidden();
+
+  // Beto cambia la foto: Ana la ve al toque en la tarjeta de la llamada, sin recargar.
+  const fotoDeBeto = a.locator('section.voz li', { hasText: 'Beto' }).locator('img.avatar');
+  await expect(fotoDeBeto).toHaveAttribute('src', /^data:/); // todavía la inicial
+  await b.getByRole('button', { name: /Beto/ }).first().click();
+  await b.getByRole('button', { name: 'Editar perfil' }).click();
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
+  await b.getByLabel('Foto de perfil', { exact: true }).setInputFiles({ name: 'nueva.png', mimeType: 'image/png', buffer: png });
+  await b.getByRole('button', { name: 'Guardar cambios' }).click();
+  await expect(b.getByText('Perfil guardado.')).toBeVisible();
+  await expect(fotoDeBeto).toHaveAttribute('src', /\/api\/files\/.*nueva/, { timeout: 3000 });
+
+  // Y el nombre: Ana lo ve cambiado en la tarjeta de la llamada y en los participantes, sin recargar.
+  await b.getByLabel('Apodo').fill('Bertito');
+  await b.getByRole('button', { name: 'Guardar cambios' }).click();
+  await expect(a.locator('section.voz li', { hasText: 'Bertito' })).toBeVisible({ timeout: 3000 });
+  await expect(a.locator('aside.participantes li', { hasText: 'Bertito' })).toHaveCount(1);
 });

@@ -1,6 +1,7 @@
 import type { RecordModel } from 'pocketbase';
 import { pb } from './pb';
 import { mensajeError } from './sesion.svelte';
+import { alCambiarUsuario, parchear } from './presencia.svelte';
 
 export type Amigo = { amistad: string; usuario: RecordModel };
 export type Solicitud = { id: string; usuario: RecordModel };
@@ -37,7 +38,8 @@ async function recargar() {
 export function iniciarAmigos(): () => void {
   void recargar();
   const parar = pb.collection('amistades').subscribe('*', () => void recargar());
-  return () => { parar.then((f) => f()).catch(() => {}); };
+  const sinOyente = alCambiarUsuario((u) => { for (const x of [...amigos.lista, ...amigos.recibidas, ...amigos.enviadas]) parchear(x.usuario, u); });
+  return () => { sinOyente(); parar.then((f) => f()).catch(() => {}); };
 }
 
 /** Cada acción devuelve '' si salió bien o el mensaje de error para mostrar. */

@@ -13,8 +13,24 @@ export function enLineaSegun(visto: string | undefined, ahora: number): boolean 
 }
 
 const vistos = $state<Record<string, string>>({});
+// La foto también llega por el realtime: así se ve al toque en todos lados, sin esperar a que se recarguen
+// los grupos, los amigos o los mensajes (que traen el usuario de cuando se cargaron).
+const avatares = $state<Record<string, string>>({});
+/** La foto más nueva que se conoce de `u` (vacío = sin foto). */
+export const avatarActual = (u: RecordModel): string => avatares[u.id] ?? u.avatar;
 const disponibilidades = $state<Record<string, string>>({});
 const reloj = $state({ ahora: Date.now() });
+
+// Nombre, color, descripción e insignia se leen en muchos lados: en vez de un mapa aparte, cada lista que guarda
+// usuarios (grupos, amigos, chats abiertos) se anota acá y copia lo nuevo sobre sus registros.
+const oyentesUsuario = new Set<(u: RecordModel) => void>();
+export function alCambiarUsuario(f: (u: RecordModel) => void) { oyentesUsuario.add(f); return () => { oyentesUsuario.delete(f); }; }
+const CAMPOS = ['name', 'color', 'status', 'avatar', 'fundador'] as const;
+/** Si `u` es el usuario de `nuevo`, le copia los datos de perfil que cambiaron (sobre $state solo avisa lo que cambió). */
+export function parchear(u: RecordModel | null | undefined, nuevo: RecordModel) {
+  if (u?.id !== nuevo.id) return;
+  for (const c of CAMPOS) if (c in nuevo && u[c] !== nuevo[c]) u[c] = nuevo[c];
+}
 
 /** Reactiva: usa el `visto` del realtime si llegó, si no el del registro. */
 export function enLinea(u: RecordModel | string): boolean {
@@ -37,7 +53,10 @@ export function iniciarPresencia(): () => void {
   void latir();
   const latido = setInterval(latir, LATIDO_MS);
   const tic = setInterval(() => (reloj.ahora = Date.now()), 15_000);
-  const sub = pb.collection('users').subscribe('*', (e) => { vistos[e.record.id] = e.record.visto; disponibilidades[e.record.id] = e.record.disponibilidad; });
+  const sub = pb.collection('users').subscribe('*', (e) => {
+    vistos[e.record.id] = e.record.visto; disponibilidades[e.record.id] = e.record.disponibilidad; avatares[e.record.id] = e.record.avatar;
+    for (const f of oyentesUsuario) f(e.record);
+  });
   return () => {
     clearInterval(latido);
     clearInterval(tic);

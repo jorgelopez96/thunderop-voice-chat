@@ -38,6 +38,11 @@ rtc:
     allow_pause: false
     use_send_side_bwe_interceptor: true
     use_send_side_bwe: true
+# Quién habla: de fábrica avisa cada 500 ms y promedia 4 muestras (el borde tardaba 1-2 s en prenderse).
+# El parpadeo entre palabras lo tapa la app (sostiene "hablando" 700 ms).
+audio:
+  update_interval: 150
+  smooth_intervals: 1
 YAML
 
 # Las claves se generan una sola vez; el dominio se reescribe en cada corrida.

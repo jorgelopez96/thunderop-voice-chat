@@ -1,5 +1,6 @@
 import type { RecordModel } from 'pocketbase';
 import { pb } from './pb';
+import { avatarActual } from './presencia.svelte';
 
 /** Avatar de letra: la inicial del nombre sobre un color que sale del nombre (siempre el mismo para cada uno). */
 export function avatarDeLetra(nombre: string): string {
@@ -14,8 +15,10 @@ export function avatarDeLetra(nombre: string): string {
 /** Foto de perfil de un usuario; sin foto, la inicial de su nombre. Los grupos no la usan.
  *  Los GIF van enteros: la miniatura de PocketBase se queda con el primer cuadro y dejaba de moverse.
  *  ponytail: un GIF pesado se baja entero en cada avatar (el navegador lo cachea); generar miniaturas animadas si molesta. */
-export const foto = (u: RecordModel | null | undefined, thumb = '64x64') =>
-  u?.avatar ? pb.files.getURL(u, u.avatar, sinMiniaturaSiGif(u.avatar, thumb)) : avatarDeLetra(u?.name ?? '');
+export function foto(u: RecordModel | null | undefined, thumb = '64x64') {
+  const avatar = u && avatarActual(u); // la del realtime si cambió desde que se cargó `u`
+  return avatar ? pb.files.getURL(u, avatar, sinMiniaturaSiGif(avatar, thumb)) : avatarDeLetra(u?.name ?? '');
+}
 
 /** Foto del grupo (quien llama se fija antes si tiene); los GIF también van enteros. */
 export const fotoGrupo = (g: RecordModel, thumb: string) => pb.files.getURL(g, g.foto, sinMiniaturaSiGif(g.foto, thumb));

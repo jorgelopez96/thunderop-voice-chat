@@ -1,6 +1,7 @@
 import type { RecordModel } from 'pocketbase';
 import { pb } from './pb';
 import { mensajeError } from './sesion.svelte';
+import { alCambiarUsuario, parchear } from './presencia.svelte';
 
 const PAGINA = 50;
 const EXPAND = 'author,respondeA.author'; // el mensaje citado y su autor, para mostrar la respuesta
@@ -48,6 +49,10 @@ export function abrirLista(coleccion: 'messages' | 'privados', filtroSala: strin
     try { m = await pb.collection(coleccion).getOne(m.id, { expand: EXPAND }); } catch { /* sin autor visible: "Ex miembro" */ }
     if (!cerrado) insertar(m);
   }, { filter: filtroSala });
+  // Los autores vienen expandidos de cuando se cargó cada mensaje: se les copia el perfil nuevo.
+  const sinOyente = alCambiarUsuario((u) => {
+    for (const m of estado.mensajes) { parchear(m.expand?.author, u); parchear(m.expand?.respondeA?.expand?.author, u); }
+  });
 
   return {
     get mensajes() { return estado.mensajes; },
@@ -65,7 +70,7 @@ export function abrirLista(coleccion: 'messages' | 'privados', filtroSala: strin
     reaccionar: (id: string, emoji: string) => pb.send('/api/reaccionar', { method: 'POST', body: { coleccion, id, emoji } }),
     /** Cambia el texto de un mensaje mío; el servidor lo marca como editado. */
     editar: (id: string, text: string) => pb.collection(coleccion).update(id, { text }),
-    cerrar() { cerrado = true; sub.then((f) => f()).catch(() => {}); },
+    cerrar() { cerrado = true; sinOyente(); sub.then((f) => f()).catch(() => {}); },
   };
 }
 

@@ -133,7 +133,7 @@
             <button class="primario ver" aria-pressed={viendo} onclick={() => ver(sid, !viendo)}>{viendo ? 'Dejar de ver' : 'Ver'}</button>{/if}
           <span class="etiqueta-nombre">
             {#if p.silenciado}<span class="mic" title="Sin micrófono" aria-label="Silenciado"><MicOff size={16} strokeWidth={1.75} /></span>{/if}
-            <span class="nombre">{p.nombre}{p.local ? ' (vos)' : ''}</span><Insignia usuario={m} />
+            <span class="nombre">{m?.name || p.nombre}{p.local ? ' (vos)' : ''}</span><Insignia usuario={m} />
           </span>
         </li>
       {/each}
