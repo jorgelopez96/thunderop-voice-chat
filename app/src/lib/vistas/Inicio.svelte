@@ -6,7 +6,7 @@
   import { grupos, grupoActual, crearGrupo, unirse } from '../grupos.svelte';
   import { voz, entrarVoz } from '../voz.svelte';
   import { delGrupo } from '../noLeidos.svelte';
-  import { foto } from '../foto';
+  import { foto, fotoGrupo } from '../foto';
   import Avatar from './Avatar.svelte';
   import Novedades from './Novedades.svelte';
   import { pantalla } from '../plataforma.svelte';
@@ -62,7 +62,7 @@
 </script>
 
 {#snippet icono(g: RecordModel)}
-  {#if g.foto}<img class="icono-grupo" alt="" src={pb.files.getURL(g, g.foto, { thumb: '100x100' })} />
+  {#if g.foto}<img class="icono-grupo" alt="" src={fotoGrupo(g, '100x100')} />
   {:else}<span class="icono-grupo" style="background:{degrade(g.name)}">{g.name.slice(0, 1).toUpperCase()}</span>{/if}
 {/snippet}
 
@@ -144,7 +144,7 @@
               {@const v = enVoz(g.id)}
               <button class="grupo" onclick={() => (grupoActual.id = g.id)}>
                 <span class="banner">
-                  {#if g.foto}<img alt="" src={pb.files.getURL(g, g.foto, { thumb: '480x270' })} />
+                  {#if g.foto}<img alt="" src={fotoGrupo(g, '480x270')} />
                   {:else}<span class="portada" style="background:{degrade(g.name)}"></span>{/if}
                 </span>
                 <span class="datos">

@@ -3,6 +3,7 @@
   import type { RecordModel } from 'pocketbase';
   import { ImagePlus, Plus, Trash2, X } from '@lucide/svelte';
   import { pb } from '../pb';
+  import { fotoGrupo } from '../foto';
   import { sesion, mensajeError } from '../sesion.svelte';
   import { borrarGrupo, banear } from '../grupos.svelte';
   import Avatar from './Avatar.svelte';
@@ -58,7 +59,7 @@
     input.value = '';
     if (!f) return;
     if (!f.type.startsWith('image/')) { error = 'La foto debe ser una imagen.'; return; }
-    if (f.size > 2 * 1024 * 1024) { error = 'La foto supera los 2 MB.'; return; }
+    if (f.size > 5 * 1024 * 1024) { error = 'La foto supera los 5 MB.'; return; }
     const datos = new FormData();
     datos.append('foto', f);
     await hacer(() => pb.collection('groups').update(grupo.id, datos));
@@ -86,7 +87,7 @@
       </div>
       <div class="foto">
         <span class="titulo">Foto del grupo</span>
-        {#if grupo.foto}<img alt="" src={pb.files.getURL(grupo, grupo.foto, { thumb: '480x270' })} />
+        {#if grupo.foto}<img alt="" src={fotoGrupo(grupo, '480x270')} />
         {:else}<span class="sin-foto">Sin foto</span>{/if}
         {#if soyDueno}
           <label class="boton"><ImagePlus size={16} strokeWidth={1.75} /> Cambiar foto

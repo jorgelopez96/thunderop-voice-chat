@@ -2,6 +2,7 @@
   import { Plus, Search, Volume2, Hash, UserPlus, Users } from '@lucide/svelte';
   import type { RecordModel } from 'pocketbase';
   import { pb } from '../pb';
+  import { fotoGrupo } from '../foto';
   import { sesion, mensajeError } from '../sesion.svelte';
   import { grupos, grupoActual, crearGrupo, unirse } from '../grupos.svelte';
   import { voz, entrarVoz } from '../voz.svelte';
@@ -98,7 +99,7 @@
 
 {#snippet icono(g: RecordModel, grande = false)}
   <span class="ig" class:grande>
-    {#if g.foto}<img alt="" src={pb.files.getURL(g, g.foto, { thumb: '100x100' })} />
+    {#if g.foto}<img alt="" src={fotoGrupo(g, '100x100')} />
     {:else}<span class="letra" style="background:{degrade(g.name)}">{g.name.slice(0, 1).toUpperCase()}</span>{/if}
     {#if gente(g.id).length}<span class="en-voz" aria-label="Hay gente en voz"><Volume2 size={10} strokeWidth={2.5} /></span>{/if}
   </span>

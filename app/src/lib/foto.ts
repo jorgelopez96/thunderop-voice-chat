@@ -15,4 +15,9 @@ export function avatarDeLetra(nombre: string): string {
  *  Los GIF van enteros: la miniatura de PocketBase se queda con el primer cuadro y dejaba de moverse.
  *  ponytail: un GIF pesado se baja entero en cada avatar (el navegador lo cachea); generar miniaturas animadas si molesta. */
 export const foto = (u: RecordModel | null | undefined, thumb = '64x64') =>
-  u?.avatar ? pb.files.getURL(u, u.avatar, /\.gif$/i.test(u.avatar) ? {} : { thumb }) : avatarDeLetra(u?.name ?? '');
+  u?.avatar ? pb.files.getURL(u, u.avatar, sinMiniaturaSiGif(u.avatar, thumb)) : avatarDeLetra(u?.name ?? '');
+
+/** Foto del grupo (quien llama se fija antes si tiene); los GIF también van enteros. */
+export const fotoGrupo = (g: RecordModel, thumb: string) => pb.files.getURL(g, g.foto, sinMiniaturaSiGif(g.foto, thumb));
+
+const sinMiniaturaSiGif = (archivo: string, thumb: string) => (/\.gif$/i.test(archivo) ? {} : { thumb });

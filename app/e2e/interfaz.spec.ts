@@ -14,6 +14,16 @@ test('foto de perfil: un GIF de 3 MB se sube y se muestra entero (animado, sin m
   const delServidor = page.locator('img[src*="/api/files/"][src*=".gif"]').first();
   await expect(delServidor).toBeVisible();
   expect(await delServidor.getAttribute('src')).not.toContain('thumb=');
+  await page.keyboard.press('Escape');
+
+  // La foto del grupo, igual: 3 MB y el GIF entero.
+  await crearGrupo(page, 'Gifs');
+  await page.getByRole('button', { name: 'Gifs', exact: true }).click();
+  await page.getByRole('button', { name: 'Configuraciones' }).click();
+  await page.locator('dialog.config input[type="file"]').setInputFiles({ name: 'grupo.gif', mimeType: 'image/gif', buffer: gif });
+  const delGrupo = page.locator('dialog.config .foto img');
+  await expect(delGrupo).toHaveAttribute('src', /\.gif/);
+  expect(await delGrupo.getAttribute('src')).not.toContain('thumb=');
 });
 
 test('en la sala: mensaje privado a un amigo, ancho del chat y configuración con Guardar', async ({ browser }) => {
