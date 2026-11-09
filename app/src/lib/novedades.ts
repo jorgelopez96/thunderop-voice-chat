@@ -4,7 +4,8 @@ export type Novedad = { version: string; fecha: string; cambios: { tipo: 'nuevo'
 
 export const NOVEDADES: Novedad[] = [
   {
-    version: '0.7.8', fecha: '2026-11-09', cambios: [
+    version: '0.7.9', fecha: '2026-11-09', cambios: [
+      { tipo: 'nuevo', texto: 'Cuando sale una versión nueva aparece el botón «Actualizar» al lado de la campanita: un toque y se instala, sin tener que cerrar la app. Se fija cada 5 minutos.' },
       { tipo: 'nuevo', texto: 'El reproductor de música ahora está abajo a la derecha, en la barra de la llamada, y aparece solo cuando hay algo sonando. Tocando el nombre del tema se abre la cola; el volumen aparece al pasar el mouse.' },
       { tipo: 'arreglo', texto: 'Si alguien cambia la foto, el nombre o la descripción, se ve al toque en todos lados, sin tener que reiniciar.' },
       { tipo: 'arreglo', texto: 'El borde de quien habla se prende mucho más rápido.' },

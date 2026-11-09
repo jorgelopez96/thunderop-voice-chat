@@ -105,3 +105,13 @@ test('en la sala: mensaje privado a un amigo, ancho del chat y configuración co
   await expect(a.locator('section.voz li', { hasText: 'Bertito' })).toBeVisible({ timeout: 3000 });
   await expect(a.locator('aside.participantes li', { hasText: 'Bertito' })).toHaveCount(1);
 });
+
+test('con una versión nueva bajada aparece el botón Actualizar al lado de la campanita', async ({ page }) => {
+  await crearCuenta(page, 'Upda');
+  await expect(page.getByRole('button', { name: 'Actualizar' })).toHaveCount(0);
+  // En el navegador no hay actualizador: se simula que el chequeo de fondo ya la bajó.
+  await page.evaluate(async () => { (await import('/src/lib/actualizacion.svelte.ts')).actualizacion.pendiente = '9.9.9'; });
+  await page.getByRole('button', { name: 'Actualizar' }).click();
+  await expect(page.getByText('con la versión 9.9.9')).toBeVisible();
+  await page.screenshot({ path: 'test-results/z-actualizar.png' });
+});

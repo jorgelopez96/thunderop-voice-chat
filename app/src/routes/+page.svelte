@@ -11,7 +11,6 @@
   import { actualizacion, buscarActualizacion } from '$lib/actualizacion.svelte';
   import Actualizacion from '$lib/vistas/Actualizacion.svelte';
   import BarraTitulo from '$lib/vistas/BarraTitulo.svelte';
-  import { voz } from '$lib/voz.svelte';
   import { aplicarModo, aplicarTema, modoGuardado, temaGuardado } from '$lib/tema';
 
   aplicarTema(temaGuardado());
@@ -25,15 +24,10 @@
   });
   onMount(() => {
     buscarActualizacion();
-    // Con la bandeja la app casi no se reabre: se vuelve a buscar a cada hora en punto, pero nunca en plena llamada.
-    let t: ReturnType<typeof setTimeout>;
-    const programar = () => {
-      const enPunto = new Date();
-      enPunto.setHours(enPunto.getHours() + 1, 0, 0, 0);
-      t = setTimeout(() => { if (!voz.salaId) buscarActualizacion(true); programar(); }, enPunto.getTime() - Date.now());
-    };
-    programar();
-    return () => clearTimeout(t);
+    // Con la bandeja la app casi no se reabre: cada 5 minutos se mira si hay una versión nueva y se baja de fondo
+    // (también en llamada: no la corta). Al estar lista aparece el botón Actualizar al lado de la campanita.
+    const t = setInterval(() => buscarActualizacion(true), 5 * 60_000);
+    return () => clearInterval(t);
   });
 </script>
 

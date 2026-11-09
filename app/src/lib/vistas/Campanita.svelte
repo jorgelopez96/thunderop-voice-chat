@@ -21,6 +21,7 @@
   const hacer = async (f: Promise<string>) => { error = await f; };
 </script>
 
+{#if actualizacion.pendiente}<button class="primario actualizar" onclick={() => (preguntar = true)} title="Thunderop {actualizacion.pendiente} está lista: reiniciá para aplicarla"><RefreshCw size={15} strokeWidth={2} /> Actualizar</button>{/if}
 <button class="plano icono" popovertarget="campanita" aria-label={n ? `Notificaciones: ${n}` : 'Notificaciones'} title="Notificaciones">
   <!-- El #key vuelve a montar la campana cuando cambia el número: en modo moderno se balancea al llegar algo. -->
   {#key n}<span class="campana"><Bell size={20} strokeWidth={1.75} /></span>{/key}
@@ -64,6 +65,7 @@
 {/if}
 
 <style>
+  .actualizar { height: 30px; min-height: 30px; padding: 0 12px; gap: 6px; border-radius: 999px; font-size: 13px; }
   .icono { position: relative; display: grid; place-items: center; padding: 6px; }
   .campana { display: grid; transform-origin: 50% 12%; }
   .contador { position: absolute; top: 2px; right: 2px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px;
