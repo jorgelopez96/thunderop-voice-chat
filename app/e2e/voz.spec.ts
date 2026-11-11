@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { crearCuenta, crearGrupo, de, unirse } from './cuentas';
+import { crearCuenta, crearGrupo, de, unirse, grupoDeTres } from './cuentas';
 
 type Stats = { mic: boolean; remotos: Record<string, { mic: boolean; bytes: number }> };
 const stats = (p: Page) => p.evaluate(() => (window as unknown as { __voz: { stats(): Promise<Stats> } }).__voz.stats());
@@ -99,4 +99,18 @@ test('tres personas en una sala de voz', async ({ browser }) => {
   await otra.getByRole('button', { name: 'Abrir el grupo' }).click();
   const presencia = otra.locator('li.sala', { has: otra.getByRole('button', { name: 'Sala de voz General' }) }).locator('.quienes');
   await expect.poll(async () => (await presencia.getByRole('listitem').evaluateAll((li) => li.map((x) => x.querySelector(':scope > span:not(.caja)')?.textContent ?? ''))).map((t) => t.slice(0, -4)).sort(), { timeout: 10_000 }).toEqual(['Ana', 'Beto']); // sin el sufijo de crearCuenta
+});
+
+test('supresión fuerte (DeepFilterNet): arranca sin errores y el audio sigue llegando', async ({ browser }) => {
+  const [a, b] = await grupoDeTres(browser, `Fuerte${Math.random().toString(36).slice(2, 6)}`, async (p) => {
+    await p.addInitScript(() => { try { const k = 'dm.voz'; const v = JSON.parse(localStorage.getItem(k) ?? '{}'); localStorage.setItem(k, JSON.stringify({ ...v, v: 3, supresion: true, supresionFuerte: true })); } catch { /* */ } });
+  });
+  for (const p of [a, b]) await p.getByRole('button', { name: 'Sala de voz General' }).click();
+  for (const p of [a, b]) await expect(p.locator('section.voz .franja li')).toHaveCount(2, { timeout: 15_000 });
+  await a.waitForTimeout(8000); // baja y compila el modelo (16 MB)
+  await expect(a.getByRole('alert')).toHaveCount(0);
+  const bytes = () => b.evaluate(() => (globalThis as unknown as { __voz: { stats(): Promise<{ remotos: Record<string, { bytes: number }> }> } }).__voz.stats())
+    .then((s) => Object.entries(s.remotos).find(([n]) => n.startsWith('Ana'))?.[1].bytes ?? 0);
+  const antes = await bytes();
+  await expect.poll(bytes, { timeout: 10_000 }).toBeGreaterThan(antes + 5000);
 });

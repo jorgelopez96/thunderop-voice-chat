@@ -18,8 +18,8 @@ export type Participante = { id: string; nombre: string; hablando: boolean; sile
 /** `sinPermiso`: el dueño nos silenció (los permisos de LiveKit no dejan publicar el micrófono). `viendo`: sids de las pantallas que miramos
  *  (en el orden en que se eligieron). */
 /** `sinSonido`: el navegador no deja reproducir hasta que se toque la pantalla (celular que volvió solo a la llamada). */
-export const voz = $state<{ salaId: string | null; salaNombre: string; grupoId: string | null; conectando: boolean; error: string; muteado: boolean; ensordecido: boolean; sinPermiso: boolean; supresion: boolean; participantes: Participante[]; senal: 'buena' | 'regular' | 'mala'; transmitiendo: boolean; viendo: string[]; vistaPrevia: boolean; calidadEnVivo: Calidad | null; sinSonido: boolean; camara: boolean; camEnPantalla: Cam | null }>({
-  salaId: null, salaNombre: '', grupoId: null, conectando: false, error: '', muteado: false, ensordecido: false, sinPermiso: false, supresion: leerPrefs().supresion, participantes: [], senal: 'buena', transmitiendo: false, viendo: [], vistaPrevia: leerPrefs().vistaPrevia, calidadEnVivo: null, sinSonido: false, camara: false, camEnPantalla: null,
+export const voz = $state<{ salaId: string | null; salaNombre: string; grupoId: string | null; conectando: boolean; error: string; muteado: boolean; ensordecido: boolean; sinPermiso: boolean; supresion: boolean; supresionFuerte: boolean; participantes: Participante[]; senal: 'buena' | 'regular' | 'mala'; transmitiendo: boolean; viendo: string[]; vistaPrevia: boolean; calidadEnVivo: Calidad | null; sinSonido: boolean; camara: boolean; camEnPantalla: Cam | null }>({
+  salaId: null, salaNombre: '', grupoId: null, conectando: false, error: '', muteado: false, ensordecido: false, sinPermiso: false, supresion: leerPrefs().supresion, supresionFuerte: leerPrefs().supresionFuerte, participantes: [], senal: 'buena', transmitiendo: false, viendo: [], vistaPrevia: leerPrefs().vistaPrevia, calidadEnVivo: null, sinSonido: false, camara: false, camEnPantalla: null,
 });
 
 // LiveKit se carga recién al entrar a la voz: el arranque de la app no lo paga. Mientras haya `room`, `lk` está cargado.
@@ -114,7 +114,7 @@ function aplicarProcesador() {
     const t = microfono();
     if (!t) return;
     if (esCelular) return;
-    const op = { supresion: voz.supresion, gananciaDb: leerPrefs().gananciaDb };
+    const op = { supresion: voz.supresion, fuerte: voz.supresionFuerte, gananciaDb: leerPrefs().gananciaDb };
     try {
       let p = t.getProcessor() as ProcesadorMic | undefined;
       if (p) await p.ajustar(op);
@@ -167,7 +167,7 @@ export async function entrarVoz(roomId: string, salaNombre = '', grupoId: string
     o.frequency.setValueAtTime(desde, t);
     o.frequency.linearRampToValueAtTime(hasta, t + 0.12);
     g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(0.12, t + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.35, t + 0.02); // antes 0.12: no se oía bien quién entraba o salía
     g.gain.exponentialRampToValueAtTime(0.0001, t + 0.18);
     o.connect(g).connect(c.destination);
     o.start(t);
@@ -336,6 +336,13 @@ export async function cambiarSupresion(si: boolean) {
   guardarPrefs({ supresion: si });
   if (esCelular) await microfono()?.restartTrack(opcionesMic()).catch(() => {});
   else await aplicarProcesador();
+}
+
+/** Supresión "Fuerte" (DeepFilterNet, saca más ruido pero usa más el procesador) o "Normal" (RNNoise). Se guarda. */
+export async function cambiarSupresionFuerte(si: boolean) {
+  voz.supresionFuerte = si;
+  guardarPrefs({ supresionFuerte: si });
+  await aplicarProcesador();
 }
 
 /** Ganancia del micrófono en dB (−20 a +20), después de la supresión. Se guarda y se aplica en vivo. */
@@ -574,15 +581,25 @@ async function camEnTransmision(si: boolean) {
       camPorTransmision = voz.camara;
     }
     if (!voz.camara) return; // sin cámara: la transmisión sigue sola (el aviso ya salió)
+    calidadCamara(r, true);
     voz.camEnPantalla = POR_DEFECTO;
     await r.localParticipant.setAttributes({ camEnPantalla: escribirCam(POR_DEFECTO) }).catch(() => {});
     return;
   }
   if (!voz.camEnPantalla && !camPorTransmision) return;
   voz.camEnPantalla = null;
+  calidadCamara(r, false);
   await r.localParticipant.setAttributes({ camEnPantalla: '' }).catch(() => {});
   if (camPorTransmision && voz.camara) await alternarCamara(true);
   camPorTransmision = false;
+}
+
+/** Con la pantalla saliendo al mismo tiempo, la cámara (que va chica, en la ventanita) baja a 720p30: la pantalla y la
+ *  cámara juntas en calidad máxima saturaban la subida y la transmisión se cortaba de a ratos. Al cortar, vuelve. */
+function calidadCamara(r: Room, liviana: boolean) {
+  const t = r.localParticipant.getTrackPublication(lk.Track.Source.Camera)?.track?.mediaStreamTrack;
+  t?.applyConstraints(liviana ? { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30, max: 30 } }
+    : { width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 60 } }).catch(() => {});
 }
 
 /** Quien transmite acomoda la ventanita de su cámara (se ve al toque en su previa; a los demás les llega cada 150 ms). */

@@ -196,10 +196,26 @@
   // Celular: mantener apretado un mensaje abre sus acciones abajo.
   let hojaDe = $state<RecordModel | null>(null);
   const abrirHoja = (m: RecordModel) => { if (hojaDe) return; hojaDe = m; conAtras(() => (hojaDe = null)); };
+  // Solo cuenta que subiste si lo hiciste vos (rueda, dedo, teclado o la barra). Si la lista se mueve sola (carga
+  // mensajes anteriores, fotos, el navegador acomoda), se vuelve abajo: antes eso te dejaba arriba al cambiar de canal.
+  let gestoHasta = 0;
+  let arrastrando = false;
+  const gesto = () => (gestoHasta = Date.now() + 700);
+  function alTeclado(e: KeyboardEvent) { if (['PageUp', 'PageDown', 'ArrowUp', 'ArrowDown', 'Home', 'End', ' '].includes(e.key)) gesto(); }
+  $effect(() => {
+    const l = lista;
+    if (!l) return;
+    const abajo = () => { arrastrando = true; gesto(); }, arriba = () => { arrastrando = false; gesto(); }, cancela = () => (arrastrando = false);
+    const ev: [string, EventListener][] = [['wheel', gesto], ['touchmove', gesto], ['keydown', alTeclado as EventListener], ['pointerdown', abajo], ['pointerup', arriba], ['pointercancel', cancela]];
+    for (const [t, f] of ev) l.addEventListener(t, f, { passive: true });
+    return () => { for (const [t, f] of ev) l.removeEventListener(t, f); };
+  });
   function alScroll() {
     if (!lista) return;
-    pegado = lista.scrollHeight - lista.scrollTop - lista.clientHeight < 48;
-    if (lista.scrollTop === 0 && chat.hayMas) chat.cargarMas();
+    const mio = arrastrando || Date.now() < gestoHasta;
+    if (mio) pegado = lista.scrollHeight - lista.scrollTop - lista.clientHeight < 48;
+    else if (pegado) { bajar(); return; }
+    if (mio && lista.scrollTop === 0 && chat.hayMas) chat.cargarMas();
   }
 
   // Menú de emojis: para escribir (destino '') o para reaccionar a un mensaje (destino = su id).

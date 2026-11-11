@@ -202,3 +202,29 @@ test('una invitación en el chat llega como tarjeta: Unirme te mete al grupo y d
   await tarjeta.getByRole('button', { name: 'Unirme' }).click();
   await expect(b.getByRole('button', { name: `${nombre}Dos`, exact: true })).toBeVisible({ timeout: 10_000 }); // lo llevó al grupo
 });
+
+test('el chat solo deja de seguir el final si subís vos; si se mueve solo, vuelve abajo', async ({ browser }) => {
+  const p = await (await browser.newContext()).newPage();
+  await crearCuenta(p, 'Ana');
+  const nombre = `Gesto${Math.random().toString(36).slice(2, 6)}`;
+  await crearGrupo(p, nombre);
+  const admin = new (await import('pocketbase')).default(`http://127.0.0.1:${process.env.E2E_PB_PORT ?? 8091}`);
+  await admin.collection('_superusers').authWithPassword('admin@test.local', 'admin-pass-1234');
+  const g = await admin.collection('groups').getFirstListItem(`name = "${nombre}"`);
+  const chatId = (await admin.collection('rooms').getFirstListItem(`group = "${g.id}" && kind = "chat"`)).id;
+  for (let i = 1; i <= 40; i++) await admin.collection('messages').create({ room: chatId, author: g.owner, text: `mensaje ${i}` });
+  await p.getByRole('button', { name: 'Sala de chat General' }).click();
+  const lista = p.getByTestId('mensajes');
+  const distancia = () => lista.evaluate((e) => e.scrollHeight - e.scrollTop - e.clientHeight);
+  await expect.poll(distancia, { timeout: 10_000 }).toBeLessThan(48);
+  // Se mueve solo (como cuando carga algo arriba): vuelve abajo.
+  await lista.evaluate((e) => { e.scrollTop = 0; e.dispatchEvent(new Event('scroll')); });
+  await expect.poll(distancia, { timeout: 5000 }).toBeLessThan(48);
+  // Subo yo con la rueda: me deja donde estoy, aunque llegue algo.
+  await lista.hover();
+  await p.mouse.wheel(0, -2000);
+  await expect.poll(distancia, { timeout: 5000 }).toBeGreaterThan(200);
+  await lista.evaluate((e) => { const d = document.createElement('div'); d.style.height = '300px'; e.lastElementChild?.append(d); });
+  await p.waitForTimeout(500);
+  expect(await distancia()).toBeGreaterThan(200);
+});

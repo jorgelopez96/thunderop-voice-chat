@@ -2,7 +2,7 @@
   import { cerrarAfuera } from '../afuera';
   import { lleno } from '../rango';
   import { User, Mic, Monitor, Bell, Palette, Trash2, Check, X } from '@lucide/svelte';
-  import { voz, vistaPrevia, dispositivos, elegirEntrada, elegirSalida, elegirCamara, cambiarSupresion, cambiarGanancia } from '../voz.svelte';
+  import { voz, vistaPrevia, dispositivos, elegirEntrada, elegirSalida, elegirCamara, cambiarSupresion, cambiarSupresionFuerte, cambiarGanancia } from '../voz.svelte';
   import { leerPrefs, guardarPrefs } from '../prefs';
   import { dbDePorcentaje, porcentajeDeDb } from '../ganancia';
   import MedidorMic from './MedidorMic.svelte';
@@ -162,6 +162,14 @@
         </label>
       {/if}
       <label class="casilla"><input type="checkbox" class="switch" checked={voz.supresion} onchange={(e) => cambiarSupresion(e.currentTarget.checked)} /> Supresión de ruido</label>
+      <!-- Normal = RNNoise (por defecto). Fuerte = DeepFilterNet: saca más ruido pero usa más el procesador. En el celular va
+           el filtro del teléfono, así que no se ofrece. -->
+      {#if voz.supresion && !esCelular}
+        <div class="modo-ruido" role="radiogroup" aria-label="Intensidad de la supresión de ruido">
+          <label title="Saca el ruido de fondo común y casi no usa el procesador."><input type="radio" name="ruido" checked={!voz.supresionFuerte} onchange={() => cambiarSupresionFuerte(false)} /> Normal</label>
+          <label title="Saca mucho más ruido (teclado, ventilador, calle), pero usa bastante más el procesador. Si notás la PC más lenta o el juego se traba, volvé a Normal."><input type="radio" name="ruido" checked={voz.supresionFuerte} onchange={() => cambiarSupresionFuerte(true)} /> Fuerte <small>· usa más el procesador</small></label>
+        </div>
+      {/if}
       <!-- En el celular el micrófono va sin procesador (ver opcionesMic en voz.svelte.ts): no hay ganancia que ajustar. -->
       {#if !esCelular}
         <label>Volumen del micrófono: <span class="num">{pctMic}%</span>
@@ -222,6 +230,9 @@
 </dialog>
 
 <style>
+  .modo-ruido { display: flex; gap: 16px; margin: -4px 0 4px 36px; font-size: 13px; }
+  .modo-ruido label { display: inline-flex; flex-direction: row; align-items: center; gap: 6px; color: var(--texto); cursor: help; }
+  .modo-ruido small { color: var(--tenue); }
   h3 { margin: 0; }
   .pie-modal { position: sticky; bottom: -24px; display: flex; justify-content: flex-end; margin: auto -24px -24px; padding: 10px 24px 12px;
     background: var(--panel); border-top: 1px solid var(--borde); }

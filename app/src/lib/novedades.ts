@@ -4,7 +4,12 @@ export type Novedad = { version: string; fecha: string; cambios: { tipo: 'nuevo'
 
 export const NOVEDADES: Novedad[] = [
   {
-    version: '0.10.0', fecha: '2026-11-11', cambios: [
+    version: '0.11.0', fecha: '2026-11-11', cambios: [
+      { tipo: 'nuevo', texto: 'Ícono nuevo de Thunderop en el escritorio, la barra de tareas y la bandeja.' },
+      { tipo: 'arreglo', texto: 'Al cambiar de canal de texto ya no te deja arriba: el chat te sigue al último mensaje y solo te suelta si subís vos a leer.' },
+      { tipo: 'arreglo', texto: 'Los sonidos de cuando alguien entra o sale de la llamada, o empieza a transmitir, se escuchan bastante más fuerte.' },
+      { tipo: 'arreglo', texto: '«Pantalla + cámara»: mientras transmitís, la cámara va en 720p para que la transmisión no se corte de a ratos; al cortar vuelve a su mejor calidad.' },
+      { tipo: 'nuevo', texto: 'Supresión de ruido «Fuerte» (en Configuración → Voz): saca mucho más ruido de fondo, como el teclado, el ventilador o la calle. Usa más el procesador, así que viene en «Normal»; si la PC anda justa, dejala así. La primera vez baja el filtro (unos 16 MB).' },
       { tipo: 'nuevo', texto: 'Las invitaciones llegan al chat como una tarjeta: el grupo con su foto y cuántos son, y el botón Unirme te mete y te lleva directo. Si ya sos parte, te lo dice.' },
       { tipo: 'nuevo', texto: 'Clic derecho sobre alguien en la lista de salas (o en la llamada): un menú más chico con su volumen, sus roles (cada uno en su renglón) y lo que puedas hacerle.' },
       { tipo: 'nuevo', texto: 'Roles: permiso nuevo «Borrar sonidos», y quien lo tiene ve un tachito en cada sonido de la botonera. Los roles que podían editar la botonera también pueden borrar, como antes.' },
