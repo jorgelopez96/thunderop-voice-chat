@@ -271,3 +271,11 @@ describe('roles: revisión final', () => {
     expect((await s.a.collection('groups').getOne(s.g.id)).bloqueados).not.toContain(s.ids.c);
   });
 });
+
+describe('roles: detalles', () => {
+  it('cada rol se guarda solo con sus cuatro campos', async () => {
+    const s = await setup();
+    const g = await s.a.collection('groups').update(s.g.id, { roles: [{ ...TODOS, basura: 'x'.repeat(500) }, { id: 'rabcdef1', nombre: ' DJ ', color: '#5bc77a', permisos: [], otro: 1 }] });
+    expect(g.roles).toEqual([TODOS, { id: 'rabcdef1', nombre: 'DJ', color: '#5bc77a', permisos: [] }]);
+  });
+});

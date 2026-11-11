@@ -64,7 +64,7 @@
   .escenario { height: 100%; min-height: 0; }
   /* Absoluto: dentro del grid, height:100% no se resolvía y el video tomaba su alto natural (se recortaba arriba y abajo). */
   .escenario :global(video) { position: absolute; inset: 0; display: block; width: 100%; height: 100%; object-fit: contain; }
-  .arriba { position: absolute; top: 12px; left: 12px; display: flex; gap: 6px; }
+  .arriba { position: absolute; top: 12px; left: 12px; display: flex; gap: 6px; z-index: 1; }
   .cam-encima { position: absolute; aspect-ratio: 16 / 9; border-radius: var(--radio-menu); overflow: hidden; box-shadow: var(--sombra-2); background: #000; }
   .cam-encima :global(video) { object-fit: cover; }
   .esconder { position: absolute; top: 4px; right: 4px; min-height: 0; width: 20px; height: 20px; padding: 0; border-radius: 50%; background: rgb(8 9 13 / .7);

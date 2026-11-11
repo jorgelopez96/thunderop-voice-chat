@@ -62,10 +62,24 @@
       const dx = (ev.clientX - desde.x) / caja.width, dy = (ev.clientY - desde.y) / caja.height;
       moverCamEnPantalla(que === 'mover' ? { ...inicio, x: inicio.x + dx, y: inicio.y + dy } : { ...inicio, w: inicio.w + dx });
     };
-    const soltar = () => { window.removeEventListener('pointermove', mover); window.removeEventListener('pointerup', soltar); };
+    const soltar = () => { for (const [t, f] of [['pointermove', mover], ['pointerup', soltar], ['pointercancel', soltar]] as const) window.removeEventListener(t, f as EventListener); };
     window.addEventListener('pointermove', mover);
     window.addEventListener('pointerup', soltar);
+    window.addEventListener('pointercancel', soltar);
   }
+  // Con el teclado: flechas mueven la ventanita y + / − le cambian el tamaño.
+  function acomodarConTeclas(e: KeyboardEvent) {
+    const c = voz.camEnPantalla;
+    if (!c) return;
+    const paso = 0.02;
+    const d: Record<string, Partial<typeof c>> = { ArrowLeft: { x: c.x - paso }, ArrowRight: { x: c.x + paso }, ArrowUp: { y: c.y - paso }, ArrowDown: { y: c.y + paso },
+      '+': { w: c.w + paso }, '=': { w: c.w + paso }, '-': { w: c.w - paso } };
+    if (!d[e.key]) return;
+    e.preventDefault();
+    moverCamEnPantalla({ ...c, ...d[e.key] });
+  }
+  // Celular: mantener apretada una tarjeta abre su menú; el toque que termina ese gesto no agranda la cámara.
+  let mantuvo = 0;
   // Vista previa propia; se recalcula cuando cambian los participantes (llega o se va la pista).
   const propia = $derived((void voz.participantes, voz.transmitiendo && voz.vistaPrevia ? pistaPantallaPropia() : undefined));
 
@@ -148,11 +162,11 @@
     <ul class="franja" class:oculta={ocultarGente && enEscena > 0}>
       {#each voz.participantes as p, i (p.id)}
         {@const m = miembro(p.id)}
-        <li style:--i={Math.min(i, 5)} class:hablando={p.hablando} class:transmite={p.transmite} style="background:{fondo(m?.color, p.nombre)};--habla:{m?.color || 'var(--acento)'}" oncontextmenu={(e) => abrirMenu(e, p)} use:mantener={(x, y) => abrirMenu({ clientX: x, clientY: y, preventDefault() {} } as MouseEvent, p)}>
+        <li style:--i={Math.min(i, 5)} class:hablando={p.hablando} class:transmite={p.transmite} style="background:{fondo(m?.color, p.nombre)};--habla:{m?.color || 'var(--acento)'}" oncontextmenu={(e) => abrirMenu(e, p)} use:mantener={(x, y) => { mantuvo = Date.now(); abrirMenu({ clientX: x, clientY: y, preventDefault() {} } as MouseEvent, p); }}>
           {#if p.transmite}<span class="chips-vivo"><span class="vivo"><span class="punto-vivo"></span>EN VIVO</span>{@render espectadores(p.espectadores)}</span>{/if}
           {#if p.camara && pistaCamara(p.id)}<!-- Clic (o tocar) agranda la cámara a pantalla completa; de nuevo, vuelve. -->
             <button class="plano cam" aria-label={`Agrandar la cámara de ${m?.name || p.nombre}`}
-              onclick={(e) => (document.fullscreenElement ? document.exitFullscreen() : e.currentTarget.requestFullscreen()).catch(() => {})}>
+              onclick={(e) => { if (Date.now() - mantuvo < 800) return; (document.fullscreenElement ? document.exitFullscreen() : e.currentTarget.requestFullscreen()).catch(() => {}); }}>
               <Video pista={pistaCamara(p.id)!} clase="video-cam" etiqueta={`Cámara de ${m?.name || p.nombre}`} /></button>
           {:else}<img class="avatar" alt="" src={foto(m, '256x256')} />{/if}
           {#if p.transmite && !p.local && p.pantalla}{@const sid = p.pantalla}{@const viendo = voz.viendo.includes(sid)}
@@ -170,7 +184,7 @@
           {#if propia}<Video pista={propia} clase="previa" etiqueta="Vista previa de tu transmisión" />{/if}
           {#if voz.camEnPantalla && voz.camara && sesion.usuario}{@const c = voz.camEnPantalla}
             <div class="cam-mover" role="slider" tabindex="0" aria-label="Mover la cámara sobre tu pantalla" aria-valuenow={Math.round(c.x * 100)}
-              style:left="{c.x * 100}%" style:top="{c.y * 100}%" style:width="{c.w * 100}%" onpointerdown={(e) => acomodar(e, 'mover')}>
+              style:left="{c.x * 100}%" style:top="{c.y * 100}%" style:width="{c.w * 100}%" onpointerdown={(e) => acomodar(e, 'mover')} onkeydown={acomodarConTeclas}>
               {#if pistaCamara(sesion.usuario.id)}<Video pista={pistaCamara(sesion.usuario.id)!} clase="video-cam" etiqueta="Tu cámara" />{/if}
               <span class="tamano" aria-hidden="true" onpointerdown={(e) => acomodar(e, 'tamano')}></span>
             </div>

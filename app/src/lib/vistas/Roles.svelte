@@ -46,7 +46,9 @@
     abierto = rol.id;
   }
   function borrar(r: Rol) {
-    const asig = Object.fromEntries(Object.entries(asignaciones).map(([u, l]) => [u, l.filter((x) => x !== r.id)]));
+    // Solo de los que siguen en el grupo: con uno recién echado, el servidor rechazaba todo (y el rol no se borraba).
+    const miembros = (grupo.members ?? []) as string[];
+    const asig = Object.fromEntries(Object.entries(asignaciones).filter(([u]) => miembros.includes(u)).map(([u, l]) => [u, l.filter((x) => x !== r.id)]));
     guardar(roles.filter((x) => x.id !== r.id), asig);
   }
 </script>

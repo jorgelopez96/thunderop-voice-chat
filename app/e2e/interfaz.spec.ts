@@ -150,3 +150,33 @@ test('modo moderno: el modal se cierra con animación y después no traba los cl
   await p.getByRole('button', { name: 'Crear mi grupo' }).click({ timeout: 2000 });
   await expect(p.getByPlaceholder('Nombre del grupo nuevo')).toBeVisible();
 });
+
+test('el chat siempre vuelve al último mensaje: al cambiar de sala y volver, y aunque algo crezca después', async ({ browser }) => {
+  const p = await (await browser.newContext()).newPage();
+  await crearCuenta(p, 'Ana');
+  const nombre = `Charla${Math.random().toString(36).slice(2, 6)}`;
+  await crearGrupo(p, nombre);
+  const admin = new (await import('pocketbase')).default(`http://127.0.0.1:${process.env.E2E_PB_PORT ?? 8091}`);
+  await admin.collection('_superusers').authWithPassword('admin@test.local', 'admin-pass-1234');
+  const g = await admin.collection('groups').getFirstListItem(`name = "${nombre}"`);
+  const chatId = (await admin.collection('rooms').getFirstListItem(`group = "${g.id}" && kind = "chat"`)).id;
+  for (let i = 1; i <= 40; i++) await admin.collection('messages').create({ room: chatId, author: g.owner, text: `mensaje ${i}` });
+  const ultimo = p.getByTestId('mensaje').filter({ hasText: 'mensaje 40' }).last();
+  const lista = p.getByTestId('mensajes');
+
+  await p.getByRole('button', { name: 'Sala de chat General' }).click();
+  await expect(ultimo).toBeInViewport({ timeout: 10_000 });
+  // Subo a leer, me voy a la sala de voz y vuelvo: me deja abajo de todo.
+  await lista.evaluate((e) => (e.scrollTop = 0));
+  await p.getByRole('button', { name: 'Sala de voz General' }).click();
+  await p.getByRole('button', { name: 'Sala de chat General' }).click();
+  await expect(ultimo).toBeInViewport({ timeout: 10_000 });
+  // Algo que crece después (una vista previa que llega tarde) no me deja a mitad de camino.
+  await lista.evaluate((e) => { const d = document.createElement('div'); d.style.height = '600px'; e.lastElementChild?.append(d); });
+  await expect.poll(() => lista.evaluate((e) => e.scrollHeight - e.scrollTop - e.clientHeight)).toBeLessThan(48);
+  // Cambiar de pestaña del navegador y volver, también.
+  await lista.evaluate((e) => (e.scrollTop = 0));
+  await p.evaluate(() => { Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' }); document.dispatchEvent(new Event('visibilitychange'));
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'visible' }); document.dispatchEvent(new Event('visibilitychange')); });
+  await expect.poll(() => lista.evaluate((e) => e.scrollHeight - e.scrollTop - e.clientHeight)).toBeLessThan(48);
+});

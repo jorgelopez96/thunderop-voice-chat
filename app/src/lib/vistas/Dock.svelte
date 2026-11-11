@@ -186,7 +186,7 @@
 {/snippet}
 
 {#snippet botonCamara(tam: number)}
-  <button class="icono" class:encendida={voz.camara} onclick={alternarCamara} disabled={voz.conectando} aria-pressed={voz.camara}
+  <button class="icono" class:encendida={voz.camara} onclick={() => alternarCamara()} disabled={voz.conectando} aria-pressed={voz.camara}
     aria-label={voz.camara ? 'Apagar la cámara' : 'Prender la cámara'} title={voz.camara ? 'Apagar la cámara' : 'Prender la cámara'}>
     {#if voz.camara}<Video size={tam} strokeWidth={1.75} />{:else}<VideoOff size={tam} strokeWidth={1.75} />{/if}</button>
 {/snippet}
@@ -313,6 +313,7 @@
   .dock-movil .icono { width: 48px; min-height: 48px; border-radius: var(--radio-menu); }
   .dock-movil .apagado { color: var(--peligro); background: var(--peligro-suave); }
   .dock-movil .colgar { width: 56px; background: var(--peligro); color: #fff; }
+  @media (max-width: 360px) { .dock-movil .icono { width: 40px; } .dock-movil .colgar { width: 46px; } }
   .mas { min-width: 220px; }
   .mas:popover-open { inset: auto 8px calc(70px + env(safe-area-inset-bottom)) auto; }
   .dock { flex: none; height: 64px; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 16px; padding: 0 16px;

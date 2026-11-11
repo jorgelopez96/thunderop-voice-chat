@@ -12,6 +12,7 @@ function json(group, campo, vacio) {
 
 function permisosDe(group, userId) {
   if (group.getString("owner") === userId) return PERMISOS.slice();
+  if (!group.getStringSlice("members").includes(userId)) return [];
   const roles = json(group, "roles", []);
   const mios = ["todos"].concat(json(group, "asignaciones", {})[userId] || []);
   const set = {};
@@ -58,4 +59,7 @@ function validarAsignaciones(asig, members) {
   return "";
 }
 
-module.exports = { PERMISOS, ROL_TODOS, json, permisosDe, puede, exigir, validarRoles, validarAsignaciones };
+/** Cada rol solo con sus cuatro campos (lo demás que mande alguien no se guarda). Llamar después de validarRoles. */
+const limpiarRoles = (roles) => roles.map((r) => ({ id: r.id, nombre: r.id === "todos" ? "Todos" : r.nombre.trim(), color: r.color, permisos: r.permisos.slice() }));
+
+module.exports = { limpiarRoles, PERMISOS, ROL_TODOS, json, permisosDe, puede, exigir, validarRoles, validarAsignaciones };

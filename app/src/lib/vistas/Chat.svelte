@@ -75,6 +75,23 @@
     const id = chat.mensajes.at(-1)?.id ?? '';
     if (id !== ultimoId) { ultimoId = id; pegado = true; tick().then(bajar); }
   });
+  // Lo que crece después (vistas previas de links, imágenes, emojis) o el chat que vuelve a verse (estaba oculto y su
+  // alto era 0): si estabas abajo, seguís abajo. Volver a la pestaña (o a la app) siempre te lleva al último mensaje.
+  let contenido: HTMLElement | undefined = $state();
+  $effect(() => {
+    const l = lista, c = contenido;
+    if (!l || !c) return;
+    let alto = l.clientHeight;
+    const ro = new ResizeObserver(() => {
+      if (alto === 0 && l.clientHeight > 0) pegado = true; // volvió a verse
+      alto = l.clientHeight;
+      if (pegado) bajar();
+    });
+    ro.observe(l); ro.observe(c);
+    const alVolver = () => { if (document.visibilityState === 'visible') { pegado = true; bajar(); } };
+    document.addEventListener('visibilitychange', alVolver);
+    return () => { ro.disconnect(); document.removeEventListener('visibilitychange', alVolver); };
+  });
 
   // Si el mensaje llegó sin el autor expandido (falló el pedido del realtime), se lo busca entre los miembros.
   const autor = (m: RecordModel) => (m.expand?.author ?? miembros.find((x) => x.id === m.author)) as RecordModel | undefined;
@@ -252,7 +269,7 @@
 
 <section class="chat entra" class:movil={pantalla.movil} aria-label="Chat {titulo}">
   <h2 class="titulo">{#if volver}<button class="icono" aria-label="Volver" title="Volver" onclick={volver}><ChevronLeft size={22} strokeWidth={1.75} /></button>{/if}{#if menu}<button class="icono" aria-label="Abrir salas" title="Salas" onclick={menu}><Menu size={20} strokeWidth={1.75} /></button>{/if}{#if fotoChat}<img class="avatar foto-chat" src={fotoChat} alt="" />{/if}<span class="nombre-chat">{titulo}</span>{#if silencio}<MenuChat chat={silencio} {acciones} />{/if}{#if gente}<button class="icono" aria-label="Ver participantes" title="Participantes" onclick={gente}><Users size={19} strokeWidth={1.75} /></button>{/if}{#if cerrar}<button class="icono cerrar-chat" aria-label="Cerrar chat" title="Cerrar (Esc)" onclick={cerrar}><X size={18} strokeWidth={1.75} /></button>{/if}</h2>
-  <div class="lista" bind:this={lista} onscroll={alScroll} onloadcapture={() => pegado && bajar()} data-testid="mensajes">
+  <div class="lista" bind:this={lista} onscroll={alScroll} onloadcapture={() => pegado && bajar()} data-testid="mensajes"><div bind:this={contenido}>
     {#if chat.hayMas}<button class="plano" onclick={() => chat.cargarMas()}>Cargar anteriores</button>{/if}
     {#if chat.error}<p role="alert">{chat.error}</p>{/if}
     {#each chat.mensajes as m, i (m.id)}
@@ -302,7 +319,7 @@
         </div>
       </article>
     {/each}
-  </div>
+  </div></div>
   {#if error}<p role="alert" class="pie">{error}</p>{/if}
   {#if archivo}<div class="pie adjuntado">
     {#if archivo.type.startsWith('video/')}<video class="miniatura" src={previa} muted></video>

@@ -64,6 +64,7 @@ onRecordUpdateRequest((e) => {
     if (cambiados.includes("roles")) {
       const err = roles.validarRoles(roles.json(e.record, "roles", null));
       if (err) throw new BadRequestError(err);
+      e.record.set("roles", roles.limpiarRoles(roles.json(e.record, "roles", [])));
     }
     if (cambiados.includes("asignaciones")) {
       const err = roles.validarAsignaciones(roles.json(e.record, "asignaciones", null), despues);

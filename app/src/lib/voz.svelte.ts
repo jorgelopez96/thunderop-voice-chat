@@ -207,6 +207,8 @@ export async function entrarVoz(roomId: string, salaNombre = '', grupoId: string
   // Red de seguridad: tras una reconexión (o una suscripción que falló) algún micrófono podía quedar sin suscribir y dejaba
   // de escucharse a esa persona hasta que saliera y volviera. Se revisa al reconectar, al fallar y cada 10 s.
   r.on(RoomEvent.Reconnected, () => asegurarSuscripciones(r));
+  // Lo que se publicó como atributo (ensordecido, la cámara sobre la pantalla) se vuelve a mandar al reconectar.
+  r.on(RoomEvent.Reconnected, () => reenviarAtributos(r));
   r.on(RoomEvent.TrackSubscriptionFailed, () => setTimeout(() => asegurarSuscripciones(r), 2000));
   const revisar = setInterval(() => (room === r ? asegurarSuscripciones(r) : clearInterval(revisar)), 10_000);
   r.on(RoomEvent.TrackUnpublished, (pub) => { if (voz.viendo.includes(pub.trackSid)) aplicarVista(voz.viendo.filter((s) => s !== pub.trackSid)); });
@@ -267,6 +269,7 @@ export async function entrarVoz(roomId: string, salaNombre = '', grupoId: string
   }
   if (!vigente()) { r.disconnect(); return; } // por si el connect terminó pese al disconnect de limpiar()
   voz.conectando = false;
+  reenviarAtributos(r); // por si se ensordeció mientras conectaba
   voz.sinSonido = !r.canPlaybackAudio || c.state !== 'running';
   if (esCelular) empezarLlamada(salaNombre, voz.muteado, { colgar: salirVoz, alternarMic: () => void alternarMute(), ponerMic: (prendido) => { if (voz.muteado === prendido) void alternarMute(); } });
   avisarSala(roomId);
@@ -304,7 +307,9 @@ function volverALaLlamada() {
   const v = volverA;
   if (!v || document.visibilityState !== 'visible') return;
   volverA = null;
-  if (Date.now() < v.hasta && !voz.salaId) void entrarVoz(v.sala, v.nombre, v.grupo);
+  if (voz.salaId) return;
+  if (Date.now() < v.hasta) void entrarVoz(v.sala, v.nombre, v.grupo);
+  else voz.error = 'Se cortó la llamada mientras estabas en otra app.';
 }
 if (esCelular) {
   document.addEventListener('visibilitychange', () => { ultimaVezOculta = Date.now(); volverALaLlamada(); });
@@ -561,9 +566,9 @@ async function camEnTransmision(si: boolean) {
   if (si) {
     const mio = tx;
     if (!voz.camara) {
-      await alternarCamara();
+      await alternarCamara(true);
       // Mientras arrancaba la cámara se pudo cortar la transmisión (o salir): se apaga la que prendimos y listo.
-      if (mio !== tx || !voz.transmitiendo || room !== r) { if (voz.camara && room === r) await alternarCamara(); return; }
+      if (mio !== tx || !voz.transmitiendo || room !== r) { if (voz.camara && room === r) await alternarCamara(true); return; }
       camPorTransmision = voz.camara;
     }
     if (!voz.camara) return; // sin cámara: la transmisión sigue sola (el aviso ya salió)
@@ -574,7 +579,7 @@ async function camEnTransmision(si: boolean) {
   if (!voz.camEnPantalla && !camPorTransmision) return;
   voz.camEnPantalla = null;
   await r.localParticipant.setAttributes({ camEnPantalla: '' }).catch(() => {});
-  if (camPorTransmision && voz.camara) await alternarCamara();
+  if (camPorTransmision && voz.camara) await alternarCamara(true);
   camPorTransmision = false;
 }
 
@@ -645,11 +650,19 @@ export function volumenPantalla(identidad: string, v: number) {
   room?.remoteParticipants.get(identidad)?.setVolume(esCelular ? Math.min(1, n) : n, lk.Track.Source.ScreenShareAudio);
 }
 
+function reenviarAtributos(r: Room) {
+  const a: Record<string, string> = {};
+  if (voz.ensordecido) a.ensordecido = '1';
+  if (voz.camEnPantalla) a.camEnPantalla = escribirCam(voz.camEnPantalla);
+  if (Object.keys(a).length) r.localParticipant.setAttributes(a).catch(() => {});
+}
+
 /** Prende o apaga la cámara. La mejor calidad que dé (tope 1080p60), con simulcast: a quien la ve chica le llega una
  *  versión liviana, y una tarjeta fuera de la vista no baja video (adaptiveStream). */
-export async function alternarCamara() {
+export async function alternarCamara(desdeTransmision = false) {
   const r = room;
   if (!r || voz.conectando) return;
+  if (!desdeTransmision) camPorTransmision = false; // la tocó a mano: al cortar la transmisión queda como la dejó
   const si = !voz.camara;
   try {
     await r.localParticipant.setCameraEnabled(si, si ? { deviceId: leerPrefs().camara ?? 'default', resolution: { width: 1920, height: 1080, frameRate: 60 } } : undefined,

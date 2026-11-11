@@ -155,3 +155,26 @@ test('cámara ocupada por otro programa: lo dice claro', async ({ browser }) => 
   await a.getByRole('button', { name: 'Prender la cámara' }).click();
   await expect(a.getByRole('alert').filter({ hasText: 'La cámara la está usando otro programa.' })).toBeVisible({ timeout: 10_000 });
 });
+
+test('la ventanita también se acomoda con el teclado', async ({ browser }) => {
+  const { a, b } = await streamer(browser);
+  await expect(encima(b).locator('video')).toBeVisible({ timeout: 15_000 });
+  await a.locator('.propia .cam-mover').focus();
+  for (let i = 0; i < 5; i++) await a.keyboard.press('ArrowLeft');
+  await a.keyboard.press('+');
+  await expect.poll(async () => parseFloat(await encima(b).evaluate((e) => e.style.left)), { timeout: 10_000 }).toBeLessThan(70);
+  await expect.poll(async () => parseFloat(await encima(b).evaluate((e) => e.style.width)), { timeout: 10_000 }).toBeGreaterThan(25);
+});
+
+test('si apagás y prendés la cámara a mano durante la transmisión, al cortar queda prendida', async ({ browser }) => {
+  const { a } = await streamer(browser);
+  await expect(a.getByRole('button', { name: 'Apagar la cámara' })).toBeVisible({ timeout: 15_000 });
+  await a.getByRole('button', { name: 'Apagar la cámara' }).click();
+  await a.getByRole('button', { name: 'Prender la cámara' }).click();
+  await expect(a.getByRole('button', { name: 'Apagar la cámara' })).toBeVisible({ timeout: 10_000 });
+  await a.getByRole('button', { name: 'Dejar de transmitir' }).click();
+  await a.getByRole('button', { name: 'Dejar de transmitir' }).last().click();
+  await expect(a.getByRole('button', { name: 'Transmitir', exact: true })).toBeVisible({ timeout: 10_000 });
+  await a.waitForTimeout(1000);
+  await expect(a.getByRole('button', { name: 'Apagar la cámara' })).toBeVisible();
+});

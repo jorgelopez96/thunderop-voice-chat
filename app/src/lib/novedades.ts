@@ -4,7 +4,12 @@ export type Novedad = { version: string; fecha: string; cambios: { tipo: 'nuevo'
 
 export const NOVEDADES: Novedad[] = [
   {
-    version: '0.9.1', fecha: '2026-11-11', cambios: [
+    version: '0.9.2', fecha: '2026-11-11', cambios: [
+      { tipo: 'arreglo', texto: 'Los chats siempre te dejan en el último mensaje: al cambiar de sala o de pestaña y volver, y aunque una foto o la vista previa de un link termine de cargar después.' },
+      { tipo: 'arreglo', texto: 'Cámara: la ventanita sobre tu pantalla también se acomoda con las flechas (y + / − para el tamaño), ya no tapa el EN VIVO, y si la apagás y prendés a mano mientras transmitís, al cortar queda como la dejaste.' },
+      { tipo: 'arreglo', texto: 'Si te reconectás, los demás te siguen viendo ensordecido; y si volvés a la app después de mucho, te avisa que la llamada se cortó.' },
+      { tipo: 'arreglo', texto: 'Celular: los botones de la llamada entran en pantallas chicas, y mantener apretada una tarjeta con cámara ya no la agranda.' },
+      { tipo: 'arreglo', texto: 'Roles: borrar un rol ya no falla si alguien que lo tenía se fue del grupo.' },
       { tipo: 'arreglo', texto: 'Si seleccionás texto en una ventana (por ejemplo, el nombre del grupo) y soltás el mouse afuera, ya no se cierra.' },
       { tipo: 'arreglo', texto: 'Entrar y salir de pantalla completa ya no parpadea: la ventana cambia de tamaño tapada con un fundido y la transmisión se agranda suave.' },
       { tipo: 'nuevo', texto: 'Modo moderno: los menús y las ventanas también se cierran suave (antes desaparecían de golpe), y cambiar de grupo o de sala tiene un fundido corto.' },
