@@ -1,4 +1,5 @@
 <script lang="ts">
+  import EstadoVoz from './EstadoVoz.svelte';
   import { lleno } from '../rango';
   import Insignia from './Insignia.svelte';
   import type { RecordModel } from 'pocketbase';
@@ -13,7 +14,7 @@
   import { abrirChat, enviar, borrar } from '../chat.svelte';
   import AhoraSuena from './AhoraSuena.svelte';
   import Chat from './Chat.svelte';
-  import { voz, volumen, silenciar, desconectar, moverA, bloquearVoz, ver, pistaPantallaPropia, vistaPrevia } from '../voz.svelte';
+  import { voz, volumen, silenciar, desconectar, moverA, bloquearVoz, ver, pistaPantallaPropia, pistaCamara, vistaPrevia, moverCamEnPantalla } from '../voz.svelte';
   import Pantalla from './Pantalla.svelte';
   import EscenarioYoutube from './EscenarioYoutube.svelte';
   import { youtube } from '../youtube/youtube.svelte';
@@ -50,6 +51,21 @@
   }
 
 
+  // "Pantalla + cámara": en la vista previa, la ventanita de la cámara se arrastra (mover) o desde la esquina (tamaño).
+  let previaEl = $state<HTMLElement>();
+  function acomodar(e: PointerEvent, que: 'mover' | 'tamano') {
+    const c = voz.camEnPantalla, caja = previaEl?.getBoundingClientRect();
+    if (!c || !caja) return;
+    e.preventDefault(); e.stopPropagation();
+    const desde = { x: e.clientX, y: e.clientY }, inicio = { ...c };
+    const mover = (ev: PointerEvent) => {
+      const dx = (ev.clientX - desde.x) / caja.width, dy = (ev.clientY - desde.y) / caja.height;
+      moverCamEnPantalla(que === 'mover' ? { ...inicio, x: inicio.x + dx, y: inicio.y + dy } : { ...inicio, w: inicio.w + dx });
+    };
+    const soltar = () => { window.removeEventListener('pointermove', mover); window.removeEventListener('pointerup', soltar); };
+    window.addEventListener('pointermove', mover);
+    window.addEventListener('pointerup', soltar);
+  }
   // Vista previa propia; se recalcula cuando cambian los participantes (llega o se va la pista).
   const propia = $derived((void voz.participantes, voz.transmitiendo && voz.vistaPrevia ? pistaPantallaPropia() : undefined));
 
@@ -134,11 +150,15 @@
         {@const m = miembro(p.id)}
         <li style:--i={Math.min(i, 5)} class:hablando={p.hablando} class:transmite={p.transmite} style="background:{fondo(m?.color, p.nombre)};--habla:{m?.color || 'var(--acento)'}" oncontextmenu={(e) => abrirMenu(e, p)} use:mantener={(x, y) => abrirMenu({ clientX: x, clientY: y, preventDefault() {} } as MouseEvent, p)}>
           {#if p.transmite}<span class="chips-vivo"><span class="vivo"><span class="punto-vivo"></span>EN VIVO</span>{@render espectadores(p.espectadores)}</span>{/if}
-          <img class="avatar" alt="" src={foto(m, '256x256')} />
+          {#if p.camara && pistaCamara(p.id)}<!-- Clic (o tocar) agranda la cámara a pantalla completa; de nuevo, vuelve. -->
+            <button class="plano cam" aria-label={`Agrandar la cámara de ${m?.name || p.nombre}`}
+              onclick={(e) => (document.fullscreenElement ? document.exitFullscreen() : e.currentTarget.requestFullscreen()).catch(() => {})}>
+              <Video pista={pistaCamara(p.id)!} clase="video-cam" etiqueta={`Cámara de ${m?.name || p.nombre}`} /></button>
+          {:else}<img class="avatar" alt="" src={foto(m, '256x256')} />{/if}
           {#if p.transmite && !p.local && p.pantalla}{@const sid = p.pantalla}{@const viendo = voz.viendo.includes(sid)}
             <button class="primario ver" aria-pressed={viendo} onclick={() => ver(sid, !viendo)}>{viendo ? 'Dejar de ver' : 'Ver'}</button>{/if}
           <span class="etiqueta-nombre">
-            {#if p.silenciado}<span class="mic" title="Sin micrófono" aria-label="Silenciado"><MicOff size={16} strokeWidth={1.75} /></span>{/if}
+            <span class="mic"><EstadoVoz silenciado={p.silenciado} ensordecido={p.ensordecido} tam={16} /></span>
             <span class="nombre">{m?.name || p.nombre}{p.local ? ' (vos)' : ''}</span><Insignia usuario={m} />
           </span>
         </li>
@@ -146,7 +166,16 @@
     </ul>
     {#if voz.transmitiendo}<div class="propia">
       {#if voz.vistaPrevia}
-        {#if propia}<Video pista={propia} clase="previa" etiqueta="Vista previa de tu transmisión" />{/if}
+        <div class="previa-caja" bind:this={previaEl}>
+          {#if propia}<Video pista={propia} clase="previa" etiqueta="Vista previa de tu transmisión" />{/if}
+          {#if voz.camEnPantalla && voz.camara && sesion.usuario}{@const c = voz.camEnPantalla}
+            <div class="cam-mover" role="slider" tabindex="0" aria-label="Mover la cámara sobre tu pantalla" aria-valuenow={Math.round(c.x * 100)}
+              style:left="{c.x * 100}%" style:top="{c.y * 100}%" style:width="{c.w * 100}%" onpointerdown={(e) => acomodar(e, 'mover')}>
+              {#if pistaCamara(sesion.usuario.id)}<Video pista={pistaCamara(sesion.usuario.id)!} clase="video-cam" etiqueta="Tu cámara" />{/if}
+              <span class="tamano" aria-hidden="true" onpointerdown={(e) => acomodar(e, 'tamano')}></span>
+            </div>
+          {/if}
+        </div>
         <button class="plano" onclick={() => vistaPrevia(false)}>Ocultar vista previa</button>
       {:else}<button class="plano" onclick={() => vistaPrevia(true)}>Mostrar vista previa</button>{/if}
     </div>{/if}
@@ -199,6 +228,15 @@
 </div>
 
 <style>
+  .previa-caja { position: relative; display: inline-block; max-width: 100%; }
+  .cam-mover { position: absolute; aspect-ratio: 16 / 9; border-radius: 6px; overflow: hidden; outline: 2px solid var(--acento); cursor: grab; touch-action: none; background: #000; }
+  .cam-mover :global(.video-cam) { width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
+  .tamano { position: absolute; right: 0; bottom: 0; width: 14px; height: 14px; background: var(--acento); cursor: nwse-resize; border-top-left-radius: 4px; }
+  .cam { position: absolute; inset: 0; padding: 0; border-radius: inherit; overflow: hidden; background: #000; }
+  /* Con la cámara de fondo, el nombre, el EN VIVO y "Ver" van encima (son ítems de la grilla: z-index anda sin position). */
+  .franja li > .etiqueta-nombre, .franja li > .chips-vivo, .franja li > .ver { z-index: 1; }
+  .cam :global(.video-cam) { width: 100%; height: 100%; object-fit: cover; }
+  .cam:fullscreen :global(.video-cam) { object-fit: contain; }
   .titulo-menu { color: var(--tenue); font-size: 12px; padding: 2px 8px; }
   .menu .casilla { display: flex; align-items: center; gap: 6px; padding: 4px 8px; font-size: 13px; }
   .menu .punto { width: 8px; height: 8px; border-radius: 50%; flex: none; }

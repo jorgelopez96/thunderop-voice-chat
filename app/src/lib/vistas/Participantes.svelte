@@ -1,4 +1,5 @@
 <script lang="ts">
+  import EstadoVoz from './EstadoVoz.svelte';
   import { puedo } from '../permisos';
   import { mantener } from '../mantener';
   import { lleno } from '../rango';
@@ -32,12 +33,12 @@
   let menu = $state<HTMLElement>();
   let elegido = $state<RecordModel | null>(null);
 
-  /** Micrófono apagado de quien está en voz en este grupo: mi sala por LiveKit, las otras por la presencia del servidor. */
-  function micApagado(id: string): boolean {
+  /** Cómo está en la voz quien está en este grupo: mi sala por LiveKit, las otras por la presencia del servidor. */
+  function estadoVoz(id: string): { silenciado: boolean; ensordecido: boolean; camara: boolean } {
     const mia = voz.grupoId === grupo.id ? voz.participantes.find((p) => p.id === id) : undefined;
-    if (mia) return mia.silenciado;
-    if (enVoz.grupo !== grupo.id) return false;
-    return Object.values(enVoz.salas).some((s) => s.some((p) => p.id === id && p.silenciado));
+    if (mia) return { silenciado: mia.silenciado, ensordecido: mia.ensordecido, camara: !!mia.camara };
+    const p = enVoz.grupo === grupo.id ? Object.values(enVoz.salas).flat().find((x) => x.id === id) : undefined;
+    return { silenciado: !!p?.silenciado, ensordecido: !!p?.ensordecido, camara: !!p?.camara };
   }
   /** Agregar amigo: no a uno mismo, ni a un amigo, ni con una solicitud en cualquier sentido. */
   const puedoAgregar = (id: string) => id !== sesion.usuario?.id
@@ -74,8 +75,7 @@
           {#if m.status}<small>{m.status}</small>{/if}
         </div>
         <span class="estados">
-          {#if micApagado(m.id)}<span aria-label="Micrófono apagado" title="Micrófono apagado"><MicOff size={16} strokeWidth={1.75} /></span>{/if}
-          {#if p?.local && voz.ensordecido}<span aria-label="Sonido apagado" title="Sonido apagado"><HeadphoneOff size={16} strokeWidth={1.75} /></span>{/if}
+          <EstadoVoz {...estadoVoz(m.id)} tam={16} />
           {#if p?.transmite}<span class="vivo" aria-label="Compartiendo pantalla" title="Compartiendo pantalla"><Monitor size={16} strokeWidth={1.75} /></span>{/if}
         </span>
       </li>

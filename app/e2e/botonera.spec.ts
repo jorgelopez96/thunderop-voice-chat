@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import PocketBase from 'pocketbase';
 import { grupoDeTres } from './cuentas';
 
 /** WAV mono de 8 kHz con un tono de `segundos` (11 s pesan ~176 KB). */
@@ -52,4 +53,30 @@ test('un sonido de la botonera lo escuchan los de la sala', async ({ browser }) 
   await expect(a.getByRole('slider', { name: 'Inicio del recorte' })).toHaveAttribute('aria-valuenow', '0.1');
   await a.getByRole('button', { name: 'Subir' }).click();
   await expect(a.getByRole('button', { name: 'Larguísimo', exact: true })).toBeVisible({ timeout: 5000 });
+});
+
+test('sonidos de otros grupos: Ana toca uno de su otro grupo y Beto, que no es de ese grupo, lo escucha', async ({ browser }) => {
+  const nombre = `Otros${Math.random().toString(36).slice(2, 6)}`;
+  const [a, b] = await grupoDeTres(browser, nombre);
+  // El otro grupo de Ana, con un sonido (armado por el superuser: solo importa que exista).
+  const admin = new PocketBase(`http://127.0.0.1:${process.env.E2E_PB_PORT ?? 8091}`);
+  await admin.collection('_superusers').authWithPassword('admin@test.local', 'admin-pass-1234');
+  const g1 = await admin.collection('groups').getFirstListItem(`name = "${nombre}"`);
+  const g2 = await admin.collection('groups').create({ name: `${nombre}B`, owner: g1.owner, members: [g1.owner] });
+  const d = new FormData();
+  d.append('group', g2.id); d.append('owner', g1.owner); d.append('name', 'Trompeta');
+  d.append('file', new Blob([wav(1)], { type: 'audio/wav' }), 'trompeta.wav');
+  await admin.collection('sonidos').create(d);
+
+  for (const p of [a, b]) await entrar(p);
+  for (const p of [a, b]) await expect(p.locator('section.voz .franja li')).toHaveCount(2, { timeout: 10_000 });
+  await a.getByRole('button', { name: 'Sonidos', exact: true }).click();
+  await a.getByRole('tab', { name: `${nombre}B` }).click();
+  await expect(a.getByRole('button', { name: 'Nuevo sonido' })).toHaveCount(0); // en los ajenos solo se toca
+  const antes = await reproducidos(b);
+  await a.getByRole('button', { name: 'Trompeta', exact: true }).click();
+  await expect.poll(() => reproducidos(b), { timeout: 8000 }).toBe(antes + 1);
+  // Beto no tiene la pestaña: no es de ese grupo.
+  await b.getByRole('button', { name: 'Sonidos', exact: true }).click();
+  await expect(b.getByRole('tab', { name: `${nombre}B` })).toHaveCount(0);
 });

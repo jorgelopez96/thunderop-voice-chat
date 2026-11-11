@@ -9,16 +9,17 @@ import { mensajeTransmision } from './transmision';
 import { duenio, esPantallaNativa, iniciarNativo, detenerNativo, calidadNativo, cortarSimulado, SUFIJO_PANTALLA } from './transmisorNativo';
 import { esCelular } from './plataforma.svelte';
 import { empezarLlamada, micEnPantalla, terminarLlamada } from './segundoPlano';
+import { POR_DEFECTO, ajustar, escribirCam, leerCam, type Cam } from './camEnPantalla';
 
 /** `silenciado`: no está mandando audio (muteado, sin permiso del dueño o sin micrófono publicado). */
-/** `pantalla`: sid de la pantalla que comparte. `espectadores`: cuántos lo están mirando. */
-export type Participante = { id: string; nombre: string; hablando: boolean; silenciado: boolean; local: boolean; transmite: boolean; pantalla: string | undefined; espectadores: number };
+/** `pantalla`: sid de la pantalla que comparte. `espectadores`: cuántos lo están mirando. `camara`: sid de su cámara prendida. */
+export type Participante = { id: string; nombre: string; hablando: boolean; silenciado: boolean; ensordecido: boolean; camara: string | undefined; local: boolean; transmite: boolean; pantalla: string | undefined; espectadores: number };
 
 /** `sinPermiso`: el dueño nos silenció (los permisos de LiveKit no dejan publicar el micrófono). `viendo`: sids de las pantallas que miramos
  *  (en el orden en que se eligieron). */
 /** `sinSonido`: el navegador no deja reproducir hasta que se toque la pantalla (celular que volvió solo a la llamada). */
-export const voz = $state<{ salaId: string | null; salaNombre: string; grupoId: string | null; conectando: boolean; error: string; muteado: boolean; ensordecido: boolean; sinPermiso: boolean; supresion: boolean; participantes: Participante[]; senal: 'buena' | 'regular' | 'mala'; transmitiendo: boolean; viendo: string[]; vistaPrevia: boolean; calidadEnVivo: Calidad | null; sinSonido: boolean }>({
-  salaId: null, salaNombre: '', grupoId: null, conectando: false, error: '', muteado: false, ensordecido: false, sinPermiso: false, supresion: leerPrefs().supresion, participantes: [], senal: 'buena', transmitiendo: false, viendo: [], vistaPrevia: leerPrefs().vistaPrevia, calidadEnVivo: null, sinSonido: false,
+export const voz = $state<{ salaId: string | null; salaNombre: string; grupoId: string | null; conectando: boolean; error: string; muteado: boolean; ensordecido: boolean; sinPermiso: boolean; supresion: boolean; participantes: Participante[]; senal: 'buena' | 'regular' | 'mala'; transmitiendo: boolean; viendo: string[]; vistaPrevia: boolean; calidadEnVivo: Calidad | null; sinSonido: boolean; camara: boolean; camEnPantalla: Cam | null }>({
+  salaId: null, salaNombre: '', grupoId: null, conectando: false, error: '', muteado: false, ensordecido: false, sinPermiso: false, supresion: leerPrefs().supresion, participantes: [], senal: 'buena', transmitiendo: false, viendo: [], vistaPrevia: leerPrefs().vistaPrevia, calidadEnVivo: null, sinSonido: false, camara: false, camEnPantalla: null,
 });
 
 // LiveKit se carga recién al entrar a la voz: el arranque de la app no lo paga. Mientras haya `room`, `lk` está cargado.
@@ -64,7 +65,10 @@ function actualizar() {
   const mirando = [...r.remoteParticipants.values()].flatMap(mirandoDe);
   const p = (x: Participant, local: boolean): Participante => {
     const pantalla = pantallaDe(r, x);
+    const cam = x.getTrackPublication(lk.Track.Source.Camera);
     return { id: x.identity, nombre: x.name || x.identity, hablando: hablandoAhora(x), silenciado: !x.isMicrophoneEnabled, local,
+      // Ensordecido viaja como atributo (las apps viejas no lo mandan: se ven como antes).
+      ensordecido: local ? voz.ensordecido : x.attributes.ensordecido === '1', camara: cam && !cam.isMuted ? cam.trackSid : undefined,
       transmite: !!pantalla || (local && voz.transmitiendo), pantalla, espectadores: mirando.filter((m) => duenio(m) === x.identity).length };
   };
   // El transmisor nativo no es una persona: su pantalla se le muestra a su dueño.
@@ -127,7 +131,8 @@ function limpiar() {
   room = null; ctx = null; tx++;
   if (typeof document !== 'undefined') for (const el of document.querySelectorAll('audio[data-voz]')) el.remove();
   if (voz.ensordecido && !muteadoAntes) voz.muteado = false; // la sordera no deja el mic apagado para la próxima sala
-  Object.assign(voz, { salaId: null, salaNombre: '', grupoId: null, conectando: false, ensordecido: false, sinPermiso: false, participantes: [], senal: 'buena', transmitiendo: false, viendo: [], sinSonido: false });
+  Object.assign(voz, { salaId: null, salaNombre: '', grupoId: null, conectando: false, ensordecido: false, sinPermiso: false, participantes: [], senal: 'buena', transmitiendo: false, viendo: [], sinSonido: false, camara: false, camEnPantalla: null });
+  camPorTransmision = false;
   if (esCelular) terminarLlamada();
   void detenerAudioPantalla();
   if (nativo) { nativo = false; voz.calidadEnVivo = null; void detenerNativo(); }
@@ -197,7 +202,7 @@ export async function entrarVoz(roomId: string, salaNombre = '', grupoId: string
   r.on(RoomEvent.TrackUnsubscribed, (t: RemoteTrack) => { audios.get(t)?.remove(); audios.delete(t); });
   // Suscripción manual: micrófonos siempre; pantallas solo las que se miran (`ver`), y su audio aunque llegue después.
   r.on(RoomEvent.TrackPublished, (pub, part) => {
-    if (pub.source === Track.Source.Microphone || (pub.source === Track.Source.ScreenShareAudio && miroA(r, part))) pub.setSubscribed(true);
+    if (pub.source === Track.Source.Microphone || pub.source === Track.Source.Camera || (pub.source === Track.Source.ScreenShareAudio && miroA(r, part))) pub.setSubscribed(true);
   });
   // Red de seguridad: tras una reconexión (o una suscripción que falló) algún micrófono podía quedar sin suscribir y dejaba
   // de escucharse a esa persona hasta que saliera y volviera. Se revisa al reconectar, al fallar y cada 10 s.
@@ -265,7 +270,7 @@ export async function entrarVoz(roomId: string, salaNombre = '', grupoId: string
   voz.sinSonido = !r.canPlaybackAudio || c.state !== 'running';
   if (esCelular) empezarLlamada(salaNombre, voz.muteado, { colgar: salirVoz, alternarMic: () => void alternarMute(), ponerMic: (prendido) => { if (voz.muteado === prendido) void alternarMute(); } });
   avisarSala(roomId);
-  for (const p of r.remoteParticipants.values()) for (const pub of p.trackPublications.values()) if (pub.source === Track.Source.Microphone) pub.setSubscribed(true);
+  for (const p of r.remoteParticipants.values()) for (const pub of p.trackPublications.values()) if (pub.source === Track.Source.Microphone || pub.source === Track.Source.Camera) pub.setSubscribed(true);
   actualizar();
   await publicarMic();
   // La salida va después del micrófono: recién con el permiso concedido se ven los ids de los dispositivos.
@@ -309,7 +314,9 @@ if (esCelular) {
 
 export async function alternarMute() {
   voz.muteado = !voz.muteado;
-  if (!voz.muteado && voz.ensordecido) { voz.ensordecido = false; aplicarSordera(); } // prender el mic también devuelve el sonido
+  if (!voz.muteado && voz.ensordecido) { // prender el mic también devuelve el sonido
+    voz.ensordecido = false; aplicarSordera(); room?.localParticipant.setAttributes({ ensordecido: '' }).catch(() => {});
+  }
   if (!room) return;
   if (voz.muteado) await room.localParticipant.setMicrophoneEnabled(false).catch(() => {});
   else await publicarMic();
@@ -361,17 +368,18 @@ function aplicarSordera() {
 export async function ensordecer(si: boolean) {
   voz.ensordecido = si;
   aplicarSordera();
+  room?.localParticipant.setAttributes({ ensordecido: si ? '1' : '' }).catch(() => {});
   if (si) { muteadoAntes = voz.muteado; if (!voz.muteado) await alternarMute(); }
   else if (voz.muteado && !muteadoAntes) await alternarMute();
 }
 
-/** Suscribe lo que tiene que estar suscrito y no lo está: todos los micrófonos y las pantallas que se miran (con su sonido). */
+/** Suscribe lo que tiene que estar suscrito y no lo está: todos los micrófonos y cámaras y las pantallas que se miran (con su sonido). */
 function asegurarSuscripciones(r: Room) {
   if (r.state !== lk.ConnectionState.Connected) return;
   for (const p of r.remoteParticipants.values()) {
     const miro = miroA(r, p);
     for (const pub of p.trackPublications.values()) {
-      const quiero = pub.source === lk.Track.Source.Microphone || voz.viendo.includes(pub.trackSid) || (miro && pub.source === lk.Track.Source.ScreenShareAudio);
+      const quiero = pub.source === lk.Track.Source.Microphone || pub.source === lk.Track.Source.Camera || voz.viendo.includes(pub.trackSid) || (miro && pub.source === lk.Track.Source.ScreenShareAudio);
       if (quiero && !pub.isSubscribed) pub.setSubscribed(true);
     }
   }
@@ -415,12 +423,13 @@ let navegador = false; // transmitiendo con el compartir pantalla del navegador 
 
 /** `fuente`: un monitor o una ventana (ids de `fuentes_transmisor`); `id: 'pantalla'` es el monitor principal.
  *  `pid`: el programa de la ventana, para mandar solo su sonido. */
-export async function transmitir(calidad: Calidad, fuente: { tipo: 'monitor' | 'ventana'; id: string; pid: number }) {
+export async function transmitir(calidad: Calidad, fuente: { tipo: 'monitor' | 'ventana'; id: string; pid: number }, conCamara = false) {
   const r = room, c = ctx;
   if (!r || !c || voz.transmitiendo || arrancando) return;
   arrancando = true;
   try { await arrancarNativo(r, c, ++tx, calidad, fuente); }
   finally { arrancando = false; }
+  if (conCamara && voz.transmitiendo && room === r) await camEnTransmision(true);
 }
 
 async function arrancarNativo(r: Room, c: AudioContext, mio: number, calidad: Calidad, fuente: { tipo: 'monitor' | 'ventana'; id: string; pid: number }) {
@@ -437,6 +446,7 @@ async function arrancarNativo(r: Room, c: AudioContext, mio: number, calidad: Ca
     if (!vigente() || !nativo) return;
     tx++;
     nativo = false;
+    void camEnTransmision(false);
     voz.calidadEnVivo = null;
     voz.transmitiendo = false;
     void detenerAudioPantalla();
@@ -456,7 +466,7 @@ async function arrancarNativo(r: Room, c: AudioContext, mio: number, calidad: Ca
 
 /** Versión web: comparte con el selector del navegador (él elige pantalla, ventana o pestaña, y su audio si lo ofrece).
  *  Cancelar el selector no es un error: no queda nada a medias. */
-export async function transmitirNavegador(calidad: Calidad) {
+export async function transmitirNavegador(calidad: Calidad, conCamara = false) {
   const r = room;
   if (!r || voz.transmitiendo || arrancando) return;
   arrancando = true;
@@ -478,6 +488,7 @@ export async function transmitirNavegador(calidad: Calidad) {
     // "Dejar de compartir" del propio navegador
     pub.track?.mediaStreamTrack.addEventListener('ended', () => { if (navegador && room === r) void dejarDeTransmitir(); });
     actualizar();
+    if (conCamara) await camEnTransmision(true);
   } catch (e) {
     if (!(e instanceof DOMException && e.name === 'NotAllowedError')) voz.error = 'No se pudo compartir la pantalla.';
   } finally { arrancando = false; }
@@ -520,6 +531,9 @@ export async function dejarDeTransmitir() {
   const r = room;
   if (!r) return;
   tx++;
+  // La cámara va después y sin esperar: su atributo puede tardar hasta 5 s en confirmarse si la conexión anda mal,
+  // y la pantalla se tiene que cortar ya.
+  queueMicrotask(() => void camEnTransmision(false));
   if (navegador) {
     navegador = false;
     voz.calidadEnVivo = null;
@@ -536,6 +550,52 @@ export async function dejarDeTransmitir() {
   void detenerAudioPantalla();
   await despublicarAudio(r);
   actualizar();
+}
+
+// "Pantalla + cámara": la cámara viaja aparte y cada uno la dibuja sobre la pantalla donde dice el atributo
+// `camEnPantalla` de quien transmite (camEnPantalla.ts). Si la transmisión prendió la cámara, al cortar la apaga.
+let camPorTransmision = false;
+async function camEnTransmision(si: boolean) {
+  const r = room;
+  if (!r) return;
+  if (si) {
+    const mio = tx;
+    if (!voz.camara) {
+      await alternarCamara();
+      // Mientras arrancaba la cámara se pudo cortar la transmisión (o salir): se apaga la que prendimos y listo.
+      if (mio !== tx || !voz.transmitiendo || room !== r) { if (voz.camara && room === r) await alternarCamara(); return; }
+      camPorTransmision = voz.camara;
+    }
+    if (!voz.camara) return; // sin cámara: la transmisión sigue sola (el aviso ya salió)
+    voz.camEnPantalla = POR_DEFECTO;
+    await r.localParticipant.setAttributes({ camEnPantalla: escribirCam(POR_DEFECTO) }).catch(() => {});
+    return;
+  }
+  if (!voz.camEnPantalla && !camPorTransmision) return;
+  voz.camEnPantalla = null;
+  await r.localParticipant.setAttributes({ camEnPantalla: '' }).catch(() => {});
+  if (camPorTransmision && voz.camara) await alternarCamara();
+  camPorTransmision = false;
+}
+
+/** Quien transmite acomoda la ventanita de su cámara (se ve al toque en su previa; a los demás les llega cada 150 ms). */
+let relojCam: ReturnType<typeof setTimeout> | undefined;
+export function moverCamEnPantalla(c: Cam) {
+  if (!voz.camEnPantalla) return;
+  voz.camEnPantalla = ajustar(c);
+  if (relojCam) return;
+  relojCam = setTimeout(() => {
+    relojCam = undefined;
+    if (voz.camEnPantalla) room?.localParticipant.setAttributes({ camEnPantalla: escribirCam(voz.camEnPantalla) }).catch(() => {});
+  }, 150);
+}
+
+/** La cámara que va encima de la pantalla de `identidad` (dueño), si la transmite con "Pantalla + cámara". */
+export function camSobrePantalla(identidad: string): { cam: Cam; pista: Track } | undefined {
+  const x = room?.remoteParticipants.get(identidad);
+  const cam = leerCam(x?.attributes.camEnPantalla);
+  const pista = x?.getTrackPublication(lk.Track.Source.Camera)?.track;
+  return cam && pista ? { cam, pista } : undefined;
 }
 
 const pubPantalla = (sid: string) => {
@@ -568,8 +628,9 @@ export function pistaPantalla(sid: string): { pista: RemoteTrack | undefined; id
   return x && { pista: x.pub.track as RemoteTrack | undefined, identidad: duenio(x.p.identity) };
 }
 
-/** Pista de video de nuestra propia transmisión, para la vista previa. */
-export function pistaPantallaPropia(): RemoteTrack | undefined {
+/** Pista de video de nuestra propia transmisión, para la vista previa (en el navegador, la pantalla que se comparte). */
+export function pistaPantallaPropia(): Track | undefined {
+  if (room && navegador) return room.localParticipant.getTrackPublication(lk.Track.Source.ScreenShare)?.track;
   return room && nativo ? previaNativa(room)?.track as RemoteTrack | undefined : undefined;
 }
 
@@ -582,6 +643,39 @@ export function volumenPantalla(identidad: string, v: number) {
   const n = Math.min(2, Math.max(0, v));
   guardarVolumenPantalla(duenio(identidad), n);
   room?.remoteParticipants.get(identidad)?.setVolume(esCelular ? Math.min(1, n) : n, lk.Track.Source.ScreenShareAudio);
+}
+
+/** Prende o apaga la cámara. La mejor calidad que dé (tope 1080p60), con simulcast: a quien la ve chica le llega una
+ *  versión liviana, y una tarjeta fuera de la vista no baja video (adaptiveStream). */
+export async function alternarCamara() {
+  const r = room;
+  if (!r || voz.conectando) return;
+  const si = !voz.camara;
+  try {
+    await r.localParticipant.setCameraEnabled(si, si ? { deviceId: leerPrefs().camara ?? 'default', resolution: { width: 1920, height: 1080, frameRate: 60 } } : undefined,
+      si ? { simulcast: true } : undefined);
+    if (room === r) voz.camara = si;
+  } catch (e) {
+    const n = (e as Error)?.name;
+    voz.error = n === 'NotAllowedError' ? 'No hay permiso para usar la cámara. Habilitala en el navegador.'
+      : n === 'NotFoundError' || n === 'OverconstrainedError' ? 'No se encontró una cámara.'
+      : n === 'NotReadableError' ? 'La cámara la está usando otro programa. Cerralo y probá de nuevo.' : 'No se pudo usar la cámara.';
+    voz.camara = false;
+  }
+  actualizar();
+}
+
+/** Cambia la cámara (se guarda); si está prendida, sigue con la nueva. */
+export async function elegirCamara(deviceId: string) {
+  guardarPrefs({ camara: deviceId });
+  if (voz.camara) await room?.switchActiveDevice('videoinput', deviceId).catch(() => {});
+}
+
+/** La pista de cámara de alguien de la sala (o la propia), para hacerle `attach`. */
+export function pistaCamara(identidad: string): Track | undefined {
+  if (!room) return undefined;
+  const x = identidad === room.localParticipant.identity ? room.localParticipant : room.remoteParticipants.get(identidad);
+  return x?.getTrackPublication(lk.Track.Source.Camera)?.track;
 }
 
 /** Windows lista el mismo dispositivo hasta tres veces (Predeterminado, Comunicaciones y con su nombre): queda el
@@ -605,11 +699,12 @@ export function conNombres(lista: Dispositivo[]): Dispositivo[] {
     ({ deviceId, groupId, label: deviceId === 'default' ? (nombre ? `Predeterminado · ${nombre}` : 'Predeterminado') : limpio(label) }));
 }
 
-export async function dispositivos(): Promise<{ entradas: Dispositivo[]; salidas: Dispositivo[] }> {
+export async function dispositivos(): Promise<{ entradas: Dispositivo[]; salidas: Dispositivo[]; camaras: Dispositivo[] }> {
   try {
     const d = await navigator.mediaDevices.enumerateDevices();
-    return { entradas: conNombres(d.filter((x) => x.kind === 'audioinput')), salidas: conNombres(d.filter((x) => x.kind === 'audiooutput')) };
-  } catch { return { entradas: [], salidas: [] }; }
+    const camaras = d.filter((x) => x.kind === 'videoinput' && x.deviceId).map(({ deviceId, groupId, label }) => ({ deviceId, groupId, label }));
+    return { entradas: conNombres(d.filter((x) => x.kind === 'audioinput')), salidas: conNombres(d.filter((x) => x.kind === 'audiooutput')), camaras };
+  } catch { return { entradas: [], salidas: [], camaras: [] }; }
 }
 
 // Solo para los E2E (en el build de producción no existe): micrófono local y, por nombre de cada
@@ -636,7 +731,15 @@ if (import.meta.env.DEV) {
         (await pub.track?.getRTCStatsReport())?.forEach((s) => { if (s.type === 'inbound-rtp' && s.kind === 'video') frames += s.framesDecoded ?? 0; });
         pantallas[p.name || p.identity] = { frames };
       }
-      return { mic: room?.localParticipant.isMicrophoneEnabled ?? false, remotos, pantallas, transmitiendo: voz.transmitiendo };
+      const camaras: Record<string, { frames: number }> = {};
+      for (const p of room?.remoteParticipants.values() ?? []) {
+        const pub = p.getTrackPublication(lk.Track.Source.Camera);
+        if (!pub) continue;
+        let frames = 0;
+        (await pub.track?.getRTCStatsReport())?.forEach((s) => { if (s.type === 'inbound-rtp' && s.kind === 'video') frames += s.framesDecoded ?? 0; });
+        camaras[p.name || p.identity] = { frames };
+      }
+      return { mic: room?.localParticipant.isMicrophoneEnabled ?? false, remotos, pantallas, camaras, transmitiendo: voz.transmitiendo };
     },
   };
 }

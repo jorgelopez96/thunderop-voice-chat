@@ -39,7 +39,7 @@ routerAdd("GET", "/api/groups/{id}/voz", (e) => {
   salas.forEach((r) => {
     // LiveKit responde 200 { participants: [] } (o sin el campo) para una sala que no existe
     const participantes = lk.roomService(c, "ListParticipants", { room: r.id }, r.id).participants || [];
-    res[r.id] = participantes.filter((p) => !p.identity.endsWith(".pantalla")).map((p) => ({ id: p.identity, name: p.name, silenciado: lk.silenciado(p, silenciados) }));
+    res[r.id] = participantes.filter((p) => !p.identity.endsWith(".pantalla")).map((p) => lk.persona(p, silenciados));
   });
   return e.json(200, res);
 }, $apis.requireAuth("users"));

@@ -93,3 +93,14 @@ export function picos(muestras: Float32Array, n: number): number[] {
 
 /** "3,5 s" */
 export const formatoSegundos = (t: number) => `${t.toLocaleString('es-AR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} s`;
+
+/** Un sonido de otro grupo llega con la URL de su archivo: solo se baja si es el archivo de ESE sonido (`id`) en la
+ *  colección de sonidos de nuestro servidor. Así nadie puede hacer bajar un video adjunto ni cambiar el sonido de otro botón. */
+export function urlDeSonidoValida(url: unknown, base: string, id: string): boolean {
+  if (typeof url !== 'string') return false;
+  try {
+    const u = new URL(url), b = new URL(base);
+    const [, api, files, coleccion, registro, archivo, ...resto] = u.pathname.split('/');
+    return u.origin === b.origin && api === 'api' && files === 'files' && coleccion === 'sonidos' && registro === id && !!archivo && !resto.length;
+  } catch { return false; }
+}

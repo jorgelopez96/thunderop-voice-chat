@@ -7,14 +7,14 @@ export const CALIDADES: Record<Calidad, { alto: number; fps: number; mbps: numbe
   '1080p30': { alto: 1080, fps: 30, mbps: 12 },
   '1080p60': { alto: 1080, fps: 60, mbps: 20 },
 };
-export type PrefsVoz = { entrada?: string; salida?: string; supresion: boolean; volumenes: Record<string, number>; calidad: Calidad; vistaPrevia: boolean; volBotonera: number; volMusica: number; gananciaDb: number; sonidoMensajes: boolean; notificaciones: boolean;
+export type PrefsVoz = { entrada?: string; salida?: string; camara?: string; conCamara: boolean; supresion: boolean; volumenes: Record<string, number>; calidad: Calidad; vistaPrevia: boolean; volBotonera: number; volMusica: number; gananciaDb: number; sonidoMensajes: boolean; notificaciones: boolean;
   avisoMensajes: boolean; avisoMenciones: boolean; hora24: boolean };
 
 const CLAVE = 'dm.voz';
 // Versión del formato: lo guardado antes de la 2 tenía la supresión apagada por defecto; se reenciende una vez.
 // Antes de la 3, los volúmenes eran la ganancia directa; ahora la ganancia es el doble (ver voz.svelte.ts): se dividen a la mitad.
 const VERSION = 3;
-const DEFAULTS: PrefsVoz = { supresion: true, volumenes: {}, calidad: '1080p60', vistaPrevia: true, volBotonera: 0.8, volMusica: 50, gananciaDb: 0, sonidoMensajes: true, notificaciones: true, avisoMensajes: true, avisoMenciones: true, hora24: true };
+const DEFAULTS: PrefsVoz = { conCamara: false, supresion: true, volumenes: {}, calidad: '1080p60', vistaPrevia: true, volBotonera: 0.8, volMusica: 50, gananciaDb: 0, sonidoMensajes: true, notificaciones: true, avisoMensajes: true, avisoMenciones: true, hora24: true };
 
 export function leerPrefs(): PrefsVoz {
   try {
@@ -25,7 +25,7 @@ export function leerPrefs(): PrefsVoz {
       .map(([k, v]) => [k, viejos ? (v as number) / 2 : v])) as Record<string, number>;
     const calidad = (Object.keys(CALIDADES) as Calidad[]).find((c) => c === p.calidad) ?? DEFAULTS.calidad;
     const rango = (v: unknown, max: number, def: number) => (typeof v === 'number' && v >= 0 && v <= max ? v : def); // NaN falla la comparación
-    return { entrada: texto(p.entrada), salida: texto(p.salida), supresion: p.v >= 2 ? p.supresion === true : true, volumenes, calidad, vistaPrevia: p.vistaPrevia !== false,
+    return { entrada: texto(p.entrada), salida: texto(p.salida), camara: texto(p.camara), conCamara: p.conCamara === true, supresion: p.v >= 2 ? p.supresion === true : true, volumenes, calidad, vistaPrevia: p.vistaPrevia !== false,
       volBotonera: rango(p.volBotonera, 1, DEFAULTS.volBotonera), volMusica: rango(p.volMusica, 100, DEFAULTS.volMusica),
       sonidoMensajes: p.sonidoMensajes !== false, notificaciones: p.notificaciones !== false,
       avisoMensajes: p.avisoMensajes !== false, avisoMenciones: p.avisoMenciones !== false, hora24: p.hora24 !== false,

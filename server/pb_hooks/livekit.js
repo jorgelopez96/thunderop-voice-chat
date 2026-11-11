@@ -109,6 +109,13 @@ function silenciado(p, silenciados) {
   return !(p.tracks || []).some((t) => (t.source === "MICROPHONE" || t.source === 2) && !t.muted);
 }
 
+// Cómo se ve cada participante en la presencia de un grupo: silenciado (sin micrófono o silenciado por un moderador),
+// ensordecido (atributo que publica la app) y si tiene la cámara prendida. `source`: nombre protobuf o número.
+function persona(p, silenciados) {
+  const camara = (p.tracks || []).some((t) => (t.source === "CAMERA" || t.source === 1) && !t.muted);
+  return { id: p.identity, name: p.name, silenciado: silenciado(p, silenciados), ensordecido: (p.attributes || {}).ensordecido === "1", camara };
+}
+
 // Moderación sobre otro miembro del grupo de la ruta (`id`): exige el permiso (roles.js), que no sea uno mismo
 // ni el admin y que sea miembro. Devuelve { group, user }.
 function moderar(e, permiso, texto) {
@@ -123,4 +130,4 @@ function moderar(e, permiso, texto) {
   return { group, user };
 }
 
-module.exports = { config, token, roomService, enSalasDeVoz, grupoDeMiembro, salaDeVoz, silenciado, base64, moderar };
+module.exports = { config, token, roomService, enSalasDeVoz, grupoDeMiembro, salaDeVoz, silenciado, persona, base64, moderar };

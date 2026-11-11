@@ -1,4 +1,5 @@
 <script lang="ts">
+  import EstadoVoz from './EstadoVoz.svelte';
   import { Plus, Search, Volume2, Hash, UserPlus, Users } from '@lucide/svelte';
   import type { RecordModel } from 'pocketbase';
   import { pb } from '../pb';
@@ -16,7 +17,7 @@
   import { NOVEDADES } from '../novedades';
 
   // Inicio de la PC: grupos a la izquierda, vista previa del grupo marcado al centro y amigos a la derecha.
-  type Persona = { id: string; name: string };
+  type Persona = { id: string; name: string; silenciado?: boolean; ensordecido?: boolean; camara?: boolean };
   let enVozDe = $state<Record<string, Record<string, Persona[]>>>({});
   $effect(() => {
     const cargar = () => {
@@ -177,7 +178,7 @@
       <section class="sec">
         {#if s}
           {@const mia = voz.salaId === s[0]}
-          {@const quienes = mia ? voz.participantes.map((p) => ({ id: p.id, name: p.nombre, hablando: p.hablando, transmite: p.transmite })) : s[1].map((p) => ({ ...p, hablando: false, transmite: false }))}
+          {@const quienes = mia ? voz.participantes.map((p) => ({ id: p.id, name: p.nombre, hablando: p.hablando, transmite: p.transmite, silenciado: p.silenciado, ensordecido: p.ensordecido, camara: !!p.camara })) : s[1].map((p) => ({ ...p, hablando: false, transmite: false }))}
           <h3><span class="vivo"></span>En voz en {nombreSala(s[0])}
             <button class="primario" onclick={() => entrar(g, s[0])}><Volume2 size={16} strokeWidth={1.75} /> {mia ? 'Ir a la sala' : 'Entrar'}</button></h3>
           <div class="mosaico">
@@ -188,7 +189,7 @@
                   <span class="quien">{#if m}<Avatar usuario={m} tam={18} />{/if}{p.name} está transmitiendo</span></div>
               {:else}
                 <div class="baldosa" class:habla={p.hablando} style="--c:{m?.color || 'var(--acento)'}">
-                  {#if m}<Avatar usuario={m} tam={64} hablando={p.hablando} />{/if}<span class="quien">{p.name}</span></div>
+                  {#if m}<Avatar usuario={m} tam={64} hablando={p.hablando} />{/if}<span class="quien">{p.name}<EstadoVoz silenciado={p.silenciado} ensordecido={p.ensordecido} camara={!!p.camara} /></span></div>
               {/if}
             {/each}
             {#if !mia}<button class="baldosa libre" onclick={() => entrar(g, s[0])}><Plus size={18} strokeWidth={1.75} /> Tu lugar</button>{/if}

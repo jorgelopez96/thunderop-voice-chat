@@ -2,10 +2,10 @@ import type { RecordModel } from 'pocketbase';
 import { pb } from './pb';
 import { leerPrefs } from './prefs';
 import { contextoVoz, publicarDatos, alRecibirDatos, voz } from './voz.svelte';
-import { validarSonido, mensajeSubida, recortarMono, codificarWav, MAX_BYTES_ORIGINAL, TASA, type Seleccion } from './botoneraLogica';
+import { validarSonido, mensajeSubida, recortarMono, codificarWav, urlDeSonidoValida, MAX_BYTES, MAX_SEGUNDOS, MAX_BYTES_ORIGINAL, TASA, type Seleccion } from './botoneraLogica';
 
 const TOPIC = 'botonera';
-const buffers = new Map<string, { group: string; b: AudioBuffer }>(); // ponytail: sin tope de tamaño; 50 sonidos × ≤10 s por grupo es acotado
+const buffers = new Map<string, AudioBuffer>(); // ponytail: sin tope de tamaño; 50 sonidos × ≤10 s por grupo, por cada grupo que se use
 const codificar = (o: unknown) => new TextEncoder().encode(JSON.stringify(o));
 
 /** Quién tocó qué, para el cartelito de la llamada: los últimos 5, cada uno dura 2,5 s. */
@@ -21,7 +21,20 @@ function anotar(quien: string, sonido: string) {
 export function sonidos(grupoId: string) {
   const estado = $state<{ lista: RecordModel[] }>({ lista: [] });
   const cargar = async () => {
-    try { estado.lista = await pb.collection('sonidos').getFullList({ filter: pb.filter('group = {:g}', { g: grupoId }), sort: '@rowid' }); }
+    try { estado.lista = await pb.collection('sonidos').getFullList({ filter: pb.filter('group = {:g}', { g: grupoId }), sort: '@rowid', requestKey: `sonidos-${grupoId}` }); }
+    catch { /* se conserva la lista anterior */ }
+  };
+  cargar();
+  const sub = pb.collection('sonidos').subscribe('*', cargar);
+  return { estado, parar: () => { sub.then((f) => f()).catch(() => {}); } };
+}
+
+/** Los sonidos de mis otros grupos (la regla de la colección ya deja ver solo los de grupos donde estoy). Cada lista pide
+ *  con su clave: con la misma, PocketBase cancelaba la otra (se pedían juntas) y la botonera quedaba vacía. */
+export function sonidosDeOtros(grupoId: string) {
+  const estado = $state<{ lista: RecordModel[] }>({ lista: [] });
+  const cargar = async () => {
+    try { estado.lista = await pb.collection('sonidos').getFullList({ filter: pb.filter('group != {:g}', { g: grupoId }), sort: '@rowid', requestKey: `sonidos-otros-${grupoId}` }); }
     catch { /* se conserva la lista anterior */ }
   };
   cargar();
@@ -71,26 +84,36 @@ export async function borrar(id: string) {
   buffers.delete(id);
 }
 
-/** Decodifica un sonido del grupo de voz actual; uno de otro grupo (id mandado por un par de otra sala) no se decodifica ni se cachea. */
-async function buffer(id: string, c: AudioContext) {
-  let e = buffers.get(id);
-  if (!e) {
-    const rec = await pb.collection('sonidos').getOne(id);
-    if (rec.group !== voz.grupoId) throw new Error('otro grupo');
-    e = { group: rec.group, b: await c.decodeAudioData(await (await fetch(pb.files.getURL(rec, rec.file))).arrayBuffer()) };
-    buffers.set(id, e);
+/** Decodifica un sonido. Uno de otro grupo (que no podemos leer si no somos miembros) llega con la URL de su archivo:
+ *  se usa solo si es de nuestro servidor (urlDeSonidoValida). Sin URL (apps viejas), se busca por id. */
+async function buffer(id: string, c: AudioContext, url?: unknown) {
+  let b = buffers.get(id);
+  if (!b) {
+    const base = new URL(pb.baseURL || '/', location.href).href;
+    let src: string;
+    if (urlDeSonidoValida(url, base, id)) src = url as string;
+    else { const rec = await pb.collection('sonidos').getOne(id); src = urlDeSonido(rec); }
+    const datos = await (await fetch(src)).arrayBuffer();
+    if (datos.byteLength > MAX_BYTES) throw new Error('muy grande'); // un sonido pesa hasta 1 MB
+    b = await c.decodeAudioData(datos);
+    if (b.duration > MAX_SEGUNDOS + 0.5) throw new Error('muy largo');
+    // Tope del caché: se va el más viejo (un Map recuerda el orden en que se agregó).
+    if (buffers.size >= 200) buffers.delete(buffers.keys().next().value!);
+    buffers.set(id, b);
   }
-  if (e.group !== voz.grupoId) throw new Error('otro grupo');
-  return e.b;
+  return b;
 }
+
+/** La URL del archivo con el nombre de la colección (no su id): es la que se valida del otro lado. */
+const urlDeSonido = (rec: RecordModel) => `${new URL(pb.baseURL || '/', location.href).href.replace(/\/$/, '')}/api/files/sonidos/${rec.id}/${encodeURIComponent(rec.file)}`;
 
 /** Reproduce localmente por el contexto de la voz, sin tope: se pueden pisar y mezclar todos los que quieran.
  *  Sin voz no hay contexto: no suena. */
-async function reproducir(id: string, base: number) {
+async function reproducir(id: string, base: number, url?: unknown) {
   const c = contextoVoz();
   if (!c || voz.ensordecido) return; // ensordecido no escucha nada, tampoco la botonera
   try {
-    const b = await buffer(id, c);
+    const b = await buffer(id, c, url);
     if (c.state === 'closed') return;
     const fuente = c.createBufferSource(), vol = c.createGain();
     fuente.buffer = b; vol.gain.value = leerPrefs().volBotonera * base;
@@ -106,19 +129,21 @@ async function reproducir(id: string, base: number) {
 export async function tocar(rec: RecordModel) {
   if (!voz.salaId) return;
   const vol = volumenDe(rec);
-  void reproducir(rec.id, vol);
+  // La URL viaja para los que no son del grupo del sonido (sonidos de otros grupos); las apps viejas la ignoran.
+  const url = urlDeSonido(rec);
+  void reproducir(rec.id, vol, url);
   anotar('Vos', rec.name);
-  await publicarDatos(codificar({ id: rec.id, vol, nombre: rec.name }), TOPIC);
+  await publicarDatos(codificar({ id: rec.id, vol, nombre: rec.name, url }), TOPIC);
 }
 
 alRecibirDatos((payload, topic, de) => {
   if (topic !== TOPIC) return;
   try {
-    const { id, vol, nombre } = JSON.parse(new TextDecoder().decode(payload));
+    const { id, vol, nombre, url } = JSON.parse(new TextDecoder().decode(payload));
     // Las versiones viejas no mandan el nombre del sonido.
     if (typeof id === 'string') anotar(de ?? 'Alguien', typeof nombre === 'string' ? nombre.slice(0, 60) : 'un sonido');
     // Mismo rango que la colección: un par no puede mandar un sonido a todo volumen.
-    if (typeof id === 'string') void reproducir(id, typeof vol === 'number' ? Math.min(2, Math.max(0.05, vol)) : 1);
+    if (typeof id === 'string') void reproducir(id, typeof vol === 'number' ? Math.min(2, Math.max(0.05, vol)) : 1, url);
   } catch { /* dato ajeno o roto */ }
 });
 

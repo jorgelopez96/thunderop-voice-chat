@@ -1,7 +1,7 @@
 <script lang="ts">
   import { lleno } from '../rango';
   import { Volume2, VolumeX, Maximize, X, Eye } from '@lucide/svelte';
-  import { voz, ver, pistaPantalla, volumenPantalla } from '../voz.svelte';
+  import { voz, ver, pistaPantalla, volumenPantalla, camSobrePantalla } from '../voz.svelte';
   import Video from './Video.svelte';
   import { volumenPantallaDe } from '../prefs';
   import { duenio } from '../transmisorNativo';
@@ -17,6 +17,9 @@
   let pct = $state(100);
   $effect(() => { if (info) pct = Math.round(volumenPantallaDe(duenio(info.identidad)) * 100); });
   let ultimo = 100;
+  // "Pantalla + cámara": la cámara de quien transmite, donde la acomodó él. Esconderla (✕) es solo para uno.
+  const encima = $derived((void voz.participantes, info ? camSobrePantalla(duenio(info.identidad)) : undefined));
+  let camEscondida = $state(false);
   // Con varias a la vez, pantalla completa muestra todas juntas (cada una ocupa su parte); con una, solo esa.
   // Si deja de existir (dejó de transmitir, cerraste esta o colgaste) mientras está agrandada, se sale de la pantalla completa.
   $effect(() => () => { if (completa.sid === sid || (completa.sid === 'todas' && !voz.viendo.length)) void salirPantallaCompleta(); });
@@ -36,6 +39,12 @@
   {#if pista}<Video {pista} etiqueta={`Pantalla de ${p?.nombre ?? ''}`} />{/if}
   <span class="arriba"><span class="vivo"><span class="punto"></span>EN VIVO</span>
     <span class="espectadores num" title="Personas mirando"><Eye size={14} strokeWidth={1.75} />{p?.espectadores ?? 0}</span></span>
+  {#if encima && !camEscondida}
+    <div class="cam-encima" style:left="{encima.cam.x * 100}%" style:top="{encima.cam.y * 100}%" style:width="{encima.cam.w * 100}%">
+      <Video pista={encima.pista} etiqueta={`Cámara de ${p?.nombre ?? ''}`} />
+      <button class="icono esconder" onclick={() => (camEscondida = true)} aria-label="Esconder la cámara" title="Esconder la cámara"><X size={12} strokeWidth={2} /></button>
+    </div>
+  {/if}
   <span class="etiqueta">{p?.nombre ?? ''}</span>
   <button class="icono cerrar" onclick={() => ver(sid, false)} aria-label="Dejar de ver" title="Dejar de ver"><X size={16} strokeWidth={1.75} /></button>
   <div class="controles">
@@ -56,6 +65,11 @@
   /* Absoluto: dentro del grid, height:100% no se resolvía y el video tomaba su alto natural (se recortaba arriba y abajo). */
   .escenario :global(video) { position: absolute; inset: 0; display: block; width: 100%; height: 100%; object-fit: contain; }
   .arriba { position: absolute; top: 12px; left: 12px; display: flex; gap: 6px; }
+  .cam-encima { position: absolute; aspect-ratio: 16 / 9; border-radius: var(--radio-menu); overflow: hidden; box-shadow: var(--sombra-2); background: #000; }
+  .cam-encima :global(video) { object-fit: cover; }
+  .esconder { position: absolute; top: 4px; right: 4px; min-height: 0; width: 20px; height: 20px; padding: 0; border-radius: 50%; background: rgb(8 9 13 / .7);
+    opacity: 0; transition: opacity var(--dur-media); }
+  .cam-encima:hover .esconder, .esconder:focus-visible { opacity: 1; }
   .vivo, .espectadores { display: inline-flex; align-items: center; gap: 5px; height: 24px; padding: 0 8px; border-radius: var(--radio); font-size: 11.5px; font-weight: 750; }
   .vivo { color: #07210F; background: var(--ok); letter-spacing: .03em; }
   .punto { width: 6px; height: 6px; border-radius: 50%; background: #07210F; }

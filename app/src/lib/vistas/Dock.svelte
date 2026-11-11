@@ -1,10 +1,10 @@
 <script lang="ts">
   import { puedo } from '../permisos';
   import { alTocar, estabaAbierto } from '../menu';
-  import { Mic, MicOff, Headphones, HeadphoneOff, ChevronDown, Monitor, AudioWaveform, Music, TvMinimalPlay, PhoneOff, MessageSquare, Ellipsis, Check } from '@lucide/svelte';
-  import { voz, alternarMute, ensordecer, salirVoz, transmitir, transmitirNavegador, dejarDeTransmitir, cambiarCalidad, dispositivos, elegirEntrada, elegirSalida, type Dispositivo } from '../voz.svelte';
+  import { Mic, MicOff, Headphones, HeadphoneOff, ChevronDown, Monitor, Video, VideoOff, AudioWaveform, Music, TvMinimalPlay, PhoneOff, MessageSquare, Ellipsis, Check } from '@lucide/svelte';
+  import { voz, alternarMute, ensordecer, alternarCamara, salirVoz, transmitir, transmitirNavegador, dejarDeTransmitir, cambiarCalidad, dispositivos, elegirEntrada, elegirSalida, type Dispositivo } from '../voz.svelte';
   import { grupos } from '../grupos.svelte';
-  import { CALIDADES, leerPrefs, type Calidad } from '../prefs';
+  import { CALIDADES, leerPrefs, guardarPrefs, type Calidad } from '../prefs';
   import Botonera from './Botonera.svelte';
   import { tocados } from '../botonera.svelte';
   import Musica from './Musica.svelte';
@@ -103,8 +103,11 @@
   // El Dock se desmonta con el diálogo abierto (salir de la sala): no hay `close`.
   $effect(() => alCerrar);
   // Antes de empezar se vuelve a mirar: la ventana pudo cerrarse o ser otra.
+  // Modo de la transmisión: solo la pantalla o la pantalla con la cámara encima (se recuerda).
+  let conCamara = $state(leerPrefs().conCamara);
   async function empezar() {
-    if (!nativoUI) { d?.close(); void transmitirNavegador(calidad); return; }
+    guardarPrefs({ conCamara });
+    if (!nativoUI) { d?.close(); void transmitirNavegador(calidad, conCamara); return; }
     const f = elegida;
     if (!f || comprobando) return;
     comprobando = true; aviso = '';
@@ -114,7 +117,7 @@
       if (!r.length) { aviso = 'No se pudo comprobar. Probá de nuevo.'; return; }
       if (!elegirFuente(r, f)) { fuentesLista = r; elegida = null; perdida = true; return; }
       d.close();
-      transmitir(calidad, f);
+      transmitir(calidad, f, conCamara);
     } finally { comprobando = false; }
   }
   const nombreCalidad = (c: Calidad) => `${CALIDADES[c].alto}p · ${CALIDADES[c].fps} fps`;
@@ -173,12 +176,19 @@
     {:else}
     {#if puedeTransmitir()}<button class="icono cian" onclick={abrirTransmision} disabled={voz.conectando} aria-label="Transmitir" title="Transmitir pantalla"><Monitor size={20} strokeWidth={1.75} /></button>{/if}
     {/if}
+    {@render botonCamara(20)}
     <button class="icono magenta" aria-pressed={abiertoSonidos} popovertarget="dock-sonidos" onclick={ubicarPanel} aria-label="Sonidos" title="Sonidos"><AudioWaveform size={20} strokeWidth={1.75} /></button>
     <button class="icono violeta" aria-pressed={abiertoMusica} popovertarget="dock-musica" onclick={ubicarPanel} aria-label="Música" title="Música"><Music size={20} strokeWidth={1.75} /></button>
     <button class="icono rojo-yt" aria-pressed={abiertoYoutube} popovertarget="dock-youtube" onclick={ubicarPanel} aria-label="YouTube juntos" title="Ver un video de YouTube juntos"><TvMinimalPlay size={20} strokeWidth={1.75} /></button>
     <span class="separador"></span>
     <button class="icono colgar" onclick={salirVoz} aria-label="Desconectarse" title="Desconectarse"><PhoneOff size={20} strokeWidth={1.75} /></button>
   </div>
+{/snippet}
+
+{#snippet botonCamara(tam: number)}
+  <button class="icono" class:encendida={voz.camara} onclick={alternarCamara} disabled={voz.conectando} aria-pressed={voz.camara}
+    aria-label={voz.camara ? 'Apagar la cámara' : 'Prender la cámara'} title={voz.camara ? 'Apagar la cámara' : 'Prender la cámara'}>
+    {#if voz.camara}<Video size={tam} strokeWidth={1.75} />{:else}<VideoOff size={tam} strokeWidth={1.75} />{/if}</button>
 {/snippet}
 
 {#if pantalla.movil}
@@ -188,6 +198,7 @@
     {#if voz.muteado || voz.sinPermiso}<MicOff size={22} strokeWidth={1.75} />{:else}<Mic size={22} strokeWidth={1.75} />{/if}</button>
   <button class="icono" class:apagado={voz.ensordecido} onclick={() => ensordecer(!voz.ensordecido)} aria-label={voz.ensordecido ? 'Activar sonido' : 'Ensordecerme'}>
     {#if voz.ensordecido}<HeadphoneOff size={22} strokeWidth={1.75} />{:else}<Headphones size={22} strokeWidth={1.75} />{/if}</button>
+  {@render botonCamara(22)}
   <button class="icono violeta" popovertarget="dock-musica" onclick={ubicarPanel} aria-label="Música"><Music size={22} strokeWidth={1.75} /></button>
   <button class="icono" aria-label="Chat de la sala" onclick={() => { navMovil.chatSala = true; conAtras(() => (navMovil.chatSala = false)); }}><MessageSquare size={22} strokeWidth={1.75} /></button>
   <button class="icono" popovertarget="dock-mas" aria-label="Más opciones"><Ellipsis size={22} strokeWidth={1.75} /></button>
@@ -265,6 +276,12 @@
 
 <dialog bind:this={d} class="fuentes" onclose={alCerrar}>
   <h3>Transmitir pantalla</h3>
+  <div class="modos" role="radiogroup" aria-label="Qué transmitir">
+    <label class="modo" class:elegido={!conCamara}><input type="radio" name="modo" value="pantalla" checked={!conCamara} onchange={() => (conCamara = false)} />
+      <span class="mini"></span>Pantalla</label>
+    <label class="modo" class:elegido={conCamara}><input type="radio" name="modo" value="camara" checked={conCamara} onchange={() => (conCamara = true)} />
+      <span class="mini"><span class="cam"></span></span>Pantalla + cámara</label>
+  </div>
   {#if nativoUI}<div class="scroll" aria-live="polite">
     {#if fuentesLista === null}<small>Buscando pantallas y ventanas…</small>
     {:else if perdida}<small>Lo que elegiste ya no está disponible. Elegí otra opción.</small>{@render grilla('Pantallas', monitores)}{@render grilla('Ventanas', ventanas)}
@@ -284,6 +301,13 @@
 
 
 <style>
+  .modos { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
+  .modo { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px; border: 1px solid var(--borde-fuerte); border-radius: var(--radio-menu); font-size: 13px; cursor: pointer; }
+  .modo.elegido { border-color: var(--acento); background: var(--acento-suave); }
+  .modo input { position: absolute; opacity: 0; pointer-events: none; }
+  .modo:has(input:focus-visible) { outline: 2px solid var(--foco); }
+  .mini { position: relative; width: 96px; aspect-ratio: 16 / 9; border-radius: 5px; background: linear-gradient(135deg, #1b3a5c, #5c2a2a); }
+  .mini .cam { position: absolute; right: 4px; bottom: 4px; width: 30%; aspect-ratio: 16 / 9; border-radius: 3px; background: #c9a27a; border: 1px solid var(--acento); }
   .dock-movil { flex: none; display: flex; justify-content: space-around; align-items: center; height: calc(62px + env(safe-area-inset-bottom));
     padding: 0 8px env(safe-area-inset-bottom); background: var(--panel); border-top: 1px solid var(--borde); }
   .dock-movil .icono { width: 48px; min-height: 48px; border-radius: var(--radio-menu); }

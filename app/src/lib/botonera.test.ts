@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { validarSonido, mensajeSubida, separarEmoji, unirEmoji, seleccionInicial, moverManija, recortarMono, codificarWav, picos, formatoSegundos, MAX_BYTES, TASA } from './botoneraLogica';
+import { urlDeSonidoValida, validarSonido, mensajeSubida, separarEmoji, unirEmoji, seleccionInicial, moverManija, recortarMono, codificarWav, picos, formatoSegundos, MAX_BYTES, TASA } from './botoneraLogica';
 
 const ok = { duracion: 3, tamaño: 1000, tipo: 'audio/mpeg' };
 
@@ -96,3 +96,23 @@ it('picos de la forma de onda', () => {
 });
 
 it('formato de segundos', () => expect(formatoSegundos(3.25)).toMatch(/^3,[23] s$/));
+
+describe('urlDeSonidoValida (sonidos de otros grupos)', () => {
+  const base = 'https://thunderop.duckdns.org';
+  it('acepta solo el archivo de ese sonido, en la colección de sonidos', () => {
+    expect(urlDeSonidoValida(`${base}/api/files/sonidos/abc123/pum_x1.wav`, base, 'abc123')).toBe(true);
+    expect(urlDeSonidoValida(`${base}/api/files/sonidos/abc123/pum.mp3?token=`, `${base}/`, 'abc123')).toBe(true);
+  });
+  it('rechaza otro sonido (no se puede cambiar el de un botón ajeno) u otra colección (adjuntos, videos)', () => {
+    expect(urlDeSonidoValida(`${base}/api/files/sonidos/otro999/pum.wav`, base, 'abc123')).toBe(false);
+    expect(urlDeSonidoValida(`${base}/api/files/messages/abc123/video.mp4`, base, 'abc123')).toBe(false);
+    expect(urlDeSonidoValida(`${base}/api/files/sonidos/abc123`, base, 'abc123')).toBe(false);
+  });
+  it('rechaza otro sitio, otra ruta o cualquier cosa rara', () => {
+    expect(urlDeSonidoValida('https://otro.com/api/files/sonidos/abc123/c.wav', base, 'abc123')).toBe(false);
+    expect(urlDeSonidoValida(`${base}.evil.com/api/files/sonidos/abc123/c.wav`, base, 'abc123')).toBe(false);
+    expect(urlDeSonidoValida(`${base}/api/files/../collections/x`, base, 'x')).toBe(false);
+    expect(urlDeSonidoValida('javascript:alert(1)', base, 'abc123')).toBe(false);
+    expect(urlDeSonidoValida(42, base, 'abc123')).toBe(false);
+  });
+});

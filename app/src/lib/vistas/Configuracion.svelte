@@ -1,7 +1,7 @@
 <script lang="ts">
   import { lleno } from '../rango';
   import { User, Mic, Monitor, Bell, Palette, Trash2, Check, X } from '@lucide/svelte';
-  import { voz, vistaPrevia, dispositivos, elegirEntrada, elegirSalida, cambiarSupresion, cambiarGanancia } from '../voz.svelte';
+  import { voz, vistaPrevia, dispositivos, elegirEntrada, elegirSalida, elegirCamara, cambiarSupresion, cambiarGanancia } from '../voz.svelte';
   import { leerPrefs, guardarPrefs } from '../prefs';
   import { dbDePorcentaje, porcentajeDeDb } from '../ganancia';
   import MedidorMic from './MedidorMic.svelte';
@@ -27,7 +27,7 @@
   let modo = $state<Modo>(modoGuardado());
   const MODOS = [['basico', 'Básico', 'Estático y liviano: sin animaciones ni brillos. Rinde más mientras jugás y transmitís.'],
     ['moderno', 'Moderno', 'Sombras, brillos en tu color y animaciones cortas. Para PCs con resto.']] as const;
-  let lista = $state<Awaited<ReturnType<typeof dispositivos>>>({ entradas: [], salidas: [] });
+  let lista = $state<Awaited<ReturnType<typeof dispositivos>>>({ entradas: [], salidas: [], camaras: [] });
   // El elegido puede no estar en la lista (es el mismo que el predeterminado, o no está conectado): se muestra Predeterminado.
   const visible = (l: { deviceId: string }[], id: string | undefined) => (id && l.some((x) => x.deviceId === id) ? id : 'default');
   const conPredeterminado = <T extends { deviceId: string }>(l: T[]) => (l.some((x) => x.deviceId === 'default') ? l : [{ deviceId: 'default', label: 'Predeterminado' }, ...l]);
@@ -153,6 +153,13 @@
           {#each conPredeterminado(lista.salidas) as x (x.deviceId)}<option value={x.deviceId}>{x.label || 'Altavoz'}</option>{/each}
         </select>
       </label>
+      {#if lista.camaras.length}
+        <label>Cámara
+          <select value={lista.camaras.some((x) => x.deviceId === prefs.camara) ? prefs.camara : lista.camaras[0].deviceId} onchange={(e) => elegirCamara(e.currentTarget.value)}>
+            {#each lista.camaras as x (x.deviceId)}<option value={x.deviceId}>{x.label || 'Cámara'}</option>{/each}
+          </select>
+        </label>
+      {/if}
       <label class="casilla"><input type="checkbox" class="switch" checked={voz.supresion} onchange={(e) => cambiarSupresion(e.currentTarget.checked)} /> Supresión de ruido</label>
       <!-- En el celular el micrófono va sin procesador (ver opcionesMic en voz.svelte.ts): no hay ganancia que ajustar. -->
       {#if !esCelular}

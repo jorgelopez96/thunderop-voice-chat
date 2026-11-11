@@ -1,4 +1,5 @@
 <script lang="ts">
+  import EstadoVoz from './EstadoVoz.svelte';
   import type { RecordModel } from 'pocketbase';
   import { untrack } from 'svelte';
   import { sesion, mensajeError } from '../sesion.svelte';
@@ -73,8 +74,9 @@
     presencia(grupo.id);
   }
   /** Quién está en la sala: en la tuya, los participantes en vivo; en otras, la presencia del servidor. */
-  const quienes = (r: RecordModel): { id: string; nombre: string; hablando?: boolean; transmite?: boolean }[] =>
-    r.id === voz.salaId ? voz.participantes : (enVoz.grupo === grupo.id ? enVoz.salas[r.id] ?? [] : []).map((p) => ({ id: p.id, nombre: p.name }));
+  const quienes = (r: RecordModel): { id: string; nombre: string; hablando?: boolean; transmite?: boolean; silenciado?: boolean; ensordecido?: boolean; camara?: unknown }[] =>
+    r.id === voz.salaId ? voz.participantes : (enVoz.grupo === grupo.id ? enVoz.salas[r.id] ?? [] : [])
+      .map((p) => ({ id: p.id, nombre: p.name, silenciado: p.silenciado, ensordecido: p.ensordecido, camara: p.camara }));
   const miembro = (id: string) => ((grupo.expand?.members ?? []) as RecordModel[]).find((m) => m.id === id);
   let menuGrupo = $state<HTMLElement>();
   let cabecera = $state<HTMLElement>();
@@ -142,6 +144,7 @@
     {#if q.length}
       <ul class="quienes">{#each q as p (p.id)}{@const m = miembro(p.id)}
         <li>{#if m}<Avatar usuario={m} tam={20} hablando={p.hablando} />{/if}<span>{p.nombre}</span>
+          <EstadoVoz silenciado={p.silenciado} ensordecido={p.ensordecido} camara={!!p.camara} />
           {#if p.transmite}<Monitor size={14} strokeWidth={1.75} color="var(--cian)" aria-label="Transmitiendo" />{/if}</li>
       {/each}</ul>
     {/if}
