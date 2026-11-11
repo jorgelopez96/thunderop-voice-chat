@@ -109,13 +109,16 @@ function silenciado(p, silenciados) {
   return !(p.tracks || []).some((t) => (t.source === "MICROPHONE" || t.source === 2) && !t.muted);
 }
 
-// Moderación del dueño sobre otro miembro del grupo de la ruta (`id`): valida y devuelve { group, user }.
-function moderar(e) {
+// Moderación sobre otro miembro del grupo de la ruta (`id`): exige el permiso (roles.js), que no sea uno mismo
+// ni el admin y que sea miembro. Devuelve { group, user }.
+function moderar(e, permiso, texto) {
+  const roles = require(`${__hooks}/roles.js`);
   const group = grupoDeMiembro(e.app, e.request.pathValue("id"), e.auth.id);
-  if (group.getString("owner") !== e.auth.id) throw new ForbiddenError("Solo el dueño puede hacer esto.");
+  roles.exigir(group, e.auth.id, permiso, texto);
   const user = e.requestInfo().body.user;
   if (typeof user !== "string" || !user) throw new BadRequestError("Falta el usuario.");
   if (user === e.auth.id) throw new BadRequestError("No podés hacerte esto a vos mismo.");
+  if (user === group.getString("owner")) throw new ForbiddenError("No podés hacerle esto al admin del grupo.");
   if (!group.getStringSlice("members").includes(user)) throw new BadRequestError("Ese usuario no es miembro del grupo.");
   return { group, user };
 }

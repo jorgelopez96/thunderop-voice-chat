@@ -3,6 +3,7 @@
   import { untrack } from 'svelte';
   import { sesion, mensajeError } from '../sesion.svelte';
   import { pb } from '../pb';
+  import { puedo } from '../permisos';
   import { salas, enVoz, presencia, crearSala, renombrarSala, borrarSala, ordenarSalas, miga } from '../grupos.svelte';
   import Chat from './Chat.svelte';
   import { abrirChat, enviar, borrar } from '../chat.svelte';
@@ -26,6 +27,9 @@
 
   let { grupo, volver }: { grupo: RecordModel; volver: () => void } = $props();
   const soyDueno = $derived(grupo.owner === sesion.usuario?.id);
+  // Salas (crear, renombrar, ordenar, borrar) y borrar mensajes ajenos van por permiso (permisos.ts).
+  const puedoSalas = $derived(puedo(grupo, sesion.usuario?.id, 'salas'));
+  const puedoMensajes = $derived(puedo(grupo, sesion.usuario?.id, 'mensajes'));
   // svelte-ignore state_referenced_locally
   const s = salas(grupo.id); // el componente se recrea por grupo (clave en Principal)
   $effect(() => s.parar);
@@ -74,7 +78,7 @@
   const miembro = (id: string) => ((grupo.expand?.members ?? []) as RecordModel[]).find((m) => m.id === id);
   let menuGrupo = $state<HTMLElement>();
   let cabecera = $state<HTMLElement>();
-  // Nueva sala (solo el dueño, desde el menú del grupo): modal con Cancelar, Esc o clic afuera.
+  // Nueva sala (con el permiso "salas", desde el menú del grupo): modal con Cancelar, Esc o clic afuera.
   let creando = $state<'chat' | 'voz' | null>(null);
   let dlgNueva = $state<HTMLDialogElement>();
   $effect(() => { if (creando) { nueva = ''; dlgNueva?.showModal(); } });
@@ -124,12 +128,12 @@
 
 {#snippet sala(r: RecordModel)}
   {@const q = r.kind === 'voz' ? quienes(r) : []}
-  <li class="sala" class:sobre={sobre === r.id} draggable={soyDueno && !pantalla.movil}
+  <li class="sala" class:sobre={sobre === r.id} draggable={puedoSalas && !pantalla.movil}
     ondragstart={(e) => { arrastrada = r; e.dataTransfer?.setData('text/plain', r.id); }}
     ondragover={(e) => { if (arrastrada && arrastrada.kind === r.kind) { e.preventDefault(); sobre = r.id; } }}
     ondragleave={() => sobre === r.id && (sobre = null)} ondrop={(e) => { e.preventDefault(); soltar(r); }} ondragend={() => (arrastrada = sobre = null)}
-    oncontextmenu={(e) => { if (!soyDueno) return; e.preventDefault(); menuSala = r; abrirEnPunto(menuSalaEl, e.clientX, e.clientY); }}
-    use:mantener={(x, y) => { if (!soyDueno) return; menuSala = r; abrirEnPunto(menuSalaEl, x, y); }} class:activa={r.kind === 'chat' ? r.id === salaId && !centroVoz : r.id === voz.salaId && centroVoz}>
+    oncontextmenu={(e) => { if (!puedoSalas) return; e.preventDefault(); menuSala = r; abrirEnPunto(menuSalaEl, e.clientX, e.clientY); }}
+    use:mantener={(x, y) => { if (!puedoSalas) return; menuSala = r; abrirEnPunto(menuSalaEl, x, y); }} class:activa={r.kind === 'chat' ? r.id === salaId && !centroVoz : r.id === voz.salaId && centroVoz}>
       <button class="plano nombre" class:sin-leer={!!noLeidos.salas[r.id]} aria-label={`${r.kind === 'chat' ? 'Sala de chat' : 'Sala de voz'} ${r.name}`} onclick={() => { hacer(() => abrir(r)); entrarSala(); }}>
         {#if r.kind === 'chat'}<Hash size={16} strokeWidth={1.75} />{:else}<Volume2 size={16} strokeWidth={1.75} />{/if}<span>{r.name}</span>
         {#if r.kind === 'voz'}<small class:verde={q.length}>{q.length ? `${q.length} en voz` : 'vacía'}</small>{/if}
@@ -158,7 +162,7 @@
     ondragover={(e) => { if (arrastreSeccion && arrastreSeccion !== tipo) { e.preventDefault(); seccionSobre = tipo; } }}
     ondragleave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null) && seccionSobre === tipo) seccionSobre = null; }}
     ondrop={(e) => { const otra = arrastreSeccion; if (!otra) return; e.preventDefault(); arrastreSeccion = seccionSobre = null; if (otra !== tipo) invertirSecciones(); }}>
-    <div class="seccion-salas" role="heading" aria-level="3" draggable={soyDueno && !pantalla.movil}
+    <div class="seccion-salas" role="heading" aria-level="3" draggable={puedoSalas && !pantalla.movil}
       ondragstart={(e) => { arrastreSeccion = tipo; e.dataTransfer?.setData('text/plain', tipo); }} ondragend={() => (arrastreSeccion = seccionSobre = null)}>{texto}</div>
     <ul>{#each lista as r (r.id)}{@render sala(r)}{/each}</ul>
   </div>
@@ -187,7 +191,7 @@
   <div popover id="menu-grupo" class="menu" bind:this={menuGrupo}
     onbeforetoggle={(e) => { if (e.newState !== 'open' || !cabecera) return; const r = cabecera.getBoundingClientRect(); menuGrupo!.style.left = `${r.left}px`; menuGrupo!.style.top = `${r.bottom + 4}px`; }}>
     <button class="plano" onclick={() => { menuGrupo?.hidePopover(); invitando = true; }}><UserPlus size={16} strokeWidth={1.75} /> Invitar al grupo</button>
-    {#if soyDueno}
+    {#if puedoSalas}
       <button class="plano" onclick={() => { menuGrupo?.hidePopover(); creando = 'voz'; }}><Volume2 size={16} strokeWidth={1.75} /> Nueva sala de voz</button>
       <button class="plano" onclick={() => { menuGrupo?.hidePopover(); creando = 'chat'; }}><Hash size={16} strokeWidth={1.75} /> Nueva sala de chat</button>
       <button class="plano" onclick={() => { menuGrupo?.hidePopover(); hacer(async () => { await pb.collection('groups').update(grupo.id, { chatsArriba: !grupo.chatsArriba }); }); }}>
@@ -206,8 +210,8 @@
 
   {#if pantalla.movil && !enSala}<!-- celular: se ve la lista -->
   {:else if enSalaVoz && salaVoz}<Voz {grupo} {soyDueno} {salasVoz} sala={salaVoz.name} volver={pantalla.movil ? aLaLista : undefined} />
-  {:else if salaAbierta}{#key salaAbierta.id}<Chat titulo={`# ${salaAbierta.name}`} volver={pantalla.movil ? aLaLista : undefined} gente={pantalla.movil ? abrirDer : undefined} miembros={grupo.expand?.members ?? []} abrir={() => abrirChat(salaAbierta.id)} enviar={(t, f, r) => enviar(salaAbierta.id, t, f, r)} {borrar} silencio={salaAbierta.id} acciones={soyDueno ? accionesSala : undefined}
-    puedeBorrar={(m) => m.author === sesion.usuario?.id || soyDueno} />{/key}
+  {:else if salaAbierta}{#key salaAbierta.id}<Chat titulo={`# ${salaAbierta.name}`} volver={pantalla.movil ? aLaLista : undefined} gente={pantalla.movil ? abrirDer : undefined} miembros={grupo.expand?.members ?? []} abrir={() => abrirChat(salaAbierta.id)} enviar={(t, f, r) => enviar(salaAbierta.id, t, f, r)} {borrar} silencio={salaAbierta.id} acciones={puedoSalas ? accionesSala : undefined}
+    puedeBorrar={(m) => m.author === sesion.usuario?.id || puedoMensajes} />{/key}
   {:else}<div class="vacio">Elegí una sala de chat</div>{/if}
 
   {#if enSalaVoz && !pantalla.movil}<div popover id="capa-participantes" class="capa"><Participantes {grupo} /></div>

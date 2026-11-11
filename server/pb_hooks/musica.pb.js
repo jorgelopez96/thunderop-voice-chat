@@ -1,6 +1,6 @@
 /// <reference path="../pb_data/types.d.ts" />
 // Música sincronizada por sala de voz: cola en `canciones`, estado en `reproducciones`.
-// Cualquier miembro del grupo la maneja. Posición = pausaS ?? (ahora - inicioMs) / 1000.
+// Agregar pide "agregarMusica" y manejar la cola, "cola" (roles.js). Posición = pausaS ?? (ahora - inicioMs) / 1000.
 // La cola va por `orden` (único por sala, creciente al agregar); la siguiente es la primera en espera.
 // Cada acción corre en una transacción, así varios `termino` del mismo tema avanzan una sola vez.
 
@@ -17,7 +17,7 @@ routerAdd("GET", "/api/rooms/{id}/musica", (e) => {
 
 routerAdd("POST", "/api/rooms/{id}/musica", (e) => {
   const lk = require(`${__hooks}/livekit.js`);
-  const { room } = lk.salaDeVoz(e.app, e.request.pathValue("id"), e.auth.id);
+  const { room, group } = lk.salaDeVoz(e.app, e.request.pathValue("id"), e.auth.id);
 
   const body = e.requestInfo().body;
   const accion = body.accion;
@@ -25,6 +25,10 @@ routerAdd("POST", "/api/rooms/{id}/musica", (e) => {
   if (!["agregar", "agregarLista", "pausar", "reanudar", "saltar", "termino", "error", "quitar", "vaciar", "ordenar"].includes(accion)) {
     throw new BadRequestError("Acción desconocida.");
   }
+  // `termino` y `error` los manda la app sola al terminar o fallar un tema: no piden permiso.
+  const roles = require(`${__hooks}/roles.js`);
+  if (accion === "agregar" || accion === "agregarLista") roles.exigir(group, e.auth.id, "agregarMusica", "agregar canciones");
+  else if (accion !== "termino" && accion !== "error") roles.exigir(group, e.auth.id, "cola", "manejar la música");
 
   // Link de YouTube → id de 11 caracteres. El host tiene que ser exacto (nada de youtube.com.evil.com).
   let videoId, titulo, nuevas = [];

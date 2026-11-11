@@ -38,6 +38,7 @@
   --peligro-hover: #EA7383;
   --peligro-suave: color-mix(in srgb, var(--peligro) 14%, transparent);
   --corona: #C9A85B;
+  --verificado: #1D9BF0; /* tilde azul de cuenta verificada */
   --cian: #4FB8D8; /* solo ícono de Pantalla */
   --cian-suave: color-mix(in srgb, var(--cian) 16%, transparent);
   --magenta: #C96FC9; /* solo ícono de Sonidos */

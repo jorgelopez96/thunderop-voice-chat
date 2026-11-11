@@ -3,6 +3,7 @@ import { pb } from './pb';
 import { extraerCodigo, linkInvitacion } from './invitacion';
 import { salirVoz, voz } from './voz.svelte';
 import { alCambiarUsuario, parchear } from './presencia.svelte';
+import { puedo, type Permiso, type Rol } from './permisos';
 
 export const grupos = $state<{ lista: RecordModel[]; cargado: boolean }>({ lista: [], cargado: false });
 // Svelte no permite reasignar un $state exportado: se expone como propiedad.
@@ -16,6 +17,12 @@ export const enVoz = $state<{ grupo: string | null; salas: Record<string, { id: 
 pb.authStore.onChange(() => {
   if (!pb.authStore.token) { grupos.lista = []; grupos.cargado = false; grupoActual.id = null; enVoz.grupo = null; enVoz.salas = {}; salirVoz(); voz.error = ''; voz.muteado = false; }
 });
+
+/** ¿Tengo el permiso `p` en el grupo de la llamada en curso? (música, YouTube y botonera viven en la sala de voz). */
+export function puedoEnLaLlamada(p: Permiso) {
+  const g = grupos.lista.find((x) => x.id === voz.grupoId);
+  return !!g && puedo(g, pb.authStore.record?.id, p);
+}
 
 const ES = (e: unknown, ...codigos: number[]) => e instanceof ClientResponseError && codigos.includes(e.status);
 
@@ -89,9 +96,27 @@ export async function echar(groupId: string, userId: string) {
   await pb.collection('groups').update(groupId, { 'members-': userId });
 }
 
-/** Solo el dueño: banear lo echa y no lo deja volver con invitaciones; desbanear lo vuelve a dejar. */
+/** Admin o quien tenga "banear": banear lo echa y no lo deja volver con invitaciones; desbanear lo vuelve a dejar. */
 export async function banear(groupId: string, userId: string, baneado: boolean) {
   await pb.send(`/api/groups/${groupId}/banear`, { method: 'POST', body: { user: userId, baneado } });
+}
+
+/** Solo el admin: guarda la lista de roles (con "todos" primero) y, si se pasan, las asignaciones. */
+export async function guardarRoles(groupId: string, roles: Rol[], asignaciones?: Record<string, string[]>) {
+  await pb.collection('groups').update(groupId, asignaciones ? { roles, asignaciones } : { roles });
+}
+
+/** Solo el admin: le da (`si`) o le saca un rol a un miembro. */
+export async function asignarRol(g: RecordModel, userId: string, rolId: string, si: boolean) {
+  const asig = { ...((g.asignaciones ?? {}) as Record<string, string[]>) };
+  const otros = (asig[userId] ?? []).filter((x) => x !== rolId);
+  asig[userId] = si ? [...otros, rolId] : otros;
+  await pb.collection('groups').update(g.id, { asignaciones: asig });
+}
+
+/** Quien tenga "bloquearVoz": saca a un miembro de la voz y no lo deja volver, o lo deja volver. */
+export async function bloquearVozDe(groupId: string, userId: string, bloqueado: boolean) {
+  await pb.send(`/api/groups/${groupId}/bloquear-voz`, { method: 'POST', body: { user: userId, bloqueado } });
 }
 
 export async function salirDe(groupId: string) {

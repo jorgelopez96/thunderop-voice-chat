@@ -12,7 +12,7 @@
   import { pb } from '../pb';
   import { bloquear, bloqueados } from '../amigos.svelte';
   import { pedirPermiso } from '../notifNavegador';
-  import { esEscritorio } from '../plataforma.svelte';
+  import { esEscritorio, esCelular } from '../plataforma.svelte';
   import { sesion, salir, mensajeError } from '../sesion.svelte';
   import { pedirCodigo, restablecer } from '../cuenta.svelte';
   import { errorClave, soloDigitos } from '../reglasCuenta';
@@ -154,10 +154,13 @@
         </select>
       </label>
       <label class="casilla"><input type="checkbox" class="switch" checked={voz.supresion} onchange={(e) => cambiarSupresion(e.currentTarget.checked)} /> Supresión de ruido</label>
-      <label>Volumen del micrófono: <span class="num">{pctMic}%</span>
-        <input type="range" min="0" max="100" step="1" bind:value={pctMic} style={lleno(pctMic, 0, 100)} oninput={() => cambiarGanancia(dbDePorcentaje(pctMic))} />
-      </label>
-      <MedidorMic {entrada} gananciaDb={dbDePorcentaje(pctMic)} />
+      <!-- En el celular el micrófono va sin procesador (ver opcionesMic en voz.svelte.ts): no hay ganancia que ajustar. -->
+      {#if !esCelular}
+        <label>Volumen del micrófono: <span class="num">{pctMic}%</span>
+          <input type="range" min="0" max="100" step="1" bind:value={pctMic} style={lleno(pctMic, 0, 100)} oninput={() => cambiarGanancia(dbDePorcentaje(pctMic))} />
+        </label>
+      {/if}
+      <MedidorMic {entrada} gananciaDb={esCelular ? 0 : dbDePorcentaje(pctMic)} />
     </section>
 
   {:else if solapa === 'transmision'}

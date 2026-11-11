@@ -6,7 +6,7 @@ beforeAll(async () => { h = await startPocketBase(); });
 afterAll(async () => { await h.stop(); });
 
 const rejected = (p: Promise<any>) =>
-  p.then(() => { throw new Error('should have been rejected'); }, (e) => expect([400, 404]).toContain(e.status));
+  p.then(() => { throw new Error('should have been rejected'); }, (e) => expect([400, 403, 404]).toContain(e.status));
 
 async function setup() {
   const a = await h.nuevoUsuario('ana');

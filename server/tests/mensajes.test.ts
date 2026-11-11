@@ -78,7 +78,7 @@ describe('mensajes', () => {
     const { a, b, chat } = await setup();
     const mb = await b.collection('messages').create({ room: chat, author: uid(b), text: 'b' });
     const ma = await a.collection('messages').create({ room: chat, author: uid(a), text: 'a' });
-    await expect(b.collection('messages').delete(ma.id)).rejects.toMatchObject({ status: 404 });
+    await expect(b.collection('messages').delete(ma.id)).rejects.toMatchObject({ status: 403 });
     await b.collection('messages').delete(mb.id);
     const mb2 = await b.collection('messages').create({ room: chat, author: uid(b), text: 'b2' });
     await a.collection('messages').delete(mb2.id);

@@ -19,7 +19,7 @@ describe('grupos', () => {
       return d;
     };
     expect((await a.collection('groups').update(g.id, foto())).foto).toMatch(/\.png$/);
-    await expect(b.collection('groups').update(g.id, foto())).rejects.toMatchObject({ status: 404 });
+    await expect(b.collection('groups').update(g.id, foto())).rejects.toMatchObject({ status: 403 });
   });
 
   it('create group sets owner, members and default rooms', async () => {
@@ -53,7 +53,7 @@ describe('grupos', () => {
     const g = await a.collection('groups').create({ name: 'viejo' });
     await a.collection('groups').update(g.id, { name: 'nuevo' });
     await h.admin.collection('groups').update(g.id, { members: [a.authStore.record!.id, b.authStore.record!.id] });
-    await expect(b.collection('groups').update(g.id, { name: 'hack' })).rejects.toMatchObject({ status: 404 });
+    await expect(b.collection('groups').update(g.id, { name: 'hack' })).rejects.toMatchObject({ status: 403 });
   });
 
   it('owner cannot add members directly', async () => {

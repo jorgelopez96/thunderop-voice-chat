@@ -25,7 +25,7 @@ const reloj = $state({ ahora: Date.now() });
 // usuarios (grupos, amigos, chats abiertos) se anota acá y copia lo nuevo sobre sus registros.
 const oyentesUsuario = new Set<(u: RecordModel) => void>();
 export function alCambiarUsuario(f: (u: RecordModel) => void) { oyentesUsuario.add(f); return () => { oyentesUsuario.delete(f); }; }
-const CAMPOS = ['name', 'color', 'status', 'avatar', 'fundador'] as const;
+const CAMPOS = ['name', 'color', 'status', 'avatar', 'fundador', 'verificado'] as const;
 /** Si `u` es el usuario de `nuevo`, le copia los datos de perfil que cambiaron (sobre $state solo avisa lo que cambió). */
 export function parchear(u: RecordModel | null | undefined, nuevo: RecordModel) {
   if (u?.id !== nuevo.id) return;

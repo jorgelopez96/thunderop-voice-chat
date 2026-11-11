@@ -17,7 +17,7 @@
   import { Settings } from '@lucide/svelte';
   import Grupo from './Grupo.svelte';
   import Dock from './Dock.svelte';
-  import { voz } from '../voz.svelte';
+  import { voz, activarSonido } from '../voz.svelte';
   import { iniciarPresencia } from '../presencia.svelte';
   import { iniciarAmigos } from '../amigos.svelte';
   import { iniciarPrivados } from '../privados.svelte';
@@ -73,6 +73,9 @@
   <ChatPrivado />
   {#if voz.error}
     <p class="aviso" role="alert">{voz.error} <button class="plano" aria-label="Cerrar aviso" onclick={() => (voz.error = '')}>✕</button></p>
+  {/if}
+  {#if voz.sinSonido}
+    <p class="aviso" role="status">Volviste a la llamada. <button onclick={activarSonido}>Tocá para escuchar</button></p>
   {/if}
 
   {#if actual}

@@ -5,7 +5,9 @@
   import { pb } from '../pb';
   import { fotoGrupo } from '../foto';
   import { sesion, mensajeError } from '../sesion.svelte';
-  import { borrarGrupo, banear } from '../grupos.svelte';
+  import { borrarGrupo, banear, asignarRol, bloquearVozDe } from '../grupos.svelte';
+  import { puedo, rolesDe, rolesDeMiembro, type Permiso } from '../permisos';
+  import Roles from './Roles.svelte';
   import Avatar from './Avatar.svelte';
   import Insignia from './Insignia.svelte';
   import BotonEmoji from './BotonEmoji.svelte';
@@ -13,8 +15,9 @@
   import Confirmar from './Confirmar.svelte';
   import { sonidos, editar, borrar } from '../botonera.svelte';
 
-  // Configuraciones del grupo, por solapas. General: nombre, descripción y foto (los cambia el dueño).
-  // Sonidos: cada uno edita los que subió; el dueño, todos. Participantes, Baneados y Borrar: Baneados y Borrar solo el dueño.
+  // Configuraciones del grupo, por solapas, según los permisos de cada uno (permisos.ts). General: nombre, descripción
+  // y foto ("grupo"). Sonidos: con "botonera" todos, con "subirSonidos" los propios. Participantes: todos ven los roles
+  // de todos; el admin los da. Roles y Borrar: solo el admin. Bloqueados: sin voz ("bloquearVoz") y baneados ("banear").
   // Borrar pide dos pasos: confirmar y escribir el nombre del grupo.
   let { grupo, cerrar }: { grupo: RecordModel; cerrar: () => void } = $props();
   let d = $state<HTMLDialogElement>();
@@ -22,22 +25,29 @@
   const soyDueno = $derived(grupo.owner === sesion.usuario?.id);
   const miembros = $derived((grupo.expand?.members ?? []) as RecordModel[]);
   const ingresos = $derived((grupo.ingresos ?? {}) as Record<string, string>);
-  const baneados = $derived((grupo.baneados ?? []) as { id: string; name: string; username: string; fecha: string }[]);
+  const baneados = $derived((grupo.baneados ?? []) as { id: string; name: string; username: string; fecha: string; por?: string }[]);
+  const yo = $derived(sesion.usuario?.id);
+  const p = (x: Permiso) => puedo(grupo, yo, x);
+  const sinVoz = $derived(((grupo.bloqueados ?? []) as string[]).map((id) => ({ id, m: miembros.find((x) => x.id === id), ...((grupo.bloqueadosInfo ?? {})[id] ?? {}) as { por?: string; fecha?: string } })));
+  const nombreDe = (id?: string) => (id ? miembros.find((x) => x.id === id)?.name : undefined);
+  let asignando = $state<string | null>(null); // miembro al que el admin le está eligiendo roles
   let paso = $state<0 | 1 | 2>(0); // 0: nada, 1: ¿seguro?, 2: escribir el nombre
   let escrito = $state('');
   let error = $state('');
   let ocupado = $state(false);
-  type Solapa = 'general' | 'sonidos' | 'participantes' | 'baneados' | 'borrar';
+  type Solapa = 'general' | 'sonidos' | 'participantes' | 'roles' | 'bloqueados' | 'borrar';
   let solapa = $state<Solapa>('general');
   const solapas = $derived<[Solapa, string][]>([['general', 'General'], ['sonidos', 'Sonidos'], ['participantes', 'Participantes'],
-    ...(soyDueno ? [['baneados', 'Baneados'], ['borrar', 'Borrar grupo']] as [Solapa, string][] : [])]);
+    ...(soyDueno ? [['roles', 'Roles']] as [Solapa, string][] : []),
+    ...(p('bloquearVoz') || p('banear') ? [['bloqueados', 'Bloqueados']] as [Solapa, string][] : []),
+    ...(soyDueno ? [['borrar', 'Borrar grupo']] as [Solapa, string][] : [])]);
   // svelte-ignore state_referenced_locally
   const lista = sonidos(grupo.id);
   $effect(() => lista.parar);
   let nuevo = $state(false);
   let aBorrar = $state<RecordModel | null>(null);
   let aBanear = $state<RecordModel | null>(null);
-  const puedeEditar = (x: RecordModel) => soyDueno || x.owner === sesion.usuario?.id;
+  const puedeEditar = (x: RecordModel) => p('botonera') || (x.owner === yo && p('subirSonidos'));
   const fecha = (f?: string) => (f ? new Date(f.replace(' ', 'T')).toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric' }) : '—');
   function renombrar(x: RecordModel, name: string) {
     name = name.trim();
@@ -79,9 +89,9 @@
     <section class="general">
       <div class="datos">
         <label>Nombre del grupo
-          <input value={grupo.name} maxlength="40" disabled={!soyDueno} onchange={(e) => guardarGrupo('name', e.currentTarget.value)} /></label>
+          <input value={grupo.name} maxlength="40" disabled={!p('grupo')} onchange={(e) => guardarGrupo('name', e.currentTarget.value)} /></label>
         <label>Descripción
-          <textarea rows="4" maxlength="300" disabled={!soyDueno} value={grupo.descripcion ?? ''}
+          <textarea rows="4" maxlength="300" disabled={!p('grupo')} value={grupo.descripcion ?? ''}
             placeholder="Contanos de qué va este grupo… o cuántas horas de vicio llevan."
             onchange={(e) => guardarGrupo('descripcion', e.currentTarget.value)}></textarea></label>
       </div>
@@ -89,10 +99,10 @@
         <span class="titulo">Foto del grupo</span>
         {#if grupo.foto}<img alt="" src={fotoGrupo(grupo, '480x270')} />
         {:else}<span class="sin-foto">Sin foto</span>{/if}
-        {#if soyDueno}
+        {#if p('grupo')}
           <label class="boton"><ImagePlus size={16} strokeWidth={1.75} /> Cambiar foto
             <input type="file" hidden accept="image/png,image/jpeg,image/webp,image/gif" onchange={cambiarFoto} /></label>
-        {:else}<small>Solo el dueño puede cambiarla.</small>{/if}
+        {:else}<small>No tenés permiso para cambiarla.</small>{/if}
       </div>
     </section>
 
@@ -114,7 +124,7 @@
           </li>
         {:else}<li class="tenue">Todavía no hay sonidos en este grupo.</li>{/each}
       </ul>
-      <button class="centro" onclick={() => (nuevo = true)}><Plus size={16} strokeWidth={1.75} /> Nuevo sonido</button>
+      {#if p('subirSonidos')}<button class="centro" onclick={() => (nuevo = true)}><Plus size={16} strokeWidth={1.75} /> Nuevo sonido</button>{/if}
     </section>
     {#if nuevo}<SubirSonido grupoId={grupo.id} cerrar={() => (nuevo = false)} />{/if}
     {#if aBorrar}{@const x = aBorrar}<Confirmar texto={`¿Borrar el sonido "${x.name}"?`} cancelar={() => (aBorrar = null)}
@@ -124,34 +134,70 @@
     <section>
       <h3>Participantes — {miembros.length}</h3>
       <ul class="tabla">
-        <li class="cabeza"><span>Miembro</span><span>Cuenta creada</span><span>En el grupo desde</span><span></span></li>
+        <li class="cabeza"><span>Miembro</span><span>Roles</span><span>En el grupo desde</span><span></span></li>
         {#each miembros as m (m.id)}
           <li>
             <span class="quien"><Avatar usuario={m} tam={28} /><span>{m.name}{#if m.username}<small>@{m.username}</small>{/if}</span>
               <Insignia usuario={m} dueno={m.id === grupo.owner} /></span>
-            <span>{fecha(m.created)}</span>
+            <span class="etiquetas">
+              {#if m.id === grupo.owner}<span class="admin">ADMIN</span>
+              {:else}
+                {#each rolesDeMiembro(grupo, m.id) as r (r.id)}<span class="etiqueta"><span class="punto" style:background={r.color}></span>{r.nombre}</span>{/each}
+                {#if soyDueno && rolesDe(grupo).length > 1}<button class="plano mas" aria-label={`Roles de ${m.name}`} aria-expanded={asignando === m.id}
+                  onclick={() => (asignando = asignando === m.id ? null : m.id)}>+</button>{/if}
+              {/if}
+            </span>
             <span>{fecha(m.id === grupo.owner ? ingresos[m.id] ?? grupo.created : ingresos[m.id])}</span>
-            <span>{#if soyDueno && m.id !== grupo.owner}<button class="plano peligro chico" onclick={() => (aBanear = m)}>Banear</button>{/if}</span>
+            <span>{#if p('banear') && m.id !== grupo.owner && m.id !== yo}<button class="plano peligro chico" onclick={() => (aBanear = m)}>Banear</button>{/if}</span>
           </li>
+          {#if asignando === m.id}
+            <li class="asignar" role="group" aria-label={`Elegir roles de ${m.name}`}>
+              {#each rolesDe(grupo).slice(1) as r (r.id)}
+                <label class="casilla"><input type="checkbox" checked={rolesDeMiembro(grupo, m.id).some((x) => x.id === r.id)} disabled={ocupado}
+                  onchange={(e) => hacer(() => asignarRol(grupo, m.id, r.id, e.currentTarget.checked))} /><span class="punto" style:background={r.color}></span>{r.nombre}</label>
+              {/each}
+            </li>
+          {/if}
         {/each}
       </ul>
     </section>
     {#if aBanear}{@const m = aBanear}<Confirmar texto={`¿Banear a ${m.name}? Sale del grupo y no puede volver hasta que lo desbanees.`}
       cancelar={() => (aBanear = null)} confirmar={() => { aBanear = null; hacer(() => banear(grupo.id, m.id, true)); }} />{/if}
 
-  {:else if solapa === 'baneados'}
-    <section>
-      <h3>Baneados — {baneados.length}</h3>
-      <ul class="tabla">
-        {#each baneados as b (b.id)}
-          <li class="baneado">
-            <span class="quien"><span>{b.name}{#if b.username}<small>@{b.username}</small>{/if}</span></span>
-            <span>Baneado el {fecha(b.fecha)}</span>
-            <span><button class="plano chico" disabled={ocupado} onclick={() => hacer(() => banear(grupo.id, b.id, false))}>Desbanear</button></span>
-          </li>
-        {:else}<li class="tenue">No hay nadie baneado.</li>{/each}
-      </ul>
-    </section>
+  {:else if solapa === 'roles'}
+    <Roles {grupo} />
+
+  {:else if solapa === 'bloqueados'}
+    {#if p('bloquearVoz')}
+      <section>
+        <h3>Sin voz — {sinVoz.length}</h3>
+        <p class="tenue">Siguen en el grupo y en el chat, pero no pueden entrar a las llamadas.</p>
+        <ul class="tabla">
+          {#each sinVoz as b (b.id)}
+            <li class="baneado">
+              <span class="quien">{#if b.m}<Avatar usuario={b.m} tam={28} />{/if}<span>{b.m?.name ?? 'Alguien que ya no está'}{#if b.m?.username}<small>@{b.m.username}</small>{/if}</span></span>
+              <span>{nombreDe(b.por) ? `Por ${nombreDe(b.por)} · ` : ''}{b.fecha ? fecha(b.fecha) : ''}</span>
+              <span><button class="plano chico" disabled={ocupado} onclick={() => hacer(() => bloquearVozDe(grupo.id, b.id, false))}>Desbloquear</button></span>
+            </li>
+          {:else}<li class="tenue">No hay nadie bloqueado de la voz.</li>{/each}
+        </ul>
+      </section>
+    {/if}
+    {#if p('banear')}
+      <section>
+        <h3>Baneados — {baneados.length}</h3>
+        <p class="tenue">Están fuera del grupo y no pueden volver a entrar.</p>
+        <ul class="tabla">
+          {#each baneados as b (b.id)}
+            <li class="baneado">
+              <span class="quien"><span>{b.name}{#if b.username}<small>@{b.username}</small>{/if}</span></span>
+              <span>{nombreDe(b.por) ? `Por ${nombreDe(b.por)} · ` : 'Baneado el '}{fecha(b.fecha)}</span>
+              <span><button class="plano chico" disabled={ocupado} onclick={() => hacer(() => banear(grupo.id, b.id, false))}>Desbanear</button></span>
+            </li>
+          {:else}<li class="tenue">No hay nadie baneado.</li>{/each}
+        </ul>
+      </section>
+    {/if}
 
   {:else}
     <section class="peligroso">
@@ -194,6 +240,13 @@
   .tabla li.baneado { grid-template-columns: minmax(0, 2fr) 1fr 100px; }
   .tabla li.tenue { display: block; border: 0; }
   .tabla .cabeza { color: var(--tenue); font-size: 12px; }
+  .etiquetas { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; min-width: 0; }
+  .etiqueta { display: inline-flex; align-items: center; gap: 5px; padding: 1px 8px; border-radius: 10px; background: var(--superficie); font-size: 11px; }
+  .punto { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+  .admin { font-size: 10px; font-weight: 700; color: var(--sobre-acento); background: var(--corona); border-radius: 4px; padding: 0 5px; }
+  .mas { min-height: 0; padding: 0 7px; border: 1px dashed var(--punteado); border-radius: 10px; font-size: 12px; color: var(--tenue); }
+  .tabla li.asignar { display: flex; flex-wrap: wrap; gap: 6px 16px; padding: 6px 4px 10px; }
+  .asignar .casilla { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
   .quien { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 14px; }
   .quien small { margin-left: 6px; color: var(--tenue); }
   .chico { padding: 4px 8px; min-height: 0; font-size: 13px; }

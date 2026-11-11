@@ -65,3 +65,9 @@ export async function grupoDeTres(browser: Browser, nombre: string, antes?: (p: 
   await unirse(c, link);
   return [a, b, c] as const;
 }
+
+/** Le da `permisos` al rol "Todos" del grupo `nombre` (por el superuser): para pruebas de antes de los roles. */
+export async function permisosATodos(nombre: string, permisos: string[]) {
+  const g = await admin!.collection('groups').getFirstListItem(`name = "${nombre}"`);
+  await admin!.collection('groups').update(g.id, { roles: [{ id: 'todos', nombre: 'Todos', color: '', permisos }, ...(g.roles ?? []).slice(1)] });
+}

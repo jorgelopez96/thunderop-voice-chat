@@ -8,7 +8,8 @@
   import { leerPrefs, guardarPrefs } from '../prefs';
 
   // Contenido del panelcito de Sonidos del dock. Quien lo usa lo recrea por grupo ({#key}).
-  let { grupoId, userId, soyDueno }: { grupoId: string; userId: string | undefined; soyDueno: boolean } = $props();
+  // `puedeEditar` y `puedeSubir` salen de los permisos del grupo (permisos.ts): botonera / subirSonidos.
+  let { grupoId, puedeEditar, puedeSubir }: { grupoId: string; puedeEditar: (x: RecordModel) => boolean; puedeSubir: boolean } = $props();
   // svelte-ignore state_referenced_locally
   const s = sonidos(grupoId);
   $effect(() => s.parar);
@@ -27,12 +28,12 @@
   </div>
   <ul class="grilla">
     {#each visibles as x (x.id)}
-      <li oncontextmenu={(e) => { if (!soyDueno && x.owner !== userId) return; e.preventDefault(); editando = x; }}>
+      <li oncontextmenu={(e) => { if (!puedeEditar(x)) return; e.preventDefault(); editando = x; }}>
         <!-- aria-disabled y no disabled: un botón disabled no recibe el clic derecho -->
         <button class="sonido" aria-disabled={!voz.salaId} onclick={() => voz.salaId && tocar(x)}>{x.name}</button>
       </li>
     {/each}
-    <li><button class="sonido nuevo" onclick={() => (nuevo = true)}><Plus size={16} strokeWidth={1.75} /> Nuevo sonido</button></li>
+    {#if puedeSubir}<li><button class="sonido nuevo" onclick={() => (nuevo = true)}><Plus size={16} strokeWidth={1.75} /> Nuevo sonido</button></li>{/if}
   </ul>
   {#if !s.estado.lista.length}<p class="tenue">Todavía no hay sonidos en este grupo.</p>
   {:else if !visibles.length}<p class="tenue">Ningún sonido se llama así.</p>{/if}

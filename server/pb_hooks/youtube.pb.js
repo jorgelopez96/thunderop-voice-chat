@@ -15,11 +15,12 @@ routerAdd("GET", "/api/rooms/{id}/youtube", (e) => {
 
 routerAdd("POST", "/api/rooms/{id}/youtube", (e) => {
   const lk = require(`${__hooks}/livekit.js`);
-  const { room } = lk.salaDeVoz(e.app, e.request.pathValue("id"), e.auth.id);
+  const { room, group } = lk.salaDeVoz(e.app, e.request.pathValue("id"), e.auth.id);
 
   const body = e.requestInfo().body;
   const accion = body.accion;
   if (!["poner", "pausar", "reanudar", "ir", "sacar"].includes(accion)) throw new BadRequestError("Acción desconocida.");
+  require(`${__hooks}/roles.js`).exigir(group, e.auth.id, "youtube", "manejar los videos");
 
   const posS = body.posS;
   if (accion === "ir" && (typeof posS !== "number" || !isFinite(posS) || posS < 0 || posS > 86400)) throw new BadRequestError("Posición inválida.");

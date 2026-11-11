@@ -1,4 +1,7 @@
 <script lang="ts">
+  import { puedoEnLaLlamada } from '../grupos.svelte';
+  // Pausar y saltear piden "cola" (permisos.ts); el volumen es de cada uno.
+  const puedoCola = $derived(puedoEnLaLlamada('cola'));
   import { lleno } from '../rango';
   import type { RecordModel } from 'pocketbase';
   import { Music, Pause, Play, SkipForward, Volume2, VolumeX } from '@lucide/svelte';
@@ -33,9 +36,9 @@
     <span class="icono-musica"><Music size={15} strokeWidth={1.75} /></span>
     {#if cola}<button class="titulo" popovertarget="dock-musica" onclick={cola} title="{detalle} · Ver la cola"><strong>{musica.actual.titulo}</strong></button>
     {:else}<span class="titulo" title={detalle}><strong>{musica.actual.titulo}</strong></span>{/if}
-    <button class="icono" onclick={() => (musica.pausado ? reanudar() : pausar())} aria-label={musica.pausado ? 'Reanudar' : 'Pausar'} title={musica.pausado ? 'Reanudar' : 'Pausar'}>
+    {#if puedoCola}<button class="icono" onclick={() => (musica.pausado ? reanudar() : pausar())} aria-label={musica.pausado ? 'Reanudar' : 'Pausar'} title={musica.pausado ? 'Reanudar' : 'Pausar'}>
       {#if musica.pausado}<Play size={16} strokeWidth={1.75} />{:else}<Pause size={16} strokeWidth={1.75} />{/if}</button>
-    <button class="icono" onclick={saltar} disabled={!enCola} aria-label="Saltar" title={enCola ? 'Pasar a la siguiente (para todos)' : 'No hay otra canción en la cola'}><SkipForward size={16} strokeWidth={1.75} /></button>
+    <button class="icono" onclick={saltar} disabled={!enCola} aria-label="Saltar" title={enCola ? 'Pasar a la siguiente (para todos)' : 'No hay otra canción en la cola'}><SkipForward size={16} strokeWidth={1.75} /></button>{/if}
     <button class="icono" onclick={mutear} aria-label={vol ? 'Silenciar música' : 'Activar música'} title={vol ? 'Silenciar música' : 'Activar música'}>
       {#if vol}<Volume2 size={16} strokeWidth={1.75} />{:else}<VolumeX size={16} strokeWidth={1.75} />{/if}</button>
     <input type="range" min="0" max="100" step="5" bind:value={vol} style={lleno(vol, 0, 100)} aria-label="Volumen de la música" oninput={() => volumenMusica(vol)} />

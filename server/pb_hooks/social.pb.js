@@ -1,14 +1,15 @@
 /// <reference path="../pb_data/types.d.ts" />
-// Hooks sociales. `fundador` solo lo cambia un superuser (panel de PocketBase).
+// Hooks sociales. `fundador` y `verificado` solo los cambia un superuser (panel de PocketBase).
 // Latido: el cliente lo manda cada 45 s; en línea = `visto` de hace menos de 90 s.
 onRecordCreateRequest((e) => {
-  if (!e.hasSuperuserAuth()) e.record.set("fundador", false);
+  if (!e.hasSuperuserAuth()) { e.record.set("fundador", false); e.record.set("verificado", false); }
   e.next();
 }, "users");
 
 onRecordUpdateRequest((e) => {
   if (!e.hasSuperuserAuth()) {
     e.record.set("fundador", e.record.original().getBool("fundador"));
+    e.record.set("verificado", e.record.original().getBool("verificado"));
     e.record.set("visto", e.record.original().get("visto")); // solo lo cambia el latido
     if (e.record.getString("disponibilidad") === "invisible") e.record.set("visto", ""); // se ve desconectado al instante
   }

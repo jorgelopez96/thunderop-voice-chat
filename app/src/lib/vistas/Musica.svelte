@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { puedoEnLaLlamada } from '../grupos.svelte';
   import { tick } from 'svelte';
   import { ChevronDown, ChevronUp, X } from '@lucide/svelte';
   import { musica, agregar, agregarLista, quitar, vaciar, ordenar, movible } from '../musica/musica.svelte';
@@ -8,6 +9,9 @@
   import { pantalla } from '../plataforma.svelte';
 
   // Contenido del panelcito de Música del dock: agregar links y ver la cola. Lo que suena va en la píldora del dock (AhoraSuena).
+  // Agregar pide "agregarMusica"; ordenar, quitar y vaciar, "cola" (permisos.ts). Sin permiso, solo se ve la cola.
+  const puedoAgregar = $derived(puedoEnLaLlamada('agregarMusica'));
+  const puedoCola = $derived(puedoEnLaLlamada('cola'));
   let url = $state('');
   let aleatorio = $state(false);
   let leyendo = $state(''); // progreso al agregar una lista
@@ -55,29 +59,30 @@
 
 <div class="musica">
   <div class="cabecera"><h3>Música</h3>
-    {#if musica.actual || enCola.length}<button class="plano peligro chico" onclick={() => (vaciando = true)}>Quitar todas</button>{/if}</div>
-  <form class="fila" onsubmit={enviar}>
+    {#if puedoCola && (musica.actual || enCola.length)}<button class="plano peligro chico" onclick={() => (vaciando = true)}>Quitar todas</button>{/if}</div>
+  {#if puedoAgregar}<form class="fila" onsubmit={enviar}>
     <input bind:value={url} required placeholder="Pegá un link de YouTube (video o lista)" aria-label="Pegá un link de YouTube" />
     <button type="submit" class="primario" disabled={!voz.salaId || voz.conectando || !!leyendo}>Agregar</button>
   </form>
   {#if lista}<label class="casilla"><input type="checkbox" bind:checked={aleatorio} /> Es una lista: agregarla mezclada</label>{/if}
+  {:else}<p class="tenue">Para agregar canciones hace falta un rol que lo permita.</p>{/if}
   {#if leyendo}<p class="tenue" role="status">{leyendo}</p>{/if}
   {#if musica.error}<p role="alert">{musica.error}</p>{/if}
   {#if enCola.length}
     <ul bind:this={ul} aria-label="Canciones de la sala">
       {#each enCola as c (c.id)}
         {@const i = pos(c.id)}
-        <li data-id={c.id} draggable={i >= 0 && !pantalla.movil} class:arriba={sobre === c.id && pos(arrastrada) > i} class:abajo={sobre === c.id && pos(arrastrada) < i}
+        <li data-id={c.id} draggable={puedoCola && i >= 0 && !pantalla.movil} class:arriba={sobre === c.id && pos(arrastrada) > i} class:abajo={sobre === c.id && pos(arrastrada) < i}
           ondragstart={(e) => { arrastrada = c.id; e.dataTransfer?.setData('text/plain', c.id); }}
           ondragover={(e) => { if (arrastrada && i >= 0) { e.preventDefault(); sobre = c.id; } }}
           ondragleave={() => sobre === c.id && (sobre = null)} ondrop={(e) => { e.preventDefault(); soltar(c.id); }} ondragend={() => (arrastrada = sobre = null)}>
           <span class="titulo" class:sonando={c.estado === 'sonando'}>{c.titulo}{c.estado === 'error' ? ' — No se puede reproducir acá' : ''}</span>
           {#if c.estado === 'sonando'}<small class="tenue">Sonando</small>{/if}
-          {#if i >= 0 && movibles.length > 1}
+          {#if puedoCola && i >= 0 && movibles.length > 1}
             <button class="icono chica" data-paso="-1" disabled={i === 0} aria-label={`Subir ${c.titulo}`} title="Subir" onclick={() => correr(c.id, -1)}><ChevronUp size={14} strokeWidth={1.75} /></button>
             <button class="icono chica" data-paso="1" disabled={i === movibles.length - 1} aria-label={`Bajar ${c.titulo}`} title="Bajar" onclick={() => correr(c.id, 1)}><ChevronDown size={14} strokeWidth={1.75} /></button>
           {/if}
-          {#if c.estado !== 'error'}<button class="icono" aria-label={`Quitar ${c.titulo}`} title="Quitar" onclick={() => quitar(c.id)}><X size={14} strokeWidth={1.75} /></button>{/if}
+          {#if puedoCola && c.estado !== 'error'}<button class="icono" aria-label={`Quitar ${c.titulo}`} title="Quitar" onclick={() => quitar(c.id)}><X size={14} strokeWidth={1.75} /></button>{/if}
         </li>
       {/each}
     </ul>

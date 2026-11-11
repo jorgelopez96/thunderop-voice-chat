@@ -3,6 +3,9 @@ import { crearCuenta, crearGrupo } from './cuentas';
 
 // Versión web: lo que en el navegador se comporta distinto que en el escritorio.
 
+// Las páginas de cada prueba quedaban abiertas con el micrófono tomado; al acumularse, el navegador dejaba de darlo.
+test.afterEach(async ({ browser }) => { for (const c of browser.contexts()) await c.close(); });
+
 test('sin permiso de micrófono: cartel claro y el chat sigue andando', async ({ browser }) => {
   const p = await (await browser.newContext()).newPage();
   await p.addInitScript(() => {
@@ -261,8 +264,8 @@ test('instalable: manifest con nombre, modo app e íconos', async ({ page }) => 
 });
 
 for (const [nombre, ua, texto] of [
-  ['Android', undefined, 'Si bloqueás la pantalla o cambiás de app, la llamada puede cortarse.'],
-  ['iPhone', IPHONE, 'En iPhone, la llamada se corta si bloqueás la pantalla o cambiás de app.'],
+  ['Android', undefined, 'Mientras estés en la llamada, la pantalla no se apaga sola.'],
+  ['iPhone', IPHONE, 'En iPhone, si cambiás de app la llamada se corta, pero cuando volvés entra sola de nuevo.'],
 ] as const) {
   test(`celular (${nombre}): aviso de la llamada al entrar, una vez por sesión`, async ({ browser }) => {
     const p = await (await browser.newContext({ viewport: CELULAR, ...(ua ? { userAgent: ua } : {}) })).newPage();
@@ -498,4 +501,63 @@ test('celular: los modales entran en la pantalla (confirmar borrar un mensaje)',
   expect(c.x).toBeGreaterThanOrEqual(8);
   expect(c.x + c.width).toBeLessThanOrEqual(360 - 8);
   expect(await sinScrollLateral(p)).toBe(true);
+});
+
+// Celular por sistema (no por ancho): la pantalla trabada mientras dura la llamada, el sonido sin el AudioContext y,
+// si la llamada se cae con la página en segundo plano, vuelve sola a la sala al volver.
+test('celular en llamada: pantalla trabada y vuelve solo a la sala si se cayó en segundo plano', async ({ browser }) => {
+  // Android y no iPhone: con un agente de Safari, LiveKit toma caminos de Safari que este Chromium no tiene.
+  const android = 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36';
+  const a = await (await browser.newContext({ userAgent: android, viewport: { width: 1280, height: 800 } })).newPage();
+  await a.addInitScript(() => {
+    const w = window as unknown as { trabas: number; oculta: boolean };
+    w.trabas = 0; w.oculta = false;
+    Object.defineProperty(navigator, 'wakeLock', { value: { request: async () => { w.trabas++; return { release: async () => {}, addEventListener() {} }; } } });
+    Object.defineProperty(document, 'visibilityState', { get: () => (w.oculta ? 'hidden' : 'visible') });
+  });
+  const b = await (await browser.newContext()).newPage();
+  await crearCuenta(a, 'Ana');
+  const link = await crearGrupo(a, 'Celus');
+  await crearCuenta(b, 'Beto');
+  await b.getByRole('button', { name: 'Unirme con código' }).click();
+  await b.getByPlaceholder('Código o link de invitación').fill(link);
+  await b.getByRole('button', { name: 'Unirme', exact: true }).click();
+  for (const p of [a, b]) await p.getByRole('button', { name: 'Sala de voz General' }).click();
+  await expect(b.locator('section.voz li')).toHaveCount(2, { timeout: 15_000 });
+
+  type V = { __voz: { stats(): Promise<{ mic: boolean }>; caer(): void; webAudioMix(): boolean } };
+  await expect.poll(() => a.evaluate(() => (window as unknown as { trabas: number }).trabas)).toBe(1);
+  expect(await a.evaluate(() => (globalThis as unknown as V).__voz.webAudioMix())).toBe(false);
+  await expect.poll(() => a.evaluate(() => (globalThis as unknown as V).__voz.stats().then((s) => s.mic))).toBe(true);
+  // Beto escucha a Ana (las cuentas de prueba llevan un sufijo en el nombre).
+  const bytesDeAna = () => b.evaluate(() => (globalThis as unknown as { __voz: { stats(): Promise<{ remotos: Record<string, { bytes: number }> }> } }).__voz.stats())
+    .then((s) => Object.entries(s.remotos).find(([n]) => n.startsWith('Ana'))?.[1].bytes ?? 0);
+  await expect.poll(bytesDeAna, { timeout: 15_000 }).toBeGreaterThan(0);
+
+  // Va a segundo plano y la llamada se cae: no hay cartel de error y sale de la sala.
+  const visibilidad = (oculta: boolean) => a.evaluate((o) => { (window as unknown as { oculta: boolean }).oculta = o; document.dispatchEvent(new Event('visibilitychange')); }, oculta);
+  await visibilidad(true);
+  await a.evaluate(() => (globalThis as unknown as V).__voz.caer());
+  await expect(b.locator('section.voz li')).toHaveCount(1, { timeout: 15_000 });
+  await expect(a.getByRole('alert')).toHaveCount(0);
+  // Vuelve: se reconecta sola a la misma sala.
+  await visibilidad(false);
+  await expect(b.locator('section.voz li')).toHaveCount(2, { timeout: 15_000 });
+  await expect(a.getByRole('alert')).toHaveCount(0);
+  const antes = await bytesDeAna();
+  await expect.poll(bytesDeAna, { timeout: 15_000 }).toBeGreaterThan(antes);
+  await expect.poll(() => a.evaluate(() => (window as unknown as { trabas: number }).trabas)).toBe(2);
+});
+
+test('PC en el navegador: si se cae la llamada no vuelve sola', async ({ browser }) => {
+  const a = await (await browser.newContext()).newPage();
+  await crearCuenta(a, 'Ana');
+  await crearGrupo(a, 'Compu');
+  await a.getByRole('button', { name: 'Sala de voz General' }).click();
+  await expect(a.locator('section.voz li')).toHaveCount(1, { timeout: 15_000 });
+  expect(await a.evaluate(() => (globalThis as unknown as { __voz: { webAudioMix(): boolean } }).__voz.webAudioMix())).toBe(true);
+  await a.evaluate(() => (globalThis as unknown as { __voz: { caer(): void } }).__voz.caer());
+  await expect(a.getByRole('alert').filter({ hasText: 'Se perdió la conexión de voz.' })).toBeVisible();
+  await a.waitForTimeout(1500);
+  await expect(a.locator('section.voz li')).toHaveCount(0);
 });

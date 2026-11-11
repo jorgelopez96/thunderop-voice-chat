@@ -1,4 +1,7 @@
 <script lang="ts">
+  import { puedoEnLaLlamada } from '../grupos.svelte';
+  // Pausar, ir a otro momento y sacar piden "youtube" (permisos.ts); el volumen y la pantalla completa son de cada uno.
+  const puedo = $derived(puedoEnLaLlamada('youtube'));
   import { untrack } from 'svelte';
   import { lleno } from '../rango';
   import type { RecordModel } from 'pocketbase';
@@ -46,15 +49,15 @@
   {#if youtube.error}<p class="error" role="alert">{youtube.error}</p>{/if}
   <span class="arriba"><span class="yt"><TvMinimalPlay size={14} strokeWidth={2} />YouTube</span>
     <span class="titulo" title={youtube.actual?.titulo}>{youtube.actual?.titulo}{quien ? ` · lo puso ${quien}` : ''}</span></span>
-  <button class="icono cerrar" onclick={() => (sacando = true)} aria-label="Sacar el video" title="Sacar el video (para todos)"><X size={16} strokeWidth={1.75} /></button>
+  {#if puedo}<button class="icono cerrar" onclick={() => (sacando = true)} aria-label="Sacar el video" title="Sacar el video (para todos)"><X size={16} strokeWidth={1.75} /></button>{/if}
   <div class="controles">
-    {#if youtube.terminado}
+    {#if puedo && youtube.terminado}
       <button class="icono" onclick={deNuevo} aria-label="Ver de nuevo" title="Ver de nuevo (para todos)"><RotateCcw size={16} strokeWidth={1.75} /></button>
-    {:else}
+    {:else if puedo}
       <button class="icono" onclick={() => (youtube.pausado ? reanudar() : pausar())} aria-label={youtube.pausado ? 'Reanudar' : 'Pausar'} title={youtube.pausado ? 'Reanudar (para todos)' : 'Pausar (para todos)'}>
         {#if youtube.pausado}<Play size={16} strokeWidth={1.75} />{:else}<Pause size={16} strokeWidth={1.75} />{/if}</button>
     {/if}
-    <input class="barra" type="range" min="0" max={p.dur || 1} step="1" value={t} style={lleno(t, 0, p.dur || 1)} disabled={!p.dur}
+    <input class="barra" type="range" min="0" max={p.dur || 1} step="1" value={t} style={lleno(t, 0, p.dur || 1)} disabled={!p.dur || !puedo}
       aria-label="Ir a otro momento del video" oninput={(e) => (arrastre = +e.currentTarget.value)}
       onchange={(e) => { arrastre = null; void ir(+e.currentTarget.value); }} />
     <small class="tiempo">{mmss(t)}{p.dur ? ` / ${mmss(p.dur)}` : ''}</small>

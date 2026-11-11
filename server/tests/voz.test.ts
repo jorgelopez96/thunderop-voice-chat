@@ -100,7 +100,7 @@ describe('voz', () => {
     const bId = b.authStore.record!.id;
     await a.collection('groups').update(g.id, { silenciados: [bId] });
     expect((await b.collection('groups').getOne(g.id)).silenciados).toEqual([bId]);
-    await expect(b.collection('groups').update(g.id, { silenciados: [] })).rejects.toMatchObject({ status: 404 });
+    await expect(b.collection('groups').update(g.id, { silenciados: [] })).rejects.toMatchObject({ status: 403 });
   });
 
   it('sin variables LIVEKIT_* → 503 con mensaje en español', async () => {
@@ -225,7 +225,7 @@ describe('voz', () => {
       const { a, b, g } = await setup();
       const bId = b.authStore.record!.id;
       await silenciar(a, g.id, bId, true);
-      await expect(b.collection('groups').update(g.id, { silenciados: [] })).rejects.toMatchObject({ status: 404 });
+      await expect(b.collection('groups').update(g.id, { silenciados: [] })).rejects.toMatchObject({ status: 403 });
       expect((await a.collection('groups').getOne(g.id)).silenciados).toEqual([bId]);
     });
   

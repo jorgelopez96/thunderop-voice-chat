@@ -8,5 +8,9 @@ const consulta = typeof matchMedia === 'function' && !esEscritorio ? matchMedia(
 export const pantalla = $state({ movil: consulta?.matches ?? false });
 consulta?.addEventListener('change', (e) => (pantalla.movil = e.matches));
 
+/** Celular o tablet en el navegador, por el sistema (no por el ancho). El iPad se presenta como Mac, pero es táctil. */
+export const esCelular = !esEscritorio && typeof navigator !== 'undefined'
+  && (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent)));
+
 /** En el escritorio transmite el nativo; en el navegador, solo si existe el compartir pantalla (no en celulares). */
 export const puedeTransmitir = () => esEscritorio || typeof navigator.mediaDevices?.getDisplayMedia === 'function';

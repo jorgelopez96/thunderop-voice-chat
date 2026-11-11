@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { puedo } from '../permisos';
   import { alTocar, estabaAbierto } from '../menu';
   import { Mic, MicOff, Headphones, HeadphoneOff, ChevronDown, Monitor, AudioWaveform, Music, TvMinimalPlay, PhoneOff, MessageSquare, Ellipsis, Check } from '@lucide/svelte';
   import { voz, alternarMute, ensordecer, salirVoz, transmitir, transmitirNavegador, dejarDeTransmitir, cambiarCalidad, dispositivos, elegirEntrada, elegirSalida, type Dispositivo } from '../voz.svelte';
@@ -218,7 +219,8 @@
 </div>
 
 <div popover id="dock-sonidos" class="panel" style="left:{posPanel.x}px;bottom:{posPanel.y}px" ontoggle={(e) => (abiertoSonidos = e.newState === 'open')}>
-  {#if g}{#key g.id}<Botonera grupoId={g.id} userId={sesion.usuario?.id} soyDueno={g.owner === sesion.usuario?.id} />{/key}{/if}
+  {#if g}{#key g.id}<Botonera grupoId={g.id} puedeSubir={puedo(g, sesion.usuario?.id, 'subirSonidos')}
+    puedeEditar={(x) => puedo(g, sesion.usuario?.id, 'botonera') || (x.owner === sesion.usuario?.id && puedo(g, sesion.usuario?.id, 'subirSonidos'))} />{/key}{/if}
 </div>
 <div popover id="dock-musica" class="panel" style="left:{posPanel.x}px;bottom:{posPanel.y}px" ontoggle={(e) => (abiertoMusica = e.newState === 'open')}>
   <Musica />

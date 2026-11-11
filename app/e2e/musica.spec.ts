@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { grupoDeTres } from './cuentas';
+import { permisosATodos, grupoDeTres } from './cuentas';
 
 type M = { __musica: { reproductor: boolean; tiempo(): number; videoId: string | null } };
 const tiempo = (p: Page) => p.evaluate(() => (globalThis as unknown as M).__musica.tiempo());
@@ -12,6 +12,7 @@ test('cola de música compartida', async ({ browser }) => {
   // Reproductor falso (no toca YouTube ni suena). Dura mucho hasta que el test lo acorte.
   const [a, b, c] = await grupoDeTres(browser, 'Musiqueros',
     (p) => p.addInitScript(() => { (globalThis as unknown as { __ytFalso: object }).__ytFalso = { duracion: 600 }; }));
+  await permisosATodos('Musiqueros', ['agregarMusica', 'cola']); // con roles, la música pide permiso
   for (const p of [a, b]) await entrar(p);
   for (const p of [a, b]) await expect(p.locator('section.voz .franja li')).toHaveCount(2, { timeout: 10_000 });
 

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { puedo } from '../permisos';
   import { mantener } from '../mantener';
   import { lleno } from '../rango';
   import type { RecordModel } from 'pocketbase';
@@ -41,7 +42,9 @@
   /** Agregar amigo: no a uno mismo, ni a un amigo, ni con una solicitud en cualquier sentido. */
   const puedoAgregar = (id: string) => id !== sesion.usuario?.id
     && ![...amigos.lista.map((a) => a.usuario), ...amigos.recibidas.map((s) => s.usuario), ...amigos.enviadas.map((s) => s.usuario)].some((u) => u.id === id);
-  const puedoEchar = (id: string) => soyDueno && id !== grupo.owner;
+  // Echar, banear y devolver la voz: con el permiso, nunca al admin ni a uno mismo.
+  const puedoEchar = (id: string) => puedo(grupo, sesion.usuario?.id, 'banear') && id !== grupo.owner && id !== sesion.usuario?.id;
+  const puedoVoz = (id: string) => puedo(grupo, sesion.usuario?.id, 'bloquearVoz') && id !== grupo.owner && id !== sesion.usuario?.id;
 
   // Mantener apretado (celular) abre el mismo menú que el clic derecho, donde está el dedo.
   const enPunto = (clientX: number, clientY: number) => ({ clientX, clientY, preventDefault() {} }) as MouseEvent;
@@ -94,7 +97,7 @@
       <label class="vol">Volumen · {vol} %
         <input type="range" min="0" max="200" step="5" bind:value={vol} style={lleno(vol, 0, 200)} aria-label={`Volumen de ${m.name}`} oninput={() => volumen(m.id, vol / 100)} /></label>
     {/if}
-    {#if puedoEchar(m.id) && ((grupo.bloqueados ?? []) as string[]).includes(m.id)}
+    {#if puedoVoz(m.id) && ((grupo.bloqueados ?? []) as string[]).includes(m.id)}
       <hr /><button class="plano" onclick={() => { menu?.hidePopover(); hacer(() => bloquearVoz(grupo.id, m.id, false)); }}>Permitir volver a la voz</button>
     {/if}
     {#if puedoEchar(m.id)}<hr /><button class="plano peligro" onclick={() => { menu?.hidePopover(); aEchar = m; }}>Expulsar del grupo</button>

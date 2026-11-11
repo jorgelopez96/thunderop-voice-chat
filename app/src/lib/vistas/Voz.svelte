@@ -8,7 +8,8 @@
   import { navMovil, cerrarCapa } from '../navMovil.svelte';
   import { foto } from '../foto';
   import { mensajeError, sesion } from '../sesion.svelte';
-  import { grupos } from '../grupos.svelte';
+  import { grupos, asignarRol } from '../grupos.svelte';
+  import { puedo, rolesDe, rolesDeMiembro, type Permiso } from '../permisos';
   import { abrirChat, enviar, borrar } from '../chat.svelte';
   import AhoraSuena from './AhoraSuena.svelte';
   import Chat from './Chat.svelte';
@@ -32,6 +33,9 @@
   const silenciado = (id: string) => pedidos[id] ?? ((grupo.silenciados ?? []) as string[]).includes(id);
   let vols = $state<Record<string, number>>({ ...leerPrefs().volumenes });
   let error = $state('');
+  // Lo que se le puede hacer a alguien de la llamada depende de mis permisos (permisos.ts); al admin, nada.
+  const pp = (x: Permiso) => puedo(grupo, sesion.usuario?.id, x);
+  const moderable = (id: string) => id !== grupo.owner && id !== sesion.usuario?.id;
 
   async function alternar(id: string) {
     menu?.hidePopover();
@@ -67,7 +71,9 @@
   // Chat de la sala, plegable y recordado.
   let chatAbierto = $state((() => { try { return localStorage.getItem('dm.chatSala') !== '0'; } catch { return true; } })());
   $effect(() => { if (chatAbierto && voz.salaId) return mirarSala(voz.salaId); });
-  // Celular: el navegador puede cortar el audio con la pantalla bloqueada; se avisa una vez por sesión.
+  // Celular: qué pasa con la pantalla y al cambiar de app (ver segundoPlano.ts y volverALaLlamada); se avisa una vez por sesión.
+  const AVISO_ANDROID = 'Mientras estés en la llamada, la pantalla no se apaga sola.';
+  const AVISO_IPHONE = 'En iPhone, si cambiás de app la llamada se corta, pero cuando volvés entra sola de nuevo.';
   const esIphone = typeof navigator !== 'undefined' && /iPhone|iPad|iPod/.test(navigator.userAgent);
   let avisoLlamada = $state(pantalla.movil && (() => { try { return !sessionStorage.getItem('dm.avisoLlamada'); } catch { return true; } })());
   function entendido() { avisoLlamada = false; try { sessionStorage.setItem('dm.avisoLlamada', '1'); } catch { /* sin almacenamiento: dura esta vista */ } }
@@ -110,7 +116,7 @@
       <button class="plano" popovertarget="capa-participantes"><Users size={16} strokeWidth={1.75} /> Participantes · {miembros.length}</button>
       {#if !chatAbierto && !pantalla.movil}<button class="icono" onclick={() => plegarChat(true)} aria-label="Abrir chat de la sala" title="Chat de la sala"><MessageSquare size={16} strokeWidth={1.75} /></button>{/if}
     </header>
-    {#if avisoLlamada}<p class="aviso-celular">{esIphone ? 'En iPhone, la llamada se corta si bloqueás la pantalla o cambiás de app.' : 'Si bloqueás la pantalla o cambiás de app, la llamada puede cortarse.'}
+    {#if avisoLlamada}<p class="aviso-celular">{esIphone ? AVISO_IPHONE : AVISO_ANDROID}
       <button class="plano" onclick={entendido}>Entendido</button></p>{/if}
     {#if voz.conectando}<p role="status">Conectando…</p>{/if}
     {#if error}<p role="alert">{error}</p>{/if}
@@ -158,7 +164,7 @@
           onkeydown={(e) => { if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); fijarAncho(anchoChat + (e.key === 'ArrowLeft' ? 16 : -16)); } }}></div>
         <button class="icono plegar" onclick={() => plegarChat(false)} aria-label="Plegar chat de la sala" title="Plegar"><ChevronRight size={16} strokeWidth={1.75} /></button>{/if}
       {#key id}<Chat titulo="Chat de la sala" cerrar={pantalla.movil ? cerrarCapa : undefined} miembros={grupos.lista.find((g) => g.id === voz.grupoId)?.expand?.members ?? []} abrir={() => abrirChat(id)} enviar={(t, f, r) => enviar(id, t, f, r)} {borrar} silencio={id}
-        puedeBorrar={(m) => m.author === sesion.usuario?.id || soyDueno} />{/key}
+        puedeBorrar={(m) => m.author === sesion.usuario?.id || pp('mensajes')} />{/key}
     </aside>
   {/if}
 </section>
@@ -172,16 +178,30 @@
       <input type="range" min="0" max="200" step="5" value={Math.round((vols[p.id] ?? 1) * 100)} style={lleno((vols[p.id] ?? 1) * 100, 0, 200)}
         aria-label={`Volumen de ${p.nombre}`} oninput={(e) => cambiar(p.id, +e.currentTarget.value)} />
     </label>
-    {#if soyDueno}<hr /><button class="plano peligro" onclick={() => alternar(p.id)}>{silenciado(p.id) ? 'Quitar silencio' : 'Silenciar'}</button>
-      {#each salasVoz.filter((s) => s.id !== voz.salaId) as s (s.id)}
-        <button class="plano" onclick={() => moderar(() => moverA(grupo.id, p.id, s.id))}>Mover a {s.name}</button>
+    {#if soyDueno && moderable(p.id) && rolesDe(grupo).length > 1}
+      <hr /><span class="titulo-menu">Roles</span>
+      {#each rolesDe(grupo).slice(1) as r (r.id)}
+        <label class="casilla"><input type="checkbox" checked={rolesDeMiembro(grupo, p.id).some((x) => x.id === r.id)}
+          onchange={(e) => { const si = e.currentTarget.checked; moderar(() => asignarRol(grupo, p.id, r.id, si)); }} /><span class="punto" style:background={r.color}></span>{r.nombre}</label>
       {/each}
-      <button class="plano peligro" onclick={() => moderar(() => desconectar(grupo.id, p.id))}>Desconectar de la llamada</button>
-      <button class="plano peligro" onclick={() => moderar(() => bloquearVoz(grupo.id, p.id, true))}>Desconectar y no dejar volver</button>{/if}
+    {/if}
+    {#if moderable(p.id) && (pp('silenciar') || pp('desconectar') || pp('bloquearVoz'))}<hr />
+      {#if pp('silenciar')}<button class="plano peligro" onclick={() => alternar(p.id)}>{silenciado(p.id) ? 'Quitar silencio' : 'Silenciar'}</button>{/if}
+      {#if pp('desconectar')}
+        {#each salasVoz.filter((s) => s.id !== voz.salaId) as s (s.id)}
+          <button class="plano" onclick={() => moderar(() => moverA(grupo.id, p.id, s.id))}>Mover a {s.name}</button>
+        {/each}
+        <button class="plano peligro" onclick={() => moderar(() => desconectar(grupo.id, p.id))}>Desconectar de la llamada</button>
+      {/if}
+      {#if pp('bloquearVoz')}<button class="plano peligro" onclick={() => moderar(() => bloquearVoz(grupo.id, p.id, true))}>Desconectar y no dejar volver</button>{/if}
+    {/if}
   {/if}
 </div>
 
 <style>
+  .titulo-menu { color: var(--tenue); font-size: 12px; padding: 2px 8px; }
+  .menu .casilla { display: flex; align-items: center; gap: 6px; padding: 4px 8px; font-size: 13px; }
+  .menu .punto { width: 8px; height: 8px; border-radius: 50%; flex: none; }
   .voz { display: grid; grid-template-columns: 1fr; min-height: 0; min-width: 0; }
   .voz.conChat { grid-template-columns: minmax(0, 1fr) clamp(296px, var(--ancho-chat), 60%); }
   .borde-chat { position: absolute; inset: 0 auto 0 -4px; width: 8px; z-index: 2; cursor: col-resize; touch-action: none; }

@@ -31,6 +31,8 @@ async function setup() {
   const g = await a.collection('groups').create({ name: 'g' });
   const inv = await a.collection('invites').create({ group: g.id });
   await unirse(b, inv.code);
+  // Con roles, música/videos/sonidos piden permiso: acá el rol Todos los tiene, como antes de los roles.
+  await a.collection('groups').update(g.id, { roles: [{ id: 'todos', nombre: 'Todos', color: '', permisos: ['subirSonidos'] }] });
   return { a, b, c, g };
 }
 
@@ -70,7 +72,7 @@ describe('sonidos', () => {
   it('otro miembro no puede borrar un sonido ajeno', async () => {
     const { a, b, g } = await setup();
     const s = await a.collection('sonidos').create(fd(g.id, uid(a)));
-    await expect(b.collection('sonidos').delete(s.id)).rejects.toMatchObject({ status: 404 });
+    await expect(b.collection('sonidos').delete(s.id)).rejects.toMatchObject({ status: 403 });
   });
 
   it('el dueño del grupo puede borrar cualquiera', async () => {

@@ -13,6 +13,19 @@ let h: Harness;
 beforeAll(async () => { h = await startPocketBase(); });
 afterAll(async () => { await h.stop(); });
 
+describe('verificado', () => {
+  it('no se lo pone uno mismo, sí un superuser', async () => {
+    const u = await h.nuevoUsuario('vero');
+    const id = u.authStore.record!.id;
+    await u.collection('users').update(id, { verificado: true });
+    expect((await h.admin.collection('users').getOne(id)).verificado).toBe(false);
+    await h.admin.collection('users').update(id, { verificado: true });
+    expect((await h.admin.collection('users').getOne(id)).verificado).toBe(true);
+    await u.collection('users').update(id, { status: 'hola', verificado: false });
+    expect((await h.admin.collection('users').getOne(id)).verificado).toBe(true);
+  });
+});
+
 describe('fundador', () => {
   it('no se lo pone uno mismo, sí un superuser', async () => {
     const password = `Aa1!${randomBytes(8).toString('hex')}`;

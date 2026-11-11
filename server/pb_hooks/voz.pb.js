@@ -1,5 +1,5 @@
 /// <reference path="../pb_data/types.d.ts" />
-// Rutas de voz: token de LiveKit para una sala, presencia por grupo y silenciar (dueño).
+// Rutas de voz: token de LiveKit para una sala, presencia por grupo y moderación (admin o con permiso, ver roles.js).
 // Al borrar una sala de voz se borra también en LiveKit.
 
 routerAdd("POST", "/api/rooms/{id}/token", (e) => {
@@ -47,15 +47,9 @@ routerAdd("GET", "/api/groups/{id}/voz", (e) => {
 // Dueño silencia (o no) a un miembro: guarda `silenciados` y actualiza el permiso en vivo.
 routerAdd("POST", "/api/groups/{id}/silenciar", (e) => {
   const lk = require(`${__hooks}/livekit.js`);
-  const group = lk.grupoDeMiembro(e.app, e.request.pathValue("id"), e.auth.id);
-  if (group.getString("owner") !== e.auth.id) throw new ForbiddenError("Solo el dueño puede silenciar.");
+  if (typeof e.requestInfo().body.silenciado !== "boolean") throw new BadRequestError("Faltan datos: user y silenciado.");
+  const { group, user } = lk.moderar(e, "silenciar", "silenciar");
   const body = e.requestInfo().body;
-  const user = body.user;
-  if (typeof user !== "string" || typeof body.silenciado !== "boolean") {
-    throw new BadRequestError("Faltan datos: user y silenciado.");
-  }
-  if (user === e.auth.id) throw new BadRequestError("No te podés silenciar a vos mismo.");
-  if (!group.getStringSlice("members").includes(user)) throw new BadRequestError("Ese usuario no es miembro del grupo.");
 
   const otros = group.getStringSlice("silenciados").filter((u) => u !== user);
   group.set("silenciados", body.silenciado ? otros.concat(user) : otros);
@@ -73,12 +67,7 @@ routerAdd("POST", "/api/groups/{id}/silenciar", (e) => {
 // Dueño saca a un miembro de la llamada (puede volver a entrar; para que no hable, está silenciar).
 routerAdd("POST", "/api/groups/{id}/desconectar", (e) => {
   const lk = require(`${__hooks}/livekit.js`);
-  const group = lk.grupoDeMiembro(e.app, e.request.pathValue("id"), e.auth.id);
-  if (group.getString("owner") !== e.auth.id) throw new ForbiddenError("Solo el dueño puede desconectar.");
-  const user = e.requestInfo().body.user;
-  if (typeof user !== "string" || !user) throw new BadRequestError("Falta el usuario.");
-  if (user === e.auth.id) throw new BadRequestError("No te podés desconectar a vos mismo desde acá.");
-  if (!group.getStringSlice("members").includes(user)) throw new BadRequestError("Ese usuario no es miembro del grupo.");
+  const { group, user } = lk.moderar(e, "desconectar", "desconectar");
   lk.enSalasDeVoz(e.app, group.id, "RemoveParticipant", { identity: user });
   return e.json(200, { ok: true });
 }, $apis.requireAuth("users"));
@@ -87,7 +76,7 @@ routerAdd("POST", "/api/groups/{id}/desconectar", (e) => {
 // y su app se cambia sola. Si no está en ninguna llamada, no pasa nada.
 routerAdd("POST", "/api/groups/{id}/mover", (e) => {
   const lk = require(`${__hooks}/livekit.js`);
-  const { group, user } = lk.moderar(e);
+  const { group, user } = lk.moderar(e, "desconectar", "mover de sala");
   const sala = e.requestInfo().body.sala;
   let destino = null;
   try { destino = e.app.findRecordById("rooms", typeof sala === "string" ? sala : ""); } catch (_) { destino = null; }
@@ -106,11 +95,25 @@ routerAdd("POST", "/api/groups/{id}/mover", (e) => {
 // Dueño bloquea (lo saca y no lo deja volver a la voz) o desbloquea a un miembro.
 routerAdd("POST", "/api/groups/{id}/bloquear-voz", (e) => {
   const lk = require(`${__hooks}/livekit.js`);
-  const { group, user } = lk.moderar(e);
+  const roles = require(`${__hooks}/roles.js`);
   const si = e.requestInfo().body.bloqueado;
   if (typeof si !== "boolean") throw new BadRequestError("Falta bloqueado.");
+  let group, user;
+  if (si) ({ group, user } = lk.moderar(e, "bloquearVoz", "bloquear la voz"));
+  else {
+    // Desbloquear no pide que siga en el grupo: el que se fue también tiene que poder volver a la voz.
+    group = lk.grupoDeMiembro(e.app, e.request.pathValue("id"), e.auth.id);
+    roles.exigir(group, e.auth.id, "bloquearVoz", "desbloquear la voz");
+    user = String(e.requestInfo().body.user || "");
+    if (!user) throw new BadRequestError("Falta el usuario.");
+    if (user === e.auth.id) throw new BadRequestError("No podés hacerte esto a vos mismo.");
+  }
   const otros = group.getStringSlice("bloqueados").filter((u) => u !== user);
   group.set("bloqueados", si ? otros.concat(user) : otros);
+  // Quién y cuándo, para la lista de Bloqueados (aparte: las apps viejas leen `bloqueados` como lista de ids).
+  const info = roles.json(group, "bloqueadosInfo", {});
+  if (si) info[user] = { por: e.auth.id, fecha: new Date().toISOString() }; else delete info[user];
+  group.set("bloqueadosInfo", info);
   e.app.save(group);
   if (si) {
     lk.enSalasDeVoz(e.app, group.id, "RemoveParticipant", { identity: user });

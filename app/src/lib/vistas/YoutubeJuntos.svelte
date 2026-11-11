@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { puedoEnLaLlamada } from '../grupos.svelte';
+  const puedo = $derived(puedoEnLaLlamada('youtube'));
   import { youtube, poner, sacar } from '../youtube/youtube.svelte';
   import { voz } from '../voz.svelte';
 
@@ -14,12 +16,13 @@
 
 <div class="yt">
   <div class="cabecera"><h3>YouTube juntos</h3>
-    {#if youtube.actual}<button class="plano peligro chico" onclick={sacar}>Sacar el video</button>{/if}</div>
+    {#if puedo && youtube.actual}<button class="plano peligro chico" onclick={sacar}>Sacar el video</button>{/if}</div>
   <p class="tenue">Pegá el link de un video y lo ven todos los de la sala al mismo tiempo.</p>
+  {#if !puedo}<p class="tenue">Para poner videos hace falta un rol que lo permita.</p>{:else}
   <form class="fila" onsubmit={enviar}>
     <input bind:value={url} required placeholder="https://youtu.be/…" aria-label="Link de un video de YouTube" oninput={() => (youtube.error = '')} />
     <button type="submit" class="primario" disabled={!voz.salaId || voz.conectando || enviando}>{youtube.actual ? 'Cambiar' : 'Poner'}</button>
-  </form>
+  </form>{/if}
   {#if youtube.error}<p role="alert">{youtube.error}</p>{/if}
   {#if youtube.actual}<p class="tenue ahora">Ahora: <strong>{youtube.actual.titulo}</strong></p>{/if}
 </div>

@@ -7,6 +7,8 @@ import { leerPrefs, guardarPrefs, CALIDADES, volumenPantallaDe, guardarVolumenPa
 import { iniciarAudioPantalla, detenerAudioPantalla } from './audioPantalla';
 import { mensajeTransmision } from './transmision';
 import { duenio, esPantallaNativa, iniciarNativo, detenerNativo, calidadNativo, cortarSimulado, SUFIJO_PANTALLA } from './transmisorNativo';
+import { esCelular } from './plataforma.svelte';
+import { empezarLlamada, micEnPantalla, terminarLlamada } from './segundoPlano';
 
 /** `silenciado`: no está mandando audio (muteado, sin permiso del dueño o sin micrófono publicado). */
 /** `pantalla`: sid de la pantalla que comparte. `espectadores`: cuántos lo están mirando. */
@@ -14,8 +16,9 @@ export type Participante = { id: string; nombre: string; hablando: boolean; sile
 
 /** `sinPermiso`: el dueño nos silenció (los permisos de LiveKit no dejan publicar el micrófono). `viendo`: sids de las pantallas que miramos
  *  (en el orden en que se eligieron). */
-export const voz = $state<{ salaId: string | null; salaNombre: string; grupoId: string | null; conectando: boolean; error: string; muteado: boolean; ensordecido: boolean; sinPermiso: boolean; supresion: boolean; participantes: Participante[]; senal: 'buena' | 'regular' | 'mala'; transmitiendo: boolean; viendo: string[]; vistaPrevia: boolean; calidadEnVivo: Calidad | null }>({
-  salaId: null, salaNombre: '', grupoId: null, conectando: false, error: '', muteado: false, ensordecido: false, sinPermiso: false, supresion: leerPrefs().supresion, participantes: [], senal: 'buena', transmitiendo: false, viendo: [], vistaPrevia: leerPrefs().vistaPrevia, calidadEnVivo: null,
+/** `sinSonido`: el navegador no deja reproducir hasta que se toque la pantalla (celular que volvió solo a la llamada). */
+export const voz = $state<{ salaId: string | null; salaNombre: string; grupoId: string | null; conectando: boolean; error: string; muteado: boolean; ensordecido: boolean; sinPermiso: boolean; supresion: boolean; participantes: Participante[]; senal: 'buena' | 'regular' | 'mala'; transmitiendo: boolean; viendo: string[]; vistaPrevia: boolean; calidadEnVivo: Calidad | null; sinSonido: boolean }>({
+  salaId: null, salaNombre: '', grupoId: null, conectando: false, error: '', muteado: false, ensordecido: false, sinPermiso: false, supresion: leerPrefs().supresion, participantes: [], senal: 'buena', transmitiendo: false, viendo: [], vistaPrevia: leerPrefs().vistaPrevia, calidadEnVivo: null, sinSonido: false,
 });
 
 // LiveKit se carga recién al entrar a la voz: el arranque de la app no lo paga. Mientras haya `room`, `lk` está cargado.
@@ -85,7 +88,7 @@ async function publicarMic() {
   try {
     // Un string es "exacto, y si no está, cualquiera" en LiveKit: un micrófono guardado que ya no existe cae al predeterminado.
     // No se consulta enumerateDevices antes: sin permiso de micrófono WebView2 oculta los ids y se perdería el guardado.
-    await room.localParticipant.setMicrophoneEnabled(true, { deviceId: leerPrefs().entrada ?? 'default', noiseSuppression: false, echoCancellation: true, autoGainControl: true }, { dtx: false });
+    await room.localParticipant.setMicrophoneEnabled(true, opcionesMic(), { dtx: false });
   } catch (e) {
     const n = (e as Error)?.name;
     if (n === 'NotAllowedError') voz.error = 'No hay permiso para usar el micrófono. Habilitalo en el navegador para hablar.';
@@ -95,6 +98,10 @@ async function publicarMic() {
   actualizar();
 }
 
+// Celular: la supresión es la del propio navegador. RNNoise corre en un AudioContext, y el sistema lo frena con la
+// pantalla bloqueada: el micrófono mandaría silencio. Por lo mismo ahí no hay ganancia del micrófono.
+const opcionesMic = () => ({ deviceId: leerPrefs().entrada ?? 'default', noiseSuppression: esCelular && voz.supresion, echoCancellation: true, autoGainControl: true });
+
 // En serie: LiveKit recién registra el procesador cuando termina su init (import + wasm), así que dos
 // cambios rápidos sin cola pondrían dos procesadores. Cada paso decide al llegar su turno.
 let cola = Promise.resolve();
@@ -102,6 +109,7 @@ function aplicarProcesador() {
   cola = cola.then(async () => {
     const t = microfono();
     if (!t) return;
+    if (esCelular) return;
     const op = { supresion: voz.supresion, gananciaDb: leerPrefs().gananciaDb };
     try {
       let p = t.getProcessor() as ProcesadorMic | undefined;
@@ -119,7 +127,8 @@ function limpiar() {
   room = null; ctx = null; tx++;
   if (typeof document !== 'undefined') for (const el of document.querySelectorAll('audio[data-voz]')) el.remove();
   if (voz.ensordecido && !muteadoAntes) voz.muteado = false; // la sordera no deja el mic apagado para la próxima sala
-  Object.assign(voz, { salaId: null, salaNombre: '', grupoId: null, conectando: false, ensordecido: false, sinPermiso: false, participantes: [], senal: 'buena', transmitiendo: false, viendo: [] });
+  Object.assign(voz, { salaId: null, salaNombre: '', grupoId: null, conectando: false, ensordecido: false, sinPermiso: false, participantes: [], senal: 'buena', transmitiendo: false, viendo: [], sinSonido: false });
+  if (esCelular) terminarLlamada();
   void detenerAudioPantalla();
   if (nativo) { nativo = false; voz.calidadEnVivo = null; void detenerNativo(); }
   if (navegador) { navegador = false; voz.calidadEnVivo = null; }
@@ -139,7 +148,9 @@ export async function entrarVoz(roomId: string, salaNombre = '', grupoId: string
   catch { if (vigente()) { voz.error = 'No se pudo conectar a la voz.'; salirVoz(); } return; }
   if (!vigente()) return;
   const { Room, RoomEvent, Track } = lk;
-  const r = new Room({ adaptiveStream: true, dynacast: true, webAudioMix: { audioContext: c } });
+  // Celular: el sonido sale por <audio> comunes y no por el AudioContext, que el sistema frena con la pantalla
+  // bloqueada (se dejaba de escuchar). El precio es que ahí el volumen no pasa del 100% de lo que llega.
+  const r = new Room({ adaptiveStream: true, dynacast: true, ...(esCelular ? {} : { webAudioMix: { audioContext: c } }) });
   room = r;
 
   // Tono corto que va de `desde` a `hasta` Hz, `en` segundos desde ahora. Ensordecido no suena.
@@ -220,14 +231,20 @@ export async function entrarVoz(roomId: string, salaNombre = '', grupoId: string
   r.on(RoomEvent.Disconnected, (motivo) => {
     if (!vigente()) return;
     const D = lk.DisconnectReason;
-    if (motivo !== D.CLIENT_INITIATED) {
+    const buscadas: (typeof motivo)[] = [D.CLIENT_INITIATED, D.PARTICIPANT_REMOVED, D.ROOM_DELETED, D.DUPLICATE_IDENTITY];
+    const caida = !buscadas.includes(motivo);
+    const volver = caida && seCayoEnSegundoPlano() ? { sala: roomId, nombre: salaNombre, grupo: grupoId, hasta: Date.now() + VOLVER_HASTA } : null;
+    if (motivo !== D.CLIENT_INITIATED && !volver) {
       voz.error = motivo === D.PARTICIPANT_REMOVED ? 'Te sacaron de la llamada.'
         : motivo === D.ROOM_DELETED ? 'La sala de voz se borró.'
         : motivo === D.DUPLICATE_IDENTITY ? 'Te conectaste a la voz desde otro dispositivo.'
         : 'Se perdió la conexión de voz.';
     }
     salirVoz();
+    if (volver) { volverA = volver; volverALaLlamada(); }
   });
+  // Entró sin un toque en la pantalla (volvió solo): el navegador no deja sonar hasta el próximo toque.
+  r.on(RoomEvent.AudioPlaybackStatusChanged, () => { voz.sinSonido = !r.canPlaybackAudio; });
 
   let token: string, url: string;
   try {
@@ -245,6 +262,8 @@ export async function entrarVoz(roomId: string, salaNombre = '', grupoId: string
   }
   if (!vigente()) { r.disconnect(); return; } // por si el connect terminó pese al disconnect de limpiar()
   voz.conectando = false;
+  voz.sinSonido = !r.canPlaybackAudio || c.state !== 'running';
+  if (esCelular) empezarLlamada(salaNombre, voz.muteado, { colgar: salirVoz, alternarMic: () => void alternarMute(), ponerMic: (prendido) => { if (voz.muteado === prendido) void alternarMute(); } });
   avisarSala(roomId);
   for (const p of r.remoteParticipants.values()) for (const pub of p.trackPublications.values()) if (pub.source === Track.Source.Microphone) pub.setSubscribed(true);
   actualizar();
@@ -259,7 +278,33 @@ export async function entrarVoz(roomId: string, salaNombre = '', grupoId: string
 
 export function salirVoz() {
   intento++;
+  volverA = null;
   limpiar();
+}
+
+/** Con un toque del usuario: vuelve a sonar la llamada (y los pitidos y la botonera). */
+export async function activarSonido() {
+  await Promise.all([room?.startAudio(), ctx?.resume()].map((p) => p?.catch(() => {})));
+  voz.sinSonido = !!room && (!room.canPlaybackAudio || ctx?.state !== 'running');
+}
+
+// Celular: al ir a segundo plano el sistema congela la página (el iPhone siempre, al salir del navegador) y la llamada
+// se cae. Si se cayó así, al volver se reconecta sola a la misma sala, salvo que haya pasado demasiado.
+const VOLVER_HASTA = 30 * 60_000;
+let volverA: { sala: string; nombre: string; grupo: string | null; hasta: number } | null = null;
+let ultimaVezOculta = 0; // al ocultarse y al volver: lo que importa es si estuvo oculta hace poco
+// Dos minutos: al volver, LiveKit todavía intenta reconectar casi un minuto antes de darse por vencido.
+const seCayoEnSegundoPlano = () => esCelular && (document.visibilityState === 'hidden' || Date.now() - ultimaVezOculta < 120_000);
+function volverALaLlamada() {
+  const v = volverA;
+  if (!v || document.visibilityState !== 'visible') return;
+  volverA = null;
+  if (Date.now() < v.hasta && !voz.salaId) void entrarVoz(v.sala, v.nombre, v.grupo);
+}
+if (esCelular) {
+  document.addEventListener('visibilitychange', () => { ultimaVezOculta = Date.now(); volverALaLlamada(); });
+  // El primer toque después de volver solo destraba el sonido.
+  document.addEventListener('click', () => { if (voz.sinSonido) void activarSonido(); }, true); // pointerdown no cuenta como gesto para el audio
 }
 
 export async function alternarMute() {
@@ -268,13 +313,15 @@ export async function alternarMute() {
   if (!room) return;
   if (voz.muteado) await room.localParticipant.setMicrophoneEnabled(false).catch(() => {});
   else await publicarMic();
+  if (esCelular) micEnPantalla(voz.muteado);
   actualizar();
 }
 
 export async function cambiarSupresion(si: boolean) {
   voz.supresion = si;
   guardarPrefs({ supresion: si });
-  await aplicarProcesador();
+  if (esCelular) await microfono()?.restartTrack(opcionesMic()).catch(() => {});
+  else await aplicarProcesador();
 }
 
 /** Ganancia del micrófono en dB (−20 a +20), después de la supresión. Se guarda y se aplica en vivo. */
@@ -294,8 +341,8 @@ export async function elegirSalida(deviceId: string) {
 }
 
 // El 100% de la barrita es el doble de lo que llega (con todos al 200% se pidió que ese fuera el 100% nuevo).
-// Con webAudioMix la ganancia puede pasar de 1.
-const ganancia = (v: number | undefined) => (v ?? 1) * 2;
+// Con webAudioMix la ganancia puede pasar de 1; en el celular (sin webAudioMix) un <audio> no pasa de 1.
+const ganancia = (v: number | undefined) => Math.min(esCelular ? 1 : Infinity, (v ?? 1) * 2);
 
 /** Volumen de un usuario como lo muestra la barrita (0 a 2 = 0% a 200%). Se guarda en prefs. */
 export function volumen(userId: string, v: number) {
@@ -534,7 +581,7 @@ export function volumenPantalla(identidad: string, v: number) {
   if (!Number.isFinite(v)) return;
   const n = Math.min(2, Math.max(0, v));
   guardarVolumenPantalla(duenio(identidad), n);
-  room?.remoteParticipants.get(identidad)?.setVolume(n, lk.Track.Source.ScreenShareAudio);
+  room?.remoteParticipants.get(identidad)?.setVolume(esCelular ? Math.min(1, n) : n, lk.Track.Source.ScreenShareAudio);
 }
 
 /** Windows lista el mismo dispositivo hasta tres veces (Predeterminado, Comunicaciones y con su nombre): queda el
@@ -570,6 +617,9 @@ export async function dispositivos(): Promise<{ entradas: Dispositivo[]; salidas
 if (import.meta.env.DEV) {
   (globalThis as unknown as { __voz: unknown }).__voz = {
     terminarCaptura: cortarSimulado,
+    // LiveKit se dio por vencido reconectando (lo que pasa cuando el celular congela la página).
+    caer: () => room?.emit(lk.RoomEvent.Disconnected, lk.DisconnectReason.UNKNOWN_REASON),
+    webAudioMix: () => !!room?.options.webAudioMix,
     async stats() {
       const remotos: Record<string, { mic: boolean; bytes: number }> = {};
       for (const p of room?.remoteParticipants.values() ?? []) {

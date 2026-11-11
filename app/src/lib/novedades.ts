@@ -4,7 +4,12 @@ export type Novedad = { version: string; fecha: string; cambios: { tipo: 'nuevo'
 
 export const NOVEDADES: Novedad[] = [
   {
-    version: '0.7.9', fecha: '2026-11-09', cambios: [
+    version: '0.8.0', fecha: '2026-11-10', cambios: [
+      { tipo: 'nuevo', texto: 'Roles, como en Discord: el que creó el grupo arma roles con el nombre y el color que quiera, elige qué puede hacer cada uno (silenciar, desconectar, echar, manejar la música, editar la botonera y más) y se los da a la gente en Configuraciones → Participantes o con clic derecho en la llamada.' },
+      { tipo: 'nuevo', texto: 'La música, los videos de YouTube y subir o editar sonidos ahora van con permiso: así nadie te saca la música por las suyas. Tocar los sonidos e invitar gente lo sigue pudiendo hacer cualquiera.' },
+      { tipo: 'nuevo', texto: 'Configuraciones del grupo → Bloqueados: quién no puede entrar a la voz y quién está baneado, quién lo hizo y cuándo, con botón para deshacerlo.' },
+      { tipo: 'nuevo', texto: 'Cuentas verificadas: una tilde azul al lado del nombre.' },
+      { tipo: 'arreglo', texto: 'Desde el navegador del celular: la pantalla no se apaga sola mientras estás en una llamada, el sonido sigue con la pantalla bloqueada (en Android) y, si la llamada se corta por cambiar de app, al volver entrás solo a la misma sala.' },
       { tipo: 'nuevo', texto: 'Cuando sale una versión nueva aparece el botón «Actualizar» al lado de la campanita: un toque y se instala, sin tener que cerrar la app. Se fija cada 5 minutos.' },
       { tipo: 'nuevo', texto: 'El reproductor de música ahora está abajo a la derecha, en la barra de la llamada, y aparece solo cuando hay algo sonando. Tocando el nombre del tema se abre la cola; el volumen aparece al pasar el mouse.' },
       { tipo: 'arreglo', texto: 'Si alguien cambia la foto, el nombre o la descripción, se ve al toque en todos lados, sin tener que reiniciar.' },

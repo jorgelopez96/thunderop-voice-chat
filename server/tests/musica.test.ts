@@ -32,6 +32,8 @@ async function setup() {
   const g = await a.collection('groups').create({ name: 'g' });
   const inv = await a.collection('invites').create({ group: g.id });
   await unirse(b, inv.code);
+  // Con roles, música/videos/sonidos piden permiso: acá el rol Todos los tiene, como antes de los roles.
+  await a.collection('groups').update(g.id, { roles: [{ id: 'todos', nombre: 'Todos', color: '', permisos: ['agregarMusica', 'cola'] }] });
   const salas = await a.collection('rooms').getFullList({ filter: `group = "${g.id}"` });
   const voz = salas.find((r) => r.kind === 'voz')!.id;
   const chat = salas.find((r) => r.kind === 'chat')!.id;
