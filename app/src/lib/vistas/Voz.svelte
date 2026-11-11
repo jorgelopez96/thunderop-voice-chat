@@ -119,7 +119,7 @@
   <span class="espectadores num" title={`${n} ${n === 1 ? 'persona mirando' : 'personas mirando'}`}><Eye size={14} strokeWidth={1.75} />{n}</span>
 {/snippet}
 
-<section class="voz" class:conChat={chatAbierto && !pantalla.movil} class:movil={pantalla.movil} style:--ancho-chat="{anchoChat}px">
+<section class="voz entra" class:conChat={chatAbierto && !pantalla.movil} class:movil={pantalla.movil} style:--ancho-chat="{anchoChat}px">
   <div class="centro">
     <header>
       {#if volver}<button class="icono" aria-label="Volver" title="Volver" onclick={volver}><ChevronLeft size={22} strokeWidth={1.75} /></button>{/if}

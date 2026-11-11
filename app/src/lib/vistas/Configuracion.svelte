@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { cerrarAfuera } from '../afuera';
   import { lleno } from '../rango';
   import { User, Mic, Monitor, Bell, Palette, Trash2, Check, X } from '@lucide/svelte';
   import { voz, vistaPrevia, dispositivos, elegirEntrada, elegirSalida, elegirCamara, cambiarSupresion, cambiarGanancia } from '../voz.svelte';
@@ -77,7 +78,7 @@
   let escrito = $state('');
 </script>
 
-<dialog class="config" bind:this={d} oncancel={cerrar} onclose={cerrar} onclick={(e) => e.target === d && d.close()}>
+<dialog class="config" bind:this={d} oncancel={cerrar} onclose={cerrar} use:cerrarAfuera>
   <div class="cabecera-modal"><h2>Configuración</h2><button class="icono cerrar-modal" aria-label="Cerrar" title="Cerrar (Esc)" onclick={() => d.close()}><X size={20} strokeWidth={1.75} /></button></div>
   <div class="solapas" role="tablist">
     {#each SOLAPAS as [id, texto, Icono] (id)}

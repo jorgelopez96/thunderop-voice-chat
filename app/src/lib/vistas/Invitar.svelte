@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { cerrarAfuera } from '../afuera';
   import type { RecordModel } from 'pocketbase';
   import { Search, X } from '@lucide/svelte';
   import { amigos } from '../amigos.svelte';
@@ -37,7 +38,7 @@
   }
 </script>
 
-<dialog class="invitar" bind:this={d} onclose={cerrar} onclick={(e) => e.target === d && d.close()}>
+<dialog class="invitar" bind:this={d} onclose={cerrar} use:cerrarAfuera>
   <header>
     <h3>Invitá a tus amigos a {grupo.name}</h3>
     <button class="icono" aria-label="Cerrar" onclick={() => d?.close()}><X size={18} strokeWidth={1.75} /></button>

@@ -207,19 +207,38 @@ dialog.config[open] { display: flex; flex-direction: column; gap: 20px; }
 :root[data-modo='moderno'] button.primario:hover:not(:disabled)::after,
 :root[data-modo='moderno'] button[type='submit']:hover:not(:disabled)::after { opacity: 1; }
 
+/* Menús y modales: entran y también SALEN suaves (antes se cerraban de golpe). `allow-discrete` deja animar el
+   display y el top layer al cerrar; la salida es más corta que la entrada para que no se sienta lenta. */
+:root[data-modo='moderno'] [popover] {
+  transform-origin: top center; opacity: 0; transform: translateY(-4px) scale(.97);
+  transition: opacity 110ms var(--curva-entrada), transform 110ms var(--curva-entrada), overlay 110ms allow-discrete, display 110ms allow-discrete;
+}
 :root[data-modo='moderno'] [popover]:popover-open {
-  transform-origin: top center;
-  transition: opacity 150ms var(--curva-salida), transform 150ms var(--curva-salida);
+  opacity: 1; transform: none;
+  transition: opacity 150ms var(--curva-salida), transform 150ms var(--curva-salida), overlay 150ms allow-discrete, display 150ms allow-discrete;
   @starting-style { opacity: 0; transform: translateY(-4px) scale(.97); }
 }
+:root[data-modo='moderno'] dialog {
+  opacity: 0; transform: translateY(6px) scale(.98);
+  transition: opacity 140ms var(--curva-entrada), transform 140ms var(--curva-entrada), overlay 140ms allow-discrete, display 140ms allow-discrete;
+}
 :root[data-modo='moderno'] dialog[open] {
-  transition: opacity 220ms var(--curva-salida), transform 220ms var(--curva-salida);
+  opacity: 1; transform: none;
+  transition: opacity 220ms var(--curva-salida), transform 220ms var(--curva-salida), overlay 220ms allow-discrete, display 220ms allow-discrete;
   @starting-style { opacity: 0; transform: translateY(8px) scale(.98); }
 }
+:root[data-modo='moderno'] dialog::backdrop { opacity: 0; transition: opacity 140ms linear, overlay 140ms allow-discrete, display 140ms allow-discrete; }
 :root[data-modo='moderno'] dialog[open]::backdrop {
-  transition: opacity 160ms linear;
+  opacity: 1; transition: opacity 160ms linear, overlay 160ms allow-discrete, display 160ms allow-discrete;
   @starting-style { opacity: 0; }
 }
+/* Telón de la pantalla completa (pantallaCompleta.svelte.ts): tapa los saltos de la ventana de la app. Va en los dos modos. */
+.telon { position: fixed; inset: 0; z-index: 10000; background: #000; opacity: 0; pointer-events: none; transition: opacity 120ms linear; }
+.telon.bajo { opacity: 1; }
+/* Cambiar de grupo o de sala: la pantalla nueva entra con un fundido corto (antes era un corte seco). Solo opacidad:
+   un transform haría de contenedor de lo `position: fixed` de adentro (la pantalla completa de una transmisión). */
+:root[data-modo='moderno'] .entra { animation: entra 200ms var(--curva-salida); }
+@keyframes entra { from { opacity: 0; } }
 /* Solapas: la línea de la elegida crece desde el centro (en básico es la línea fija de arriba). */
 :root[data-modo='moderno'] .solapas button { position: relative; }
 :root[data-modo='moderno'] .solapas [aria-selected='true'] { box-shadow: none; }

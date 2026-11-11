@@ -88,5 +88,8 @@
   :global(.escenarios.completa) .controles { bottom: 92px; }
   /* Pantalla completa (la página entera va a pantalla completa): tapa todo lo demás. */
   .escenario.completa { position: fixed; inset: 0; z-index: 100; height: auto; border: 0; border-radius: 0; background: #000; }
+  /* Al agrandarse, la transmisión crece suave desde su lugar en vez de saltar. */
+  :global([data-modo='moderno']) .escenario.completa { animation: agrandar 220ms var(--curva-salida); }
+  @keyframes agrandar { from { opacity: .5; transform: scale(.96); } }
 
 </style>

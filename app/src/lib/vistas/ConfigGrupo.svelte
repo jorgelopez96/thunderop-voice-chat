@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { cerrarAfuera } from '../afuera';
   import { lleno } from '../rango';
   import type { RecordModel } from 'pocketbase';
   import { ImagePlus, Plus, Trash2, X } from '@lucide/svelte';
@@ -76,7 +77,7 @@
   }
 </script>
 
-<dialog class="config" bind:this={d} onclose={cerrar} onclick={(e) => e.target === d && d.close()}>
+<dialog class="config" bind:this={d} onclose={cerrar} use:cerrarAfuera>
   <div class="cabecera-modal"><h2>Configuraciones de {grupo.name}</h2><button class="icono cerrar-modal" aria-label="Cerrar" title="Cerrar (Esc)" onclick={() => d?.close()}><X size={20} strokeWidth={1.75} /></button></div>
   <div class="solapas" role="tablist">
     {#each solapas as [id, texto] (id)}

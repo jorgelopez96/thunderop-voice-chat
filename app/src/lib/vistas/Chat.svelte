@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { cerrarAfuera } from '../afuera';
   import { alTocar, estabaAbierto } from '../menu';
   import { horaDe } from '../hora.svelte';
   import Insignia from './Insignia.svelte';
@@ -249,7 +250,7 @@
   }
 </script>
 
-<section class="chat" class:movil={pantalla.movil} aria-label="Chat {titulo}">
+<section class="chat entra" class:movil={pantalla.movil} aria-label="Chat {titulo}">
   <h2 class="titulo">{#if volver}<button class="icono" aria-label="Volver" title="Volver" onclick={volver}><ChevronLeft size={22} strokeWidth={1.75} /></button>{/if}{#if menu}<button class="icono" aria-label="Abrir salas" title="Salas" onclick={menu}><Menu size={20} strokeWidth={1.75} /></button>{/if}{#if fotoChat}<img class="avatar foto-chat" src={fotoChat} alt="" />{/if}<span class="nombre-chat">{titulo}</span>{#if silencio}<MenuChat chat={silencio} {acciones} />{/if}{#if gente}<button class="icono" aria-label="Ver participantes" title="Participantes" onclick={gente}><Users size={19} strokeWidth={1.75} /></button>{/if}{#if cerrar}<button class="icono cerrar-chat" aria-label="Cerrar chat" title="Cerrar (Esc)" onclick={cerrar}><X size={18} strokeWidth={1.75} /></button>{/if}</h2>
   <div class="lista" bind:this={lista} onscroll={alScroll} onloadcapture={() => pegado && bajar()} data-testid="mensajes">
     {#if chat.hayMas}<button class="plano" onclick={() => chat.cargarMas()}>Cargar anteriores</button>{/if}
@@ -339,7 +340,7 @@
     {#if gifsAbierto}<Gifs elegir={mandarGif} />{/if}
   </div>
   <MenuEmojis bind:menu={menuEmojis} estilo={posMenu} elegir={elegirEmoji} />
-  <dialog class="visor" bind:this={visor} onclose={() => (grande = null)} onclick={(e) => e.target === visor && visor.close()}>
+  <dialog class="visor" bind:this={visor} onclose={() => (grande = null)} use:cerrarAfuera>
     {#if grande}
       <div class="acciones">
         <a class="boton plano" href={pb.files.getURL(grande, grande.file, { download: true })} download title="Descargar" aria-label="Descargar"><Download size={18} strokeWidth={1.75} /></a>

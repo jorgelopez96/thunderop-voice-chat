@@ -4,7 +4,10 @@ export type Novedad = { version: string; fecha: string; cambios: { tipo: 'nuevo'
 
 export const NOVEDADES: Novedad[] = [
   {
-    version: '0.9.0', fecha: '2026-11-11', cambios: [
+    version: '0.9.1', fecha: '2026-11-11', cambios: [
+      { tipo: 'arreglo', texto: 'Si seleccionás texto en una ventana (por ejemplo, el nombre del grupo) y soltás el mouse afuera, ya no se cierra.' },
+      { tipo: 'arreglo', texto: 'Entrar y salir de pantalla completa ya no parpadea: la ventana cambia de tamaño tapada con un fundido y la transmisión se agranda suave.' },
+      { tipo: 'nuevo', texto: 'Modo moderno: los menús y las ventanas también se cierran suave (antes desaparecían de golpe), y cambiar de grupo o de sala tiene un fundido corto.' },
       { tipo: 'nuevo', texto: 'Cámara: prendela con el botón nuevo de la llamada y tu tarjeta muestra tu video, en la mejor calidad que dé tu cámara. Anda en la PC, en el navegador y en el celular. Tocando la tarjeta la ves en pantalla completa.' },
       { tipo: 'nuevo', texto: 'Modo streamer: al transmitir elegí «Pantalla + cámara» y tu cámara va en una ventanita encima de tu pantalla. La acomodás donde quieras arrastrándola en tu vista previa (y le cambiás el tamaño desde la esquina); el que mira la puede esconder.' },
       { tipo: 'nuevo', texto: 'Ahora se ve quién está ensordecido (auricular tachado) y quién tiene la cámara prendida en todos lados: en la lista de salas, en la llamada, en participantes y en el inicio.' },

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { cerrarAfuera } from '../afuera';
   import { sesion } from '../sesion.svelte';
   import { amigos, quitar, bloquear } from '../amigos.svelte';
   import { privado, abrirPrivado, enviarPrivado, borrarPrivado, marcarLeido } from '../privados.svelte';
@@ -16,7 +17,7 @@
   $effect(() => { if (privado.con && !d?.open) d?.showModal(); });
 </script>
 
-<dialog class="privado" bind:this={d} onclose={() => (privado.con = null)} onclick={(e) => e.target === d && d.close()}>
+<dialog class="privado" bind:this={d} onclose={() => (privado.con = null)} use:cerrarAfuera>
   {#if privado.con}
     {@const u = privado.con}
     {#key u.id}

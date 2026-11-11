@@ -10,6 +10,27 @@ let estabaMax = false;
 
 const ventana = async () => (await import('@tauri-apps/api/window')).getCurrentWindow();
 
+// Telón: en la app, entrar y salir son dos saltos de la ventana (des-maximizar y pantalla completa, o al revés) y se
+// veía achicarse y agrandarse de golpe. Mientras salta, un negro la tapa con un fundido corto (.telon en app.css).
+let telonEl: HTMLDivElement | null = null;
+const esperar = (ms: number) => new Promise((r) => setTimeout(r, ms));
+async function bajarTelon(fundido = true) {
+  if (!isTauri()) return;
+  const t = (telonEl ??= Object.assign(document.createElement('div'), { className: 'telon' }));
+  document.body.append(t);
+  if (!fundido) t.style.transitionDuration = '0ms';
+  void t.getBoundingClientRect(); // que arranque transparente y el fundido se vea
+  t.classList.add('bajo');
+  if (fundido) await esperar(130);
+  t.style.transitionDuration = '';
+}
+function subirTelon() {
+  const t = telonEl;
+  if (!t) return;
+  // Un toque después del último salto, para que la ventana ya esté en su tamaño final.
+  setTimeout(() => { t.classList.remove('bajo'); setTimeout(() => { if (!t.classList.contains('bajo')) t.remove(); }, 250); }, 140);
+}
+
 async function devolverVentana() {
   if (!isTauri()) return;
   try {
@@ -21,6 +42,7 @@ async function devolverVentana() {
 }
 
 export async function entrarPantallaCompleta(sid: string) {
+  await bajarTelon();
   if (isTauri()) {
     try {
       const w = await ventana();
@@ -33,15 +55,20 @@ export async function entrarPantallaCompleta(sid: string) {
     await document.documentElement.requestFullscreen();
     completa.sid = sid;
   } catch { void devolverVentana(); }
+  subirTelon();
 }
 
-export const salirPantallaCompleta = () => document.exitFullscreen().catch(() => {});
+export async function salirPantallaCompleta() {
+  await bajarTelon();
+  await document.exitFullscreen().catch(() => {});
+}
 
 // Se sale también con Esc o al dejar de mirar: se vuelve todo a como estaba.
 if (typeof document !== 'undefined') {
   document.addEventListener('fullscreenchange', () => {
     if (document.fullscreenElement || completa.sid === null) return;
     completa.sid = null;
-    void devolverVentana();
+    // Con Esc el navegador ya salió: el telón cae de golpe para tapar el maximizar.
+    void bajarTelon(false).then(devolverVentana).then(subirTelon);
   });
 }

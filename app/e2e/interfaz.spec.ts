@@ -115,3 +115,38 @@ test('con una versión nueva bajada aparece el botón Actualizar al lado de la c
   await expect(page.getByText('con la versión 9.9.9')).toBeVisible();
   await page.screenshot({ path: 'test-results/z-actualizar.png' });
 });
+
+test('seleccionar texto en un modal y soltar afuera no lo cierra; un clic afuera sí', async ({ browser }) => {
+  const p = await (await browser.newContext()).newPage();
+  await crearCuenta(p, 'Ana');
+  await crearGrupo(p, 'Modales');
+  await p.getByRole('button', { name: 'Modales', exact: true }).click();
+  await p.getByRole('button', { name: 'Configuraciones' }).click();
+  const modal = p.locator('dialog.config');
+  await expect(modal).toBeVisible();
+  const campo = (await modal.getByLabel('Nombre del grupo').boundingBox())!;
+  const caja = (await modal.boundingBox())!;
+  // Arrastra desde adentro del campo hasta el fondo, como al seleccionar texto.
+  await p.mouse.move(campo.x + 5, campo.y + campo.height / 2);
+  await p.mouse.down();
+  await p.mouse.move(caja.x + caja.width + 40, caja.y + 10, { steps: 6 });
+  await p.mouse.up();
+  await expect(modal).toBeVisible();
+  // Clic de verdad en el fondo: se cierra.
+  await p.mouse.click(caja.x + caja.width + 40, caja.y + 10);
+  await expect(modal).toBeHidden();
+});
+
+test('modo moderno: el modal se cierra con animación y después no traba los clics', async ({ browser }) => {
+  const p = await (await browser.newContext()).newPage();
+  await p.addInitScript(() => { try { localStorage.setItem('dm.modo', 'moderno'); } catch { /* sin almacenamiento */ } });
+  await crearCuenta(p, 'Ana');
+  expect(await p.evaluate(() => document.documentElement.dataset.modo)).toBe('moderno');
+  await p.getByRole('button', { name: 'Configuración' }).click();
+  await expect(p.locator('dialog.config')).toBeVisible();
+  await p.keyboard.press('Escape');
+  await expect(p.locator('dialog.config')).toBeHidden();
+  // Enseguida se puede usar lo de atrás (el modal que se va no se queda tapando).
+  await p.getByRole('button', { name: 'Crear mi grupo' }).click({ timeout: 2000 });
+  await expect(p.getByPlaceholder('Nombre del grupo nuevo')).toBeVisible();
+});

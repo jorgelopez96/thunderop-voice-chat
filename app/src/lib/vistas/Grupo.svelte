@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { cerrarAfuera } from '../afuera';
   import EstadoVoz from './EstadoVoz.svelte';
   import type { RecordModel } from 'pocketbase';
   import { untrack } from 'svelte';
@@ -171,7 +172,7 @@
   </div>
 {/snippet}
 
-<div class="grupo" class:enSalaVoz class:movil={pantalla.movil} class:lista={pantalla.movil && !enSala}>
+<div class="grupo entra" class:enSalaVoz class:movil={pantalla.movil} class:lista={pantalla.movil && !enSala}>
   <div class="lado-izq">
   <nav class="salas">
     <div class="cab-salas">
@@ -235,7 +236,7 @@
     </dialog>
   {/if}
   {#if creando}{@const kind = creando}
-    <dialog bind:this={dlgNueva} onclose={() => (creando = null)} onclick={(e) => e.target === dlgNueva && dlgNueva.close()}>
+    <dialog bind:this={dlgNueva} onclose={() => (creando = null)} use:cerrarAfuera>
       <form class="renombrar" onsubmit={(e) => { e.preventDefault(); hacer(() => agregar(kind)); }}>
         <h3>{kind === 'voz' ? 'Nueva sala de voz' : 'Nueva sala de chat'}</h3>
         <input bind:value={nueva} required maxlength="40" placeholder="Nombre de la sala" aria-label="Nombre de la sala" />

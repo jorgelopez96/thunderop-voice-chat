@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { cerrarAfuera } from '../afuera';
   import Avatar from './Avatar.svelte';
   import { esEscritorio } from '../plataforma.svelte';
   import { X } from '@lucide/svelte';
@@ -41,7 +42,7 @@
   {#if esEscritorio}<button class="plano peligroso" onclick={salirDeLaApp}>Salir de Thunderop</button>{/if}
 </div>
 
-<dialog class="editar" bind:this={d} onclose={() => (editando = false)} onclick={(e) => e.target === d && d.close()}>
+<dialog class="editar" bind:this={d} onclose={() => (editando = false)} use:cerrarAfuera>
   <div class="cabecera-modal"><h2>Mi perfil</h2>
     <button class="icono cerrar-modal" aria-label="Cerrar" title="Cerrar (Esc)" onclick={() => d?.close()}><X size={20} strokeWidth={1.75} /></button></div>
   {#if editando}<Perfil />{/if}
