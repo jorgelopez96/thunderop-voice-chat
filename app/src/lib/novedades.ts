@@ -4,7 +4,12 @@ export type Novedad = { version: string; fecha: string; cambios: { tipo: 'nuevo'
 
 export const NOVEDADES: Novedad[] = [
   {
-    version: '0.9.2', fecha: '2026-11-11', cambios: [
+    version: '0.10.0', fecha: '2026-11-11', cambios: [
+      { tipo: 'nuevo', texto: 'Las invitaciones llegan al chat como una tarjeta: el grupo con su foto y cuántos son, y el botón Unirme te mete y te lleva directo. Si ya sos parte, te lo dice.' },
+      { tipo: 'nuevo', texto: 'Clic derecho sobre alguien en la lista de salas (o en la llamada): un menú más chico con su volumen, sus roles (cada uno en su renglón) y lo que puedas hacerle.' },
+      { tipo: 'nuevo', texto: 'Roles: permiso nuevo «Borrar sonidos», y quien lo tiene ve un tachito en cada sonido de la botonera. Los roles que podían editar la botonera también pueden borrar, como antes.' },
+      { tipo: 'arreglo', texto: 'Si dos personas cambian algo del grupo al mismo tiempo (silenciar, bloquear, roles, entrar o salir), ya no se pisan.' },
+      { tipo: 'arreglo', texto: 'En el celular, si un moderador te desconectó mientras tenías la app en segundo plano, ya no volvés a entrar solo a la llamada.' },
       { tipo: 'arreglo', texto: 'Los chats siempre te dejan en el último mensaje: al cambiar de sala o de pestaña y volver, y aunque una foto o la vista previa de un link termine de cargar después.' },
       { tipo: 'arreglo', texto: 'Cámara: la ventanita sobre tu pantalla también se acomoda con las flechas (y + / − para el tamaño), ya no tapa el EN VIVO, y si la apagás y prendés a mano mientras transmitís, al cortar queda como la dejaste.' },
       { tipo: 'arreglo', texto: 'Si te reconectás, los demás te siguen viendo ensordecido; y si volvés a la app después de mucho, te avisa que la llamada se cortó.' },

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import MenuPersona from './MenuPersona.svelte';
   import EstadoVoz from './EstadoVoz.svelte';
   import { lleno } from '../rango';
   import Insignia from './Insignia.svelte';
@@ -29,26 +30,11 @@
   let { grupo, soyDueno, sala, salasVoz = [], abrirSalas, volver }: { grupo: RecordModel; soyDueno: boolean; sala: string; salasVoz?: RecordModel[]; abrirSalas?: () => void; volver?: () => void } = $props();
   const miembros = $derived((grupo.expand?.members ?? []) as RecordModel[]);
   const miembro = (id: string) => miembros.find((m) => m.id === id);
-  // Silencios recién pedidos, hasta que el grupo se refresque con el valor del servidor.
-  let pedidos = $state<Record<string, boolean>>({});
-  const silenciado = (id: string) => pedidos[id] ?? ((grupo.silenciados ?? []) as string[]).includes(id);
-  let vols = $state<Record<string, number>>({ ...leerPrefs().volumenes });
   let error = $state('');
   // Lo que se le puede hacer a alguien de la llamada depende de mis permisos (permisos.ts); al admin, nada.
   const pp = (x: Permiso) => puedo(grupo, sesion.usuario?.id, x);
   const moderable = (id: string) => id !== grupo.owner && id !== sesion.usuario?.id;
 
-  async function alternar(id: string) {
-    menu?.hidePopover();
-    error = '';
-    const nuevo = !silenciado(id);
-    try { await silenciar(grupo.id, id, nuevo); pedidos[id] = nuevo; } catch (e) { error = mensajeError(e); }
-  }
-  async function moderar(f: () => Promise<void>) {
-    menu?.hidePopover();
-    error = '';
-    try { await f(); } catch (e) { error = mensajeError(e); }
-  }
 
 
   // "Pantalla + cámara": en la vista previa, la ventanita de la cámara se arrastra (mover) o desde la esquina (tamaño).
@@ -86,16 +72,12 @@
   // Fondo de la tarjeta: el color del usuario, o un tono derivado del nombre.
   const fondo = (color: string | undefined, nombre: string) =>
     `color-mix(in srgb, ${color || `hsl(${[...nombre].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 7)} 45% 40%)`} 35%, var(--panel))`;
-  function cambiar(id: string, pct: number) { vols[id] = pct / 100; volumen(id, pct / 100); }
 
-  // Clic derecho en una píldora: volumen y, para el dueño, silenciar.
-  let menu = $state<HTMLElement>();
-  let elegido = $state<{ id: string; nombre: string } | null>(null);
+  // Clic derecho en una tarjeta: el menú de esa persona (MenuPersona, el mismo de la lista de salas).
+  let menuPersona = $state<ReturnType<typeof MenuPersona>>();
   function abrirMenu(e: MouseEvent, p: { id: string; nombre: string; local: boolean }) {
     e.preventDefault();
-    if (p.local) return;
-    elegido = p;
-    void abrirEnPunto(menu, e.clientX, e.clientY);
+    if (!p.local) menuPersona?.abrir(e.clientX, e.clientY, p);
   }
 
   // Chat de la sala, plegable y recordado.
@@ -212,34 +194,7 @@
   {/if}
 </section>
 
-<div popover bind:this={menu} class="menu">
-  {#if elegido}
-    {@const p = elegido}
-    {@const amigo = amigos.lista.find((a) => a.usuario.id === p.id)?.usuario}
-    {#if amigo}<button class="plano" onclick={() => { menu?.hidePopover(); privado.con = amigo; }}><MessageSquare size={16} strokeWidth={1.75} /> Enviar mensaje</button><hr />{/if}
-    <label>Volumen · {Math.round((vols[p.id] ?? 1) * 100)} %
-      <input type="range" min="0" max="200" step="5" value={Math.round((vols[p.id] ?? 1) * 100)} style={lleno((vols[p.id] ?? 1) * 100, 0, 200)}
-        aria-label={`Volumen de ${p.nombre}`} oninput={(e) => cambiar(p.id, +e.currentTarget.value)} />
-    </label>
-    {#if soyDueno && moderable(p.id) && rolesDe(grupo).length > 1}
-      <hr /><span class="titulo-menu">Roles</span>
-      {#each rolesDe(grupo).slice(1) as r (r.id)}
-        <label class="casilla"><input type="checkbox" checked={rolesDeMiembro(grupo, p.id).some((x) => x.id === r.id)}
-          onchange={(e) => { const si = e.currentTarget.checked; moderar(() => asignarRol(grupo, p.id, r.id, si)); }} /><span class="punto" style:background={r.color}></span>{r.nombre}</label>
-      {/each}
-    {/if}
-    {#if moderable(p.id) && (pp('silenciar') || pp('desconectar') || pp('bloquearVoz'))}<hr />
-      {#if pp('silenciar')}<button class="plano peligro" onclick={() => alternar(p.id)}>{silenciado(p.id) ? 'Quitar silencio' : 'Silenciar'}</button>{/if}
-      {#if pp('desconectar')}
-        {#each salasVoz.filter((s) => s.id !== voz.salaId) as s (s.id)}
-          <button class="plano" onclick={() => moderar(() => moverA(grupo.id, p.id, s.id))}>Mover a {s.name}</button>
-        {/each}
-        <button class="plano peligro" onclick={() => moderar(() => desconectar(grupo.id, p.id))}>Desconectar de la llamada</button>
-      {/if}
-      {#if pp('bloquearVoz')}<button class="plano peligro" onclick={() => moderar(() => bloquearVoz(grupo.id, p.id, true))}>Desconectar y no dejar volver</button>{/if}
-    {/if}
-  {/if}
-</div>
+<MenuPersona bind:this={menuPersona} {grupo} {salasVoz} alError={(m) => (error = m)} />
 
 <style>
   .previa-caja { position: relative; display: inline-block; max-width: 100%; }
@@ -251,9 +206,6 @@
   .franja li > .etiqueta-nombre, .franja li > .chips-vivo, .franja li > .ver { z-index: 1; }
   .cam :global(.video-cam) { width: 100%; height: 100%; object-fit: cover; }
   .cam:fullscreen :global(.video-cam) { object-fit: contain; }
-  .titulo-menu { color: var(--tenue); font-size: 12px; padding: 2px 8px; }
-  .menu .casilla { display: flex; align-items: center; gap: 6px; padding: 4px 8px; font-size: 13px; }
-  .menu .punto { width: 8px; height: 8px; border-radius: 50%; flex: none; }
   .voz { display: grid; grid-template-columns: 1fr; min-height: 0; min-width: 0; }
   .voz.conChat { grid-template-columns: minmax(0, 1fr) clamp(296px, var(--ancho-chat), 60%); }
   .borde-chat { position: absolute; inset: 0 auto 0 -4px; width: 8px; z-index: 2; cursor: col-resize; touch-action: none; }
@@ -321,11 +273,4 @@
   .chatSala :global(.hora-lado) { width: 28px; }
   .chatSala :global(.composer) { margin: 8px; }
   .plegar { position: absolute; top: 8px; right: 8px; z-index: 1; }
-  .menu { position: fixed; inset: auto; margin: 0; padding: 8px; min-width: 220px; flex-direction: column; gap: 4px;
-    background: var(--elevado); color: var(--texto); border: 1px solid var(--borde-fuerte); border-radius: var(--radio-menu); box-shadow: var(--sombra-2); }
-  .menu:popover-open { display: flex; }
-  .menu input { padding: 0; background: none; border: 0; }
-  .menu hr { border: 0; border-top: 1px solid var(--borde); margin: 4px 0; width: 100%; }
-  .menu button { justify-content: flex-start; }
-  .menu button:not(.peligro) { color: var(--texto); }
 </style>

@@ -214,7 +214,7 @@ describe('roles: música, YouTube, botonera, salas y mensajes', () => {
     expect((await s.b.collection('sonidos').update(mio.id, { name: 'mio' })).name).toBe('mio');
     await expect(s.b.collection('sonidos').update(deAna.id, { name: 'x' })).rejects.toMatchObject({ status: 403 });
     await expect(s.c.collection('sonidos').delete(mio.id)).rejects.toMatchObject({ status: 403 });
-    await darRol(s, s.ids.c, ['botonera']);
+    await darRol(s, s.ids.c, ['botonera', 'borrarSonidos']);
     await s.c.collection('sonidos').update(deAna.id, { name: 'otro' });
     await s.c.collection('sonidos').delete(mio.id);
     // Sin "subirSonidos", Beto ya no edita ni lo suyo.
@@ -272,10 +272,59 @@ describe('roles: revisión final', () => {
   });
 });
 
+describe('roles: borrar sonidos', () => {
+  const wav = () => { const b = Buffer.alloc(44 + 200); b.write('RIFF', 0); b.write('WAVEfmt ', 8); b.write('data', 36); return b; };
+  const fd = (g: string, owner: string) => { const d = new FormData(); d.append('group', g); d.append('owner', owner); d.append('name', 'pum'); d.append('file', new File([wav()], 'x.wav', { type: 'audio/wav' })); return d; };
+
+  it('borrar uno ajeno pide "borrarSonidos": "botonera" sola edita pero no borra', async () => {
+    const s = await setup();
+    const deAna = await s.a.collection('sonidos').create(fd(s.g.id, s.ids.a));
+    await darRol(s, s.ids.b, ['botonera']);
+    await s.b.collection('sonidos').update(deAna.id, { name: 'otro' });
+    await expect(s.b.collection('sonidos').delete(deAna.id)).rejects.toMatchObject({ status: 403, message: 'No tenés permiso para borrar sonidos.' });
+    await darRol(s, s.ids.c, ['borrarSonidos']);
+    await s.c.collection('sonidos').delete(deAna.id);
+  });
+});
+
 describe('roles: detalles', () => {
   it('cada rol se guarda solo con sus cuatro campos', async () => {
     const s = await setup();
     const g = await s.a.collection('groups').update(s.g.id, { roles: [{ ...TODOS, basura: 'x'.repeat(500) }, { id: 'rabcdef1', nombre: ' DJ ', color: '#5bc77a', permisos: [], otro: 1 }] });
     expect(g.roles).toEqual([TODOS, { id: 'rabcdef1', nombre: 'DJ', color: '#5bc77a', permisos: [] }]);
+  });
+});
+
+describe('cambios del grupo al mismo tiempo', () => {
+  it('varios silencios a la vez y un cambio de roles no se pisan', async () => {
+    const s = await setup();
+    const otros = [];
+    for (const n of ['dani', 'eli', 'fer', 'gabi']) {
+      const x = await h.nuevoUsuario(n);
+      const inv = await s.a.collection('invites').create({ group: s.g.id });
+      await x.send('/api/invites/join', { method: 'POST', body: { code: inv.code } });
+      otros.push(x.authStore.record!.id);
+    }
+    const blancos = [s.ids.b, s.ids.c, ...otros];
+    const rol = { id: 'rconcurr1', nombre: 'Nuevo', color: '#5bc77a', permisos: ['cola'] };
+    await Promise.all([
+      ...blancos.map((u) => s.a.send(`/api/groups/${s.g.id}/silenciar`, { method: 'POST', body: { user: u, silenciado: true } })),
+      s.a.collection('groups').update(s.g.id, { roles: [TODOS, rol] }),
+    ]);
+    const g = await s.a.collection('groups').getOne(s.g.id);
+    expect([...g.silenciados].sort()).toEqual([...blancos].sort());
+    expect(g.roles).toEqual([TODOS, rol]);
+  });
+});
+
+describe('volver solo a la llamada', () => {
+  it('si un moderador te desconectó, la vuelta automática se rechaza; entrar a mano sí se puede', async () => {
+    const s = await setup();
+    await s.a.send(`/api/groups/${s.g.id}/desconectar`, { method: 'POST', body: { user: s.ids.c } });
+    await expect(s.c.send(`/api/rooms/${s.voz.id}/token`, { method: 'POST', body: { vuelta: true } }))
+      .rejects.toMatchObject({ status: 409, message: 'Te desconectaron de la llamada.' });
+    expect((await s.c.send(`/api/rooms/${s.voz.id}/token`, { method: 'POST' })).token).toBeTruthy();
+    // A otro que no desconectaron, la vuelta automática le anda.
+    expect((await s.b.send(`/api/rooms/${s.voz.id}/token`, { method: 'POST', body: { vuelta: true } })).token).toBeTruthy();
   });
 });

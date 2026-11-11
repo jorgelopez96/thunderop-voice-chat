@@ -7,6 +7,14 @@ routerAdd("POST", "/api/rooms/{id}/token", (e) => {
   const c = lk.config();
   const { room, group } = lk.salaDeVoz(e.app, e.request.pathValue("id"), e.auth.id);
   if (group.getStringSlice("bloqueados").includes(e.auth.id)) throw new ForbiddenError("El dueño no te deja entrar a la voz por ahora.");
+  // Un moderador te desconectó mientras el celular tenía la app congelada: la app intenta volver sola (`vuelta`) y no
+  // tiene que poder. Entrar a mano sí. La marca la deja /desconectar en la memoria del servidor por 10 minutos.
+  const clave = `sacado:${group.id}:${e.auth.id}`;
+  const cuando = e.app.store().get(clave);
+  if (cuando) {
+    e.app.store().remove(clave);
+    if ((e.requestInfo().body || {}).vuelta === true && Date.now() - cuando < 10 * 60_000) throw new ApiError(409, "Te desconectaron de la llamada.");
+  }
 
   const video = { room: room.id, roomJoin: true, canSubscribe: true, canPublish: true, canPublishData: true, canUpdateOwnMetadata: true };
   if (group.getStringSlice("silenciados").includes(e.auth.id)) {
@@ -51,9 +59,13 @@ routerAdd("POST", "/api/groups/{id}/silenciar", (e) => {
   const { group, user } = lk.moderar(e, "silenciar", "silenciar");
   const body = e.requestInfo().body;
 
-  const otros = group.getStringSlice("silenciados").filter((u) => u !== user);
-  group.set("silenciados", body.silenciado ? otros.concat(user) : otros);
-  e.app.save(group);
+  // Se relee y se guarda en una transacción: dos silencios a la vez (o uno y un cambio de roles) no se pisan.
+  e.app.runInTransaction((tx) => {
+    const g = tx.findRecordById("groups", group.id);
+    const otros = g.getStringSlice("silenciados").filter((u) => u !== user);
+    g.set("silenciados", body.silenciado ? otros.concat(user) : otros);
+    tx.save(g);
+  });
 
   // Enums de TrackSource en su nombre protobuf (Twirp JSON); vacío = todas las fuentes.
   const canPublishSources = body.silenciado ? ["CAMERA", "SCREEN_SHARE", "SCREEN_SHARE_AUDIO"] : [];
@@ -68,6 +80,7 @@ routerAdd("POST", "/api/groups/{id}/silenciar", (e) => {
 routerAdd("POST", "/api/groups/{id}/desconectar", (e) => {
   const lk = require(`${__hooks}/livekit.js`);
   const { group, user } = lk.moderar(e, "desconectar", "desconectar");
+  e.app.store().set(`sacado:${group.id}:${user}`, Date.now());
   lk.enSalasDeVoz(e.app, group.id, "RemoveParticipant", { identity: user });
   return e.json(200, { ok: true });
 }, $apis.requireAuth("users"));
@@ -108,13 +121,16 @@ routerAdd("POST", "/api/groups/{id}/bloquear-voz", (e) => {
     if (!user) throw new BadRequestError("Falta el usuario.");
     if (user === e.auth.id) throw new BadRequestError("No podés hacerte esto a vos mismo.");
   }
-  const otros = group.getStringSlice("bloqueados").filter((u) => u !== user);
-  group.set("bloqueados", si ? otros.concat(user) : otros);
-  // Quién y cuándo, para la lista de Bloqueados (aparte: las apps viejas leen `bloqueados` como lista de ids).
-  const info = roles.json(group, "bloqueadosInfo", {});
-  if (si) info[user] = { por: e.auth.id, fecha: new Date().toISOString() }; else delete info[user];
-  group.set("bloqueadosInfo", info);
-  e.app.save(group);
+  e.app.runInTransaction((tx) => {
+    const g = tx.findRecordById("groups", group.id);
+    const otros = g.getStringSlice("bloqueados").filter((u) => u !== user);
+    g.set("bloqueados", si ? otros.concat(user) : otros);
+    // Quién y cuándo, para la lista de Bloqueados (aparte: las apps viejas leen `bloqueados` como lista de ids).
+    const info = roles.json(g, "bloqueadosInfo", {});
+    if (si) info[user] = { por: e.auth.id, fecha: new Date().toISOString() }; else delete info[user];
+    g.set("bloqueadosInfo", info);
+    tx.save(g);
+  });
   if (si) {
     lk.enSalasDeVoz(e.app, group.id, "RemoveParticipant", { identity: user });
     lk.enSalasDeVoz(e.app, group.id, "RemoveParticipant", { identity: `${user}.pantalla` });

@@ -141,7 +141,9 @@ function limpiar() {
   (r?.disconnect() ?? Promise.resolve()).catch(() => {}).finally(() => c?.close().catch(() => {}));
 }
 
-export async function entrarVoz(roomId: string, salaNombre = '', grupoId: string | null = null) {
+/** `vuelta`: entra solo, sin que el usuario lo pida (el celular que vuelve de segundo plano); el servidor lo rechaza si
+ *  mientras tanto un moderador lo desconectó. */
+export async function entrarVoz(roomId: string, salaNombre = '', grupoId: string | null = null, vuelta = false) {
   salirVoz();
   const mio = ++intento;
   // El contexto se crea antes de cualquier await, dentro del gesto del usuario (autoplay). 48 kHz: lo exige RNNoise.
@@ -255,7 +257,7 @@ export async function entrarVoz(roomId: string, salaNombre = '', grupoId: string
 
   let token: string, url: string;
   try {
-    ({ token, url } = await pb.send(`/api/rooms/${roomId}/token`, { method: 'POST' }));
+    ({ token, url } = await pb.send(`/api/rooms/${roomId}/token`, { method: 'POST', ...(vuelta ? { body: { vuelta: true } } : {}) }));
   } catch (e) {
     if (vigente()) { voz.error = mensajeError(e); salirVoz(); }
     return;
@@ -308,7 +310,7 @@ function volverALaLlamada() {
   if (!v || document.visibilityState !== 'visible') return;
   volverA = null;
   if (voz.salaId) return;
-  if (Date.now() < v.hasta) void entrarVoz(v.sala, v.nombre, v.grupo);
+  if (Date.now() < v.hasta) void entrarVoz(v.sala, v.nombre, v.grupo, true);
   else voz.error = 'Se cortó la llamada mientras estabas en otra app.';
 }
 if (esCelular) {

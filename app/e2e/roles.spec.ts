@@ -136,3 +136,46 @@ test('la cuenta verificada muestra la tilde azul al lado del nombre, sin recarga
   await expect(fila.getByLabel('Cuenta verificada')).toBeVisible({ timeout: 10_000 });
   await expect(b.locator('dialog.config li', { hasText: 'Beto' }).getByLabel('Cuenta verificada')).toHaveCount(0);
 });
+
+test('con "Borrar sonidos" se borra desde la botonera; sin el permiso no aparece el tachito', async ({ browser }) => {
+  const N = unico('G');
+  const [a, b, c] = await grupoDeTres(browser, N);
+  const admin = new PocketBase(`http://127.0.0.1:${process.env.E2E_PB_PORT ?? 8091}`);
+  await admin.collection('_superusers').authWithPassword('admin@test.local', 'admin-pass-1234');
+  const g = await admin.collection('groups').getFirstListItem(`name = "${N}"`);
+  const wav = Buffer.alloc(44 + 1600); wav.write('RIFF', 0); wav.write('WAVEfmt ', 8); wav.writeUInt32LE(16, 16); wav.writeUInt16LE(1, 20); wav.writeUInt16LE(1, 22);
+  wav.writeUInt32LE(8000, 24); wav.writeUInt32LE(16000, 28); wav.writeUInt16LE(2, 32); wav.writeUInt16LE(16, 34); wav.write('data', 36); wav.writeUInt32LE(1600, 40);
+  const d = new FormData(); d.append('group', g.id); d.append('owner', g.owner); d.append('name', 'Corneta'); d.append('file', new Blob([wav], { type: 'audio/wav' }), 'c.wav');
+  await admin.collection('sonidos').create(d);
+  await rolParaBeto(a, N, 'Limpieza', ['Borrar sonidos']);
+  for (const p of [b, c]) {
+    await p.getByRole('button', { name: 'Sala de voz General' }).click();
+    await p.getByRole('button', { name: 'Sonidos', exact: true }).click();
+    await expect(p.getByRole('button', { name: 'Corneta', exact: true })).toBeVisible({ timeout: 10_000 });
+  }
+  await expect(c.getByRole('button', { name: 'Borrar Corneta' })).toHaveCount(0);
+  await b.getByRole('button', { name: 'Borrar Corneta' }).click();
+  await b.getByRole('button', { name: 'Borrar', exact: true }).click();
+  await expect(b.getByRole('button', { name: 'Corneta', exact: true })).toHaveCount(0, { timeout: 10_000 });
+  await expect(c.getByRole('button', { name: 'Corneta', exact: true })).toHaveCount(0, { timeout: 10_000 });
+});
+
+test('clic derecho en la lista de salas: el mismo menú, con volumen y roles en un renglón cada uno', async ({ browser }) => {
+  const N = unico('G');
+  const [a, b] = await grupoDeTres(browser, N);
+  await configuracion(a, N, 'Roles');
+  await a.getByRole('button', { name: 'Crear rol' }).click();
+  await a.keyboard.press('Escape');
+  for (const p of [a, b]) await p.getByRole('button', { name: 'Sala de voz General' }).click();
+  await expect(a.locator('ul.quienes li', { hasText: 'Beto' })).toBeVisible({ timeout: 15_000 });
+  await a.locator('ul.quienes li', { hasText: 'Beto' }).click({ button: 'right' });
+  const menu = a.locator('.menu-persona:popover-open');
+  await expect(menu.getByLabel(/^Volumen de Beto/)).toBeVisible();
+  const rol = menu.locator('label.rol').first();
+  const [casilla, nombre] = [await rol.locator('input').boundingBox(), await rol.locator('.nombre-rol').boundingBox()];
+  expect(Math.abs((casilla!.y + casilla!.height / 2) - (nombre!.y + nombre!.height / 2))).toBeLessThan(6); // mismo renglón
+  await rol.locator('input').check();
+  await a.keyboard.press('Escape');
+  await configuracion(a, N, 'Participantes');
+  await expect(a.locator('dialog.config li', { hasText: 'Beto' }).locator('.etiqueta')).toHaveCount(1);
+});

@@ -70,6 +70,17 @@ onRecordUpdateRequest((e) => {
       const err = roles.validarAsignaciones(roles.json(e.record, "asignaciones", null), despues);
       if (err) throw new BadRequestError(err);
     }
+    // La API de registros guarda el registro entero: lo que el pedido no cambió se toma fresco de la base, y releer
+    // y guardar van en la misma transacción (las escrituras de PocketBase van de a una), así un cambio de roles no
+    // pisa un silencio (o un ingreso) que entra mientras tanto.
+    return e.app.runInTransaction((tx) => {
+      const fresco = tx.findRecordById("groups", e.record.id);
+      for (const n of ["silenciados", "bloqueados", "bloqueadosInfo", "baneados", "ingresos", "members", "asignaciones", "roles"]) {
+        if (!cambiados.includes(n)) e.record.set(n, fresco.get(n));
+      }
+      e.app = tx;
+      return e.next();
+    });
   }
   e.next();
 }, "groups");
@@ -94,12 +105,15 @@ onRecordAfterUpdateSuccess((e) => {
   const info = roles.json(e.record, "bloqueadosInfo", {});
   if (silenciados.some((u) => fuera.includes(u)) || fuera.some((u) => u in asig || u in info)) {
     // este save vuelve a disparar el hook, pero sin cambio de members no hace nada
-    const g = e.app.findRecordById("groups", e.record.id);
-    g.set("silenciados", silenciados.filter((u) => !fuera.includes(u)));
-    fuera.forEach((u) => { delete asig[u]; delete info[u]; });
-    g.set("asignaciones", asig);
-    g.set("bloqueadosInfo", info);
-    e.app.save(g);
+    e.app.runInTransaction((tx) => {
+      const g = tx.findRecordById("groups", e.record.id);
+      const a2 = roles.json(g, "asignaciones", {}), i2 = roles.json(g, "bloqueadosInfo", {});
+      g.set("silenciados", g.getStringSlice("silenciados").filter((u) => !fuera.includes(u)));
+      fuera.forEach((u) => { delete a2[u]; delete i2[u]; });
+      g.set("asignaciones", a2);
+      g.set("bloqueadosInfo", i2);
+      tx.save(g);
+    });
   }
   e.next();
 }, "groups");
@@ -117,13 +131,16 @@ routerAdd("POST", "/api/groups/{id}/banear", (e) => {
     require(`${__hooks}/roles.js`).exigir(group, e.auth.id, "banear", "desbanear");
     user = String(body.user || "");
   }
-  const lista = (JSON.parse(group.getString("baneados") || "null") || []).filter((b) => b.id !== user);
-  if (body.baneado) {
-    const u = e.app.findRecordById("users", user);
-    lista.push({ id: user, name: u.getString("name"), username: u.getString("username"), fecha: new Date().toISOString(), por: e.auth.id });
-    group.set("members", group.getStringSlice("members").filter((m) => m !== user));
-  }
-  group.set("baneados", lista);
-  e.app.save(group);
+  e.app.runInTransaction((tx) => {
+    const g = tx.findRecordById("groups", group.id);
+    const lista = (JSON.parse(g.getString("baneados") || "null") || []).filter((b) => b.id !== user);
+    if (body.baneado) {
+      const u = tx.findRecordById("users", user);
+      lista.push({ id: user, name: u.getString("name"), username: u.getString("username"), fecha: new Date().toISOString(), por: e.auth.id });
+      g.set("members", g.getStringSlice("members").filter((m) => m !== user));
+    }
+    g.set("baneados", lista);
+    tx.save(g);
+  });
   return e.json(200, { ok: true });
 }, $apis.requireAuth("users"));

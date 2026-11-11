@@ -23,7 +23,7 @@ onRecordDeleteRequest((e) => {
   e.next();
 }, "messages");
 
-// Subir pide "subirSonidos". Editar o borrar: cualquiera con "botonera"; el propio, con "subirSonidos".
+// Subir pide "subirSonidos". Editar uno ajeno, "botonera"; borrarlo, "borrarSonidos". El propio, con "subirSonidos".
 onRecordCreateRequest((e) => {
   if (!e.hasSuperuserAuth()) {
     const roles = require(`${__hooks}/roles.js`);
@@ -32,14 +32,23 @@ onRecordCreateRequest((e) => {
   e.next();
 }, "sonidos");
 
-["onRecordUpdateRequest", "onRecordDeleteRequest"].forEach((h) => {
-  globalThis[h]((e) => {
-    if (!e.hasSuperuserAuth()) {
-      const roles = require(`${__hooks}/roles.js`);
-      const g = e.app.findRecordById("groups", e.record.getString("group"));
-      const propio = e.record.getString("owner") === e.auth.id && roles.puede(g, e.auth.id, "subirSonidos");
-      if (!propio) roles.exigir(g, e.auth.id, "botonera", "editar la botonera");
-    }
-    e.next();
-  }, "sonidos");
-});
+// Cada handler corre aislado en el JSVM (no ve variables de afuera): por eso van escritos uno por uno.
+onRecordUpdateRequest((e) => {
+  if (!e.hasSuperuserAuth()) {
+    const roles = require(`${__hooks}/roles.js`);
+    const g = e.app.findRecordById("groups", e.record.getString("group"));
+    const propio = e.record.getString("owner") === e.auth.id && roles.puede(g, e.auth.id, "subirSonidos");
+    if (!propio) roles.exigir(g, e.auth.id, "botonera", "editar la botonera");
+  }
+  e.next();
+}, "sonidos");
+
+onRecordDeleteRequest((e) => {
+  if (!e.hasSuperuserAuth()) {
+    const roles = require(`${__hooks}/roles.js`);
+    const g = e.app.findRecordById("groups", e.record.getString("group"));
+    const propio = e.record.getString("owner") === e.auth.id && roles.puede(g, e.auth.id, "subirSonidos");
+    if (!propio) roles.exigir(g, e.auth.id, "borrarSonidos", "borrar sonidos");
+  }
+  e.next();
+}, "sonidos");

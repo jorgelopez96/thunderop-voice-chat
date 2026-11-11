@@ -2,7 +2,7 @@
 // roles que tenga en `asignaciones`. La misma lista de permisos está en app/src/lib/permisos.ts.
 
 const PERMISOS = ["silenciar", "desconectar", "bloquearVoz", "banear", "mensajes", "grupo", "salas",
-  "agregarMusica", "cola", "youtube", "subirSonidos", "botonera"];
+  "agregarMusica", "cola", "youtube", "subirSonidos", "botonera", "borrarSonidos"];
 const MAX_ROLES = 20, MAX_NOMBRE = 24;
 const ROL_TODOS = () => ({ id: "todos", nombre: "Todos", color: "", permisos: [] });
 

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import MenuPersona from './MenuPersona.svelte';
   import { cerrarAfuera } from '../afuera';
   import EstadoVoz from './EstadoVoz.svelte';
   import type { RecordModel } from 'pocketbase';
@@ -79,6 +80,8 @@
     r.id === voz.salaId ? voz.participantes : (enVoz.grupo === grupo.id ? enVoz.salas[r.id] ?? [] : [])
       .map((p) => ({ id: p.id, nombre: p.name, silenciado: p.silenciado, ensordecido: p.ensordecido, camara: p.camara }));
   const miembro = (id: string) => ((grupo.expand?.members ?? []) as RecordModel[]).find((m) => m.id === id);
+  // Clic derecho sobre alguien de la lista de salas: el mismo menú que en la llamada (volumen, roles, moderar).
+  let menuPersona = $state<ReturnType<typeof MenuPersona>>();
   let menuGrupo = $state<HTMLElement>();
   let cabecera = $state<HTMLElement>();
   // Nueva sala (con el permiso "salas", desde el menú del grupo): modal con Cancelar, Esc o clic afuera.
@@ -144,7 +147,9 @@
       </button>
     {#if q.length}
       <ul class="quienes">{#each q as p (p.id)}{@const m = miembro(p.id)}
-        <li>{#if m}<Avatar usuario={m} tam={20} hablando={p.hablando} />{/if}<span>{p.nombre}</span>
+        <!-- stopPropagation: si no, el clic derecho (o mantener apretado) también abría el menú de la sala de afuera. -->
+        <li oncontextmenu={(e) => { e.preventDefault(); e.stopPropagation(); menuPersona?.abrir(e.clientX, e.clientY, p); }}
+          onpointerdown={(e) => e.stopPropagation()} use:mantener={(x, y) => menuPersona?.abrir(x, y, p)}>{#if m}<Avatar usuario={m} tam={20} hablando={p.hablando} />{/if}<span>{p.nombre}</span>
           <EstadoVoz silenciado={p.silenciado} ensordecido={p.ensordecido} camara={!!p.camara} />
           {#if p.transmite}<Monitor size={14} strokeWidth={1.75} color="var(--cian)" aria-label="Transmitiendo" />{/if}</li>
       {/each}</ul>
@@ -220,6 +225,7 @@
 
   {#if enSalaVoz && !pantalla.movil}<div popover id="capa-participantes" class="capa"><Participantes {grupo} /></div>
   {:else}<Cajon lado="der" abierto={cajonDer}><Participantes {grupo} /></Cajon>{/if}
+  <MenuPersona bind:this={menuPersona} {grupo} {salasVoz} alError={(m) => (error = m)} />
   <div popover class="menu" bind:this={menuSalaEl}>
     {#if menuSala}{@const r = menuSala}
       <button class="plano" onclick={() => { menuSalaEl?.hidePopover(); editando = { id: r.id, name: r.name }; }}><Pencil size={16} strokeWidth={1.75} /> Cambiar nombre</button>

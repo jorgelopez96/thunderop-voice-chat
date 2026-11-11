@@ -1,16 +1,19 @@
 <script lang="ts">
   import { lleno } from '../rango';
   import type { RecordModel } from 'pocketbase';
-  import { Search, Volume2, Plus } from '@lucide/svelte';
+  import { Search, Volume2, Plus, Trash2 } from '@lucide/svelte';
+  import Confirmar from './Confirmar.svelte';
   import SubirSonido from './SubirSonido.svelte';
-  import { sonidos, sonidosDeOtros, tocar } from '../botonera.svelte';
+  import { sonidos, sonidosDeOtros, tocar, borrar } from '../botonera.svelte';
   import { grupos } from '../grupos.svelte';
   import { voz } from '../voz.svelte';
   import { leerPrefs, guardarPrefs } from '../prefs';
 
   // Contenido del panelcito de Sonidos del dock. Quien lo usa lo recrea por grupo ({#key}).
-  // `puedeEditar` y `puedeSubir` salen de los permisos del grupo (permisos.ts): botonera / subirSonidos.
-  let { grupoId, puedeEditar, puedeSubir }: { grupoId: string; puedeEditar: (x: RecordModel) => boolean; puedeSubir: boolean } = $props();
+  // `puedeEditar`, `puedeBorrar` y `puedeSubir` salen de los permisos del grupo (permisos.ts): botonera, borrarSonidos y subirSonidos.
+  let { grupoId, puedeEditar, puedeBorrar, puedeSubir }: { grupoId: string; puedeEditar: (x: RecordModel) => boolean; puedeBorrar: (x: RecordModel) => boolean; puedeSubir: boolean } = $props();
+  let aBorrar = $state<RecordModel | null>(null);
+  let errorBorrar = $state('');
   // svelte-ignore state_referenced_locally
   const s = sonidos(grupoId);
   $effect(() => s.parar);
@@ -47,6 +50,7 @@
       <li oncontextmenu={(e) => { if (!propia || !puedeEditar(x)) return; e.preventDefault(); editando = x; }}>
         <!-- aria-disabled y no disabled: un botón disabled no recibe el clic derecho -->
         <button class="sonido" aria-disabled={!voz.salaId} onclick={() => voz.salaId && tocar(x)}>{x.name}</button>
+        {#if propia && puedeBorrar(x)}<button class="icono tacho" aria-label={`Borrar ${x.name}`} title="Borrar sonido" onclick={() => (aBorrar = x)}><Trash2 size={13} strokeWidth={1.75} /></button>{/if}
       </li>
     {/each}
     {#if propia && puedeSubir}<li><button class="sonido nuevo" onclick={() => (nuevo = true)}><Plus size={16} strokeWidth={1.75} /> Nuevo sonido</button></li>{/if}
@@ -57,8 +61,16 @@
 
 {#if nuevo}<SubirSonido {grupoId} cerrar={() => (nuevo = false)} />{/if}
 {#if editando}<SubirSonido {grupoId} sonido={editando} cerrar={() => (editando = null)} />{/if}
+{#if aBorrar}<Confirmar texto={`¿Borrar el sonido "${aBorrar.name}"? Se borra para todo el grupo.`} accion="Borrar" cancelar={() => (aBorrar = null)}
+  confirmar={() => { const x = aBorrar!; aBorrar = null; errorBorrar = ''; borrar(x.id).catch((e) => (errorBorrar = e?.message || 'No se pudo borrar el sonido.')); }} />{/if}
+{#if errorBorrar}<p role="alert" class="tenue">{errorBorrar}</p>{/if}
 
 <style>
+  .grilla li { position: relative; }
+  .tacho { position: absolute; top: 2px; right: 2px; min-height: 0; width: 20px; height: 20px; padding: 0; border-radius: 50%;
+    background: rgb(8 9 13 / .75); color: var(--peligro); opacity: 0; transition: opacity var(--dur-rapida); }
+  .grilla li:hover .tacho, .tacho:focus-visible { opacity: 1; }
+  @media (pointer: coarse) { .tacho { opacity: 1; } }
   .pestanas { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; margin-bottom: 6px; }
   .pestanas button { flex: none; min-height: 0; padding: 4px 10px; font-size: 12px; border-radius: var(--radio-pildora); color: var(--tenue); }
   .pestanas button[aria-selected='true'] { color: var(--texto); background: var(--acento-suave); }

@@ -156,3 +156,16 @@ describe('invitaciones', () => {
     expect(m).not.toContain(b.authStore.record!.id);
   });
 });
+
+describe('vista de una invitación (la tarjeta del chat)', () => {
+  it('muestra nombre, miembros y si ya sos parte; vencida o inventada da 404', async () => {
+    const a = await h.nuevoUsuario('ana');
+    const b = await h.nuevoUsuario('beto');
+    const g = await a.collection('groups').create({ name: 'Los pibes' });
+    const inv = await a.collection('invites').create({ group: g.id });
+    const vista = (pb: { send: Function }, code: string) => pb.send(`/api/invites/${code}/vista`, {});
+    expect(await vista(b, inv.code)).toMatchObject({ grupo: { id: g.id, name: 'Los pibes', miembros: 1, foto: '' }, miembro: false });
+    expect(await vista(a, inv.code)).toMatchObject({ miembro: true });
+    await expect(vista(b, 'zzzzzzzzzz')).rejects.toMatchObject({ status: 404 });
+  });
+});

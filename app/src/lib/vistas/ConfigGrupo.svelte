@@ -49,6 +49,7 @@
   let aBorrar = $state<RecordModel | null>(null);
   let aBanear = $state<RecordModel | null>(null);
   const puedeEditar = (x: RecordModel) => p('botonera') || (x.owner === yo && p('subirSonidos'));
+  const puedeBorrar = (x: RecordModel) => p('borrarSonidos') || (x.owner === yo && p('subirSonidos'));
   const fecha = (f?: string) => (f ? new Date(f.replace(' ', 'T')).toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric' }) : '—');
   function renombrar(x: RecordModel, name: string) {
     name = name.trim();
@@ -120,8 +121,8 @@
               <input type="range" min="5" max="200" step="5" value={x.volumen || 100} style={lleno(x.volumen || 100, 5, 200)} aria-label={`Volumen de ${x.name}`} title={`${x.volumen || 100}%`}
                 onchange={(e) => hacer(() => editar(x.id, { volumen: +e.currentTarget.value }))} />
               <small>{x.volumen || 100}%</small>
-              <button class="icono" title="Borrar" aria-label={`Borrar ${x.name}`} onclick={() => (aBorrar = x)}><Trash2 size={14} strokeWidth={1.75} /></button>
             {:else}<span>{x.name}</span><small>{x.volumen || 100}%</small>{/if}
+            {#if puedeBorrar(x)}<button class="icono" title="Borrar" aria-label={`Borrar ${x.name}`} onclick={() => (aBorrar = x)}><Trash2 size={14} strokeWidth={1.75} /></button>{/if}
           </li>
         {:else}<li class="tenue">Todavía no hay sonidos en este grupo.</li>{/each}
       </ul>

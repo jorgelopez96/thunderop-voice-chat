@@ -4,7 +4,7 @@ import type { RecordModel } from 'pocketbase';
 // se decide qué mostrar). El admin (dueño) puede todo; el resto, lo del rol "todos" más lo de sus roles.
 
 export type Permiso = 'silenciar' | 'desconectar' | 'bloquearVoz' | 'banear' | 'mensajes' | 'grupo' | 'salas'
-  | 'agregarMusica' | 'cola' | 'youtube' | 'subirSonidos' | 'botonera';
+  | 'agregarMusica' | 'cola' | 'youtube' | 'subirSonidos' | 'botonera' | 'borrarSonidos';
 export type Rol = { id: string; nombre: string; color: string; permisos: Permiso[] };
 
 export const PERMISOS: { clave: Permiso; texto: string; grupo: 'Moderar' | 'Grupo' | 'Música' | 'Botonera' }[] = [
@@ -20,6 +20,7 @@ export const PERMISOS: { clave: Permiso; texto: string; grupo: 'Moderar' | 'Grup
   { clave: 'youtube', texto: 'Videos de YouTube juntos', grupo: 'Música' },
   { clave: 'subirSonidos', texto: 'Subir sonidos', grupo: 'Botonera' },
   { clave: 'botonera', texto: 'Editar la botonera', grupo: 'Botonera' },
+  { clave: 'borrarSonidos', texto: 'Borrar sonidos', grupo: 'Botonera' },
 ];
 const CLAVES = new Set<string>(PERMISOS.map((p) => p.clave));
 export const MAX_ROLES = 20, MAX_NOMBRE = 24;

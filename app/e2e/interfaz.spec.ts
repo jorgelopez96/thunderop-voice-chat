@@ -180,3 +180,25 @@ test('el chat siempre vuelve al último mensaje: al cambiar de sala y volver, y 
     Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'visible' }); document.dispatchEvent(new Event('visibilitychange')); });
   await expect.poll(() => lista.evaluate((e) => e.scrollHeight - e.scrollTop - e.clientHeight)).toBeLessThan(48);
 });
+
+test('una invitación en el chat llega como tarjeta: Unirme te mete al grupo y después dice que ya sos parte', async ({ browser }) => {
+  const nombre = `Tarjeta${Math.random().toString(36).slice(2, 6)}`;
+  const [a, b] = await (await import('./cuentas')).grupoDeTres(browser, nombre);
+  const admin = new (await import('pocketbase')).default(`http://127.0.0.1:${process.env.E2E_PB_PORT ?? 8091}`);
+  await admin.collection('_superusers').authWithPassword('admin@test.local', 'admin-pass-1234');
+  const g = await admin.collection('groups').getFirstListItem(`name = "${nombre}"`);
+  const otro = await admin.collection('groups').create({ name: `${nombre}Dos`, owner: g.owner, members: [g.owner] });
+  const inv = await admin.collection('invites').create({ group: otro.id, created_by: g.owner });
+
+  await a.getByRole('button', { name: 'Sala de chat General' }).click();
+  await a.getByPlaceholder('Escribí un mensaje').fill(`thunderop://invite/${inv.code}`);
+  await a.getByRole('button', { name: 'Enviar' }).click();
+  // Ana ya es del otro grupo; Beto no.
+  await expect(a.locator('.tarjeta-invitacion').getByText('Ya sos parte')).toBeVisible({ timeout: 10_000 });
+  await b.getByRole('button', { name: 'Sala de chat General' }).click();
+  const tarjeta = b.locator('.tarjeta-invitacion');
+  await expect(tarjeta.getByText(`Te invitaron a ${nombre}Dos`)).toBeVisible({ timeout: 10_000 });
+  await expect(b.getByTestId('mensaje').getByText('thunderop://invite/')).toHaveCount(0); // no se ve el link crudo
+  await tarjeta.getByRole('button', { name: 'Unirme' }).click();
+  await expect(b.getByRole('button', { name: `${nombre}Dos`, exact: true })).toBeVisible({ timeout: 10_000 }); // lo llevó al grupo
+});
