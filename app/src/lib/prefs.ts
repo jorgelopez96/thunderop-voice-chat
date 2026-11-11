@@ -1,20 +1,23 @@
 // Preferencias locales de voz (dispositivos, supresión, ganancia, volúmenes por usuario, transmisión) en `localStorage['dm.voz']`.
 export type Calidad = '720p30' | '720p60' | '1080p30' | '1080p60';
-// Límites de la transmisión de pantalla. `mbps`: tope del transmisor nativo (prueba 2026-10-23: 1080p60 a 20 Mbps se vio fluido).
+// Límites de la transmisión de pantalla. `mbps`: tope del transmisor nativo. Antes 1080p60 iba a 20 Mbps, pero el servidor
+// sale por una conexión de casa y cada espectador gasta eso de la subida: con varios mirando no entraban las cámaras.
 export const CALIDADES: Record<Calidad, { alto: number; fps: number; mbps: number }> = {
-  '720p30': { alto: 720, fps: 30, mbps: 6 },
-  '720p60': { alto: 720, fps: 60, mbps: 10 },
-  '1080p30': { alto: 1080, fps: 30, mbps: 12 },
-  '1080p60': { alto: 1080, fps: 60, mbps: 20 },
+  '720p30': { alto: 720, fps: 30, mbps: 4 },
+  '720p60': { alto: 720, fps: 60, mbps: 6 },
+  '1080p30': { alto: 1080, fps: 30, mbps: 6 },
+  '1080p60': { alto: 1080, fps: 60, mbps: 8 },
 };
-export type PrefsVoz = { entrada?: string; salida?: string; camara?: string; conCamara: boolean; supresion: boolean; supresionFuerte: boolean; volumenes: Record<string, number>; calidad: Calidad; vistaPrevia: boolean; volBotonera: number; volMusica: number; gananciaDb: number; sonidoMensajes: boolean; notificaciones: boolean;
+/** Hasta qué calidad baja la cámara de alguien, para quien mira. Sin dato: automática (lo que entra en la tarjeta). */
+export type CalidadCam = 'media' | 'baja';
+export type PrefsVoz = { entrada?: string; salida?: string; camara?: string; conCamara: boolean; supresion: boolean; supresionFuerte: boolean; volumenes: Record<string, number>; calidadCam: Record<string, CalidadCam>; calidad: Calidad; vistaPrevia: boolean; volBotonera: number; volMusica: number; gananciaDb: number; sonidoMensajes: boolean; notificaciones: boolean;
   avisoMensajes: boolean; avisoMenciones: boolean; hora24: boolean };
 
 const CLAVE = 'dm.voz';
 // Versión del formato: lo guardado antes de la 2 tenía la supresión apagada por defecto; se reenciende una vez.
 // Antes de la 3, los volúmenes eran la ganancia directa; ahora la ganancia es el doble (ver voz.svelte.ts): se dividen a la mitad.
 const VERSION = 3;
-const DEFAULTS: PrefsVoz = { conCamara: false, supresion: true, supresionFuerte: false, volumenes: {}, calidad: '1080p60', vistaPrevia: true, volBotonera: 0.8, volMusica: 50, gananciaDb: 0, sonidoMensajes: true, notificaciones: true, avisoMensajes: true, avisoMenciones: true, hora24: true };
+const DEFAULTS: PrefsVoz = { conCamara: false, supresion: true, supresionFuerte: false, volumenes: {}, calidadCam: {}, calidad: '1080p60', vistaPrevia: true, volBotonera: 0.8, volMusica: 50, gananciaDb: 0, sonidoMensajes: true, notificaciones: true, avisoMensajes: true, avisoMenciones: true, hora24: true };
 
 export function leerPrefs(): PrefsVoz {
   try {
@@ -23,14 +26,15 @@ export function leerPrefs(): PrefsVoz {
     const viejos = !(p.v >= 3);
     const volumenes = Object.fromEntries(Object.entries(p.volumenes ?? {}).filter(([, v]) => typeof v === 'number')
       .map(([k, v]) => [k, viejos ? (v as number) / 2 : v])) as Record<string, number>;
+    const calidadCam = Object.fromEntries(Object.entries(p.calidadCam ?? {}).filter(([, v]) => v === 'media' || v === 'baja')) as Record<string, CalidadCam>;
     const calidad = (Object.keys(CALIDADES) as Calidad[]).find((c) => c === p.calidad) ?? DEFAULTS.calidad;
     const rango = (v: unknown, max: number, def: number) => (typeof v === 'number' && v >= 0 && v <= max ? v : def); // NaN falla la comparación
-    return { entrada: texto(p.entrada), salida: texto(p.salida), camara: texto(p.camara), conCamara: p.conCamara === true, supresion: p.v >= 2 ? p.supresion === true : true, supresionFuerte: p.supresionFuerte === true, volumenes, calidad, vistaPrevia: p.vistaPrevia !== false,
+    return { entrada: texto(p.entrada), salida: texto(p.salida), camara: texto(p.camara), conCamara: p.conCamara === true, supresion: p.v >= 2 ? p.supresion === true : true, supresionFuerte: p.supresionFuerte === true, volumenes, calidadCam, calidad, vistaPrevia: p.vistaPrevia !== false,
       volBotonera: rango(p.volBotonera, 1, DEFAULTS.volBotonera), volMusica: rango(p.volMusica, 100, DEFAULTS.volMusica),
       sonidoMensajes: p.sonidoMensajes !== false, notificaciones: p.notificaciones !== false,
       avisoMensajes: p.avisoMensajes !== false, avisoMenciones: p.avisoMenciones !== false, hora24: p.hora24 !== false,
       gananciaDb: typeof p.gananciaDb === 'number' && p.gananciaDb >= -20 && p.gananciaDb <= 20 ? p.gananciaDb : DEFAULTS.gananciaDb };
-  } catch { return { ...DEFAULTS, volumenes: {} }; }
+  } catch { return { ...DEFAULTS, volumenes: {}, calidadCam: {} }; }
 }
 
 export function guardarPrefs(p: Partial<PrefsVoz>): void {

@@ -1,9 +1,9 @@
 import type { ProcesadorMic } from './ruido';
-import type { LocalAudioTrack, Participant, RemoteTrack, Room, Track } from 'livekit-client';
+import type { LocalAudioTrack, Participant, RemoteTrack, RemoteTrackPublication, Room, Track } from 'livekit-client';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { pb } from './pb';
 import { mensajeError } from './sesion.svelte';
-import { leerPrefs, guardarPrefs, CALIDADES, volumenPantallaDe, guardarVolumenPantalla, type Calidad } from './prefs';
+import { leerPrefs, guardarPrefs, CALIDADES, volumenPantallaDe, guardarVolumenPantalla, type Calidad, type CalidadCam } from './prefs';
 import { iniciarAudioPantalla, detenerAudioPantalla } from './audioPantalla';
 import { mensajeTransmision } from './transmision';
 import { duenio, esPantallaNativa, iniciarNativo, detenerNativo, calidadNativo, cortarSimulado, SUFIJO_PANTALLA } from './transmisorNativo';
@@ -193,7 +193,8 @@ export async function entrarVoz(roomId: string, salaNombre = '', grupoId: string
     if (mira && !meMiran.has(part.identity)) tono(1100, 1320);
     if (mira) meMiran.add(part.identity); else meMiran.delete(part.identity);
   });
-  r.on(RoomEvent.TrackSubscribed, (t: RemoteTrack, _pub, part) => {
+  r.on(RoomEvent.TrackSubscribed, (t: RemoteTrack, pub, part) => {
+    if (t.source === Track.Source.Camera) topeCamara(pub, part.identity);
     if (t.kind !== Track.Kind.Audio) return;
     const el = t.attach(); el.dataset.voz = ''; document.body.append(el); audios.set(t, el);
     part.setVolume(voz.ensordecido ? 0 : ganancia(leerPrefs().volumenes[part.identity]));
@@ -677,7 +678,8 @@ function reenviarAtributos(r: Room) {
 }
 
 /** Prende o apaga la cámara. La mejor calidad que dé (tope 1080p60), con simulcast: a quien la ve chica le llega una
- *  versión liviana, y una tarjeta fuera de la vista no baja video (adaptiveStream). */
+ *  versión liviana, y una tarjeta fuera de la vista no baja video (adaptiveStream). Las capas livianas son 360p y 720p
+ *  (las de fábrica, 180p y 360p, con la subida justa dejaban a todos viendo 180p). */
 export async function alternarCamara(desdeTransmision = false) {
   const r = room;
   if (!r || voz.conectando) return;
@@ -685,7 +687,7 @@ export async function alternarCamara(desdeTransmision = false) {
   const si = !voz.camara;
   try {
     await r.localParticipant.setCameraEnabled(si, si ? { deviceId: leerPrefs().camara ?? 'default', resolution: { width: 1920, height: 1080, frameRate: 60 } } : undefined,
-      si ? { simulcast: true } : undefined);
+      si ? { simulcast: true, videoSimulcastLayers: [lk.VideoPresets.h360, lk.VideoPresets.h720] } : undefined);
     if (room === r) voz.camara = si;
   } catch (e) {
     const n = (e as Error)?.name;
@@ -695,6 +697,21 @@ export async function alternarCamara(desdeTransmision = false) {
     voz.camara = false;
   }
   actualizar();
+}
+
+// Con adaptiveStream la calidad que se pide es un tope: nunca llega más de lo que entra en la tarjeta.
+const TOPE_CAM = { media: 'MEDIUM', baja: 'LOW' } as const; // 720p y 360p (capas de alternarCamara)
+function topeCamara(pub: RemoteTrackPublication, identidad: string) {
+  const c = leerPrefs().calidadCam[identidad];
+  pub.setVideoQuality(lk.VideoQuality[c ? TOPE_CAM[c] : 'HIGH']);
+}
+
+/** Hasta qué calidad ver la cámara de `identidad` (null: automática). Se recuerda por persona. */
+export function calidadCamaraDe(identidad: string, c: CalidadCam | null) {
+  const { [identidad]: _, ...resto } = leerPrefs().calidadCam;
+  guardarPrefs({ calidadCam: c ? { ...resto, [identidad]: c } : resto });
+  const pub = room?.remoteParticipants.get(identidad)?.getTrackPublication(lk.Track.Source.Camera);
+  if (pub?.isSubscribed) topeCamara(pub, identidad);
 }
 
 /** Cambia la cámara (se guarda); si está prendida, sigue con la nueva. */

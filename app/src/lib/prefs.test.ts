@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { leerPrefs, guardarPrefs, volumenPantallaDe, guardarVolumenPantalla } from './prefs';
 import { volumen } from './voz.svelte';
 
-const DEFAULTS = { conCamara: false, supresion: true, supresionFuerte: false, volumenes: {}, calidad: '1080p60', vistaPrevia: true, volBotonera: 0.8, volMusica: 50, gananciaDb: 0, sonidoMensajes: true, notificaciones: true, avisoMensajes: true, avisoMenciones: true, hora24: true };
+const DEFAULTS = { conCamara: false, supresion: true, supresionFuerte: false, volumenes: {}, calidadCam: {}, calidad: '1080p60', vistaPrevia: true, volBotonera: 0.8, volMusica: 50, gananciaDb: 0, sonidoMensajes: true, notificaciones: true, avisoMensajes: true, avisoMenciones: true, hora24: true };
 
 describe('prefs de voz', () => {
   // Vitest corre en Node (sin localStorage): uno en memoria por test.
@@ -17,6 +17,12 @@ describe('prefs de voz', () => {
     guardarVolumenPantalla('beto', 0.4);
     expect(volumenPantallaDe('beto')).toBe(0.4);
     expect(volumenPantallaDe('caro')).toBe(1);
+  });
+
+  it('la calidad de cámara de cada uno se recuerda y se ignora lo que no es media o baja', () => {
+    guardarPrefs({ calidadCam: { ana: 'baja' } });
+    localStorage.setItem('dm.voz', JSON.stringify({ ...JSON.parse(localStorage.getItem('dm.voz')!), calidadCam: { ana: 'baja', beto: 'ultra' } }));
+    expect(leerPrefs().calidadCam).toEqual({ ana: 'baja' });
   });
 
   it('sin nada guardado devuelve defaults', () => {

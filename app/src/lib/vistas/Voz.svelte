@@ -19,7 +19,7 @@
   import Pantalla from './Pantalla.svelte';
   import EscenarioYoutube from './EscenarioYoutube.svelte';
   import { youtube } from '../youtube/youtube.svelte';
-  import { completa } from '../pantallaCompleta.svelte';
+  import { completa, entrarPantallaCompleta, salirPantallaCompleta } from '../pantallaCompleta.svelte';
   import Video from './Video.svelte';
   import { leerPrefs } from '../prefs';
   import { abrirEnPunto } from '../menu';
@@ -89,6 +89,8 @@
   const esIphone = typeof navigator !== 'undefined' && /iPhone|iPad|iPod/.test(navigator.userAgent);
   let avisoLlamada = $state(pantalla.movil && (() => { try { return !sessionStorage.getItem('dm.avisoLlamada'); } catch { return true; } })());
   function entendido() { avisoLlamada = false; try { sessionStorage.setItem('dm.avisoLlamada', '1'); } catch { /* sin almacenamiento: dura esta vista */ } }
+  // Si la cámara agrandada se apaga (o esa persona se va), se sale de la pantalla completa.
+  $effect(() => { const s = completa.sid; if (s?.startsWith('cam:') && !voz.participantes.some((x) => `cam:${x.id}` === s && x.camara)) void salirPantallaCompleta(); });
   let ocultarGente = $state(false); // mientras se mira una transmisión, las tarjetas de la gente se pueden esconder
   const enEscena = $derived(voz.viendo.length + (youtube.actual ? 1 : 0)); // transmisiones que se miran + el video de YouTube juntos
   // En el celular el chat de la sala se abre a pantalla completa desde el dock (navMovil.chatSala).
@@ -147,8 +149,8 @@
         <li style:--i={Math.min(i, 5)} class:hablando={p.hablando} class:transmite={p.transmite} style="background:{fondo(m?.color, p.nombre)};--habla:{m?.color || 'var(--acento)'}" oncontextmenu={(e) => abrirMenu(e, p)} use:mantener={(x, y) => { mantuvo = Date.now(); abrirMenu({ clientX: x, clientY: y, preventDefault() {} } as MouseEvent, p); }}>
           {#if p.transmite}<span class="chips-vivo"><span class="vivo"><span class="punto-vivo"></span>EN VIVO</span>{@render espectadores(p.espectadores)}</span>{/if}
           {#if p.camara && pistaCamara(p.id)}<!-- Clic (o tocar) agranda la cámara a pantalla completa; de nuevo, vuelve. -->
-            <button class="plano cam" aria-label={`Agrandar la cámara de ${m?.name || p.nombre}`}
-              onclick={(e) => { if (Date.now() - mantuvo < 800) return; (document.fullscreenElement ? document.exitFullscreen() : e.currentTarget.requestFullscreen()).catch(() => {}); }}>
+            <button class="plano cam" class:completa={completa.sid === `cam:${p.id}`} aria-label={`Agrandar la cámara de ${m?.name || p.nombre}`}
+              onclick={() => { if (Date.now() - mantuvo < 800) return; void (completa.sid !== null ? salirPantallaCompleta() : entrarPantallaCompleta(`cam:${p.id}`)); }}>
               <Video pista={pistaCamara(p.id)!} clase="video-cam" etiqueta={`Cámara de ${m?.name || p.nombre}`} /></button>
           {:else}<img class="avatar" alt="" src={foto(m, '256x256')} />{/if}
           {#if p.transmite && !p.local && p.pantalla}{@const sid = p.pantalla}{@const viendo = voz.viendo.includes(sid)}
@@ -205,7 +207,8 @@
   /* Con la cámara de fondo, el nombre, el EN VIVO y "Ver" van encima (son ítems de la grilla: z-index anda sin position). */
   .franja li > .etiqueta-nombre, .franja li > .chips-vivo, .franja li > .ver { z-index: 1; }
   .cam :global(.video-cam) { width: 100%; height: 100%; object-fit: cover; }
-  .cam:fullscreen :global(.video-cam) { object-fit: contain; }
+  .cam.completa { position: fixed; z-index: 100; border-radius: 0; }
+  .cam.completa :global(.video-cam) { object-fit: contain; }
   .voz { display: grid; grid-template-columns: 1fr; min-height: 0; min-width: 0; }
   .voz.conChat { grid-template-columns: minmax(0, 1fr) clamp(296px, var(--ancho-chat), 60%); }
   .borde-chat { position: absolute; inset: 0 auto 0 -4px; width: 8px; z-index: 2; cursor: col-resize; touch-action: none; }

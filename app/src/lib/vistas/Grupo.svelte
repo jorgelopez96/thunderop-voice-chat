@@ -14,7 +14,7 @@
   import Voz from './Voz.svelte';
   import { voz, entrarVoz } from '../voz.svelte';
   import Confirmar from './Confirmar.svelte';
-  import { ChevronDown, Hash, UserPlus, Pencil, Trash2, Settings, Volume2, Monitor, ArrowUpDown, ChevronLeft, Users } from '@lucide/svelte';
+  import { ChevronDown, Hash, UserPlus, Pencil, Trash2, Settings, Volume2, Monitor, ArrowUpDown, ChevronLeft, Users, PanelLeftClose, PanelLeftOpen } from '@lucide/svelte';
   import Avatar from './Avatar.svelte';
   import Cajon from './movil/Cajon.svelte';
   import { pantalla } from '../plataforma.svelte';
@@ -27,6 +27,15 @@
   import { foto } from '../foto';
   import { grupos, grupoActual } from '../grupos.svelte';
   import { noLeidos, mirar } from '../noLeidos.svelte';
+  // PC: la lista de salas y la de participantes se pueden esconder (se recuerda).
+  const PANELES = 'dm.paneles';
+  let ocultos = $state<{ salas?: boolean; gente?: boolean }>((() => { try { return JSON.parse(localStorage.getItem(PANELES) ?? '{}'); } catch { return {}; } })());
+  function alternarPanel(cual: 'salas' | 'gente') {
+    ocultos[cual] = !ocultos[cual];
+    try { localStorage.setItem(PANELES, JSON.stringify(ocultos)); } catch { /* sin almacenamiento: dura esta sesión */ }
+  }
+  const sinSalas = $derived(!pantalla.movil && !!ocultos.salas);
+  const sinGente = $derived(!pantalla.movil && !!ocultos.gente);
 
   let { grupo, volver }: { grupo: RecordModel; volver: () => void } = $props();
   const soyDueno = $derived(grupo.owner === sesion.usuario?.id);
@@ -177,8 +186,10 @@
   </div>
 {/snippet}
 
-<div class="grupo entra" class:enSalaVoz class:movil={pantalla.movil} class:lista={pantalla.movil && !enSala}>
+<div class="grupo entra" class:enSalaVoz class:sinSalas class:sinGente class:movil={pantalla.movil} class:lista={pantalla.movil && !enSala}>
   <div class="lado-izq">
+  {#if sinSalas}<div class="salas plegada"><button class="icono" aria-label="Mostrar las salas" title="Mostrar las salas" onclick={() => alternarPanel('salas')}><PanelLeftOpen size={19} strokeWidth={1.75} /></button></div>
+  {:else}
   <nav class="salas">
     <div class="cab-salas">
       {#if pantalla.movil}<button class="icono" aria-label="Volver" title="Volver" onclick={salir}><ChevronLeft size={22} strokeWidth={1.75} /></button>{/if}
@@ -186,7 +197,8 @@
       <button class="plano cabecera" bind:this={cabecera} popovertarget="menu-grupo">
         <h2>{grupo.name}</h2><ChevronDown size={16} strokeWidth={1.75} />
       </button>
-      {#if pantalla.movil}<button class="icono" aria-label="Ver participantes" title="Participantes" onclick={abrirDer}><Users size={19} strokeWidth={1.75} /></button>{/if}
+      {#if pantalla.movil}<button class="icono" aria-label="Ver participantes" title="Participantes" onclick={abrirDer}><Users size={19} strokeWidth={1.75} /></button>
+      {:else}<button class="icono" aria-label="Ocultar las salas" title="Ocultar las salas" onclick={() => alternarPanel('salas')}><PanelLeftClose size={18} strokeWidth={1.75} /></button>{/if}
     </div>
     {#if error}<p role="alert">{error}</p>{/if}
 
@@ -194,6 +206,7 @@
     {:else}{@render seccion('Salas de voz', 'voz', salasVoz)}{@render seccion('Chats', 'chat', chat)}{/if}
 
   </nav>
+  {/if}
   </div>
 
   <!-- Menú del nombre del grupo: invitar, configuraciones y cambiar de grupo. Borrar va adentro de Configuraciones (a propósito, lejos). -->
@@ -219,12 +232,12 @@
 
   {#if pantalla.movil && !enSala}<!-- celular: se ve la lista -->
   {:else if enSalaVoz && salaVoz}<Voz {grupo} {soyDueno} {salasVoz} sala={salaVoz.name} volver={pantalla.movil ? aLaLista : undefined} />
-  {:else if salaAbierta}{#key salaAbierta.id}<Chat titulo={`# ${salaAbierta.name}`} volver={pantalla.movil ? aLaLista : undefined} gente={pantalla.movil ? abrirDer : undefined} miembros={grupo.expand?.members ?? []} abrir={() => abrirChat(salaAbierta.id)} enviar={(t, f, r) => enviar(salaAbierta.id, t, f, r)} {borrar} silencio={salaAbierta.id} acciones={puedoSalas ? accionesSala : undefined}
+  {:else if salaAbierta}{#key salaAbierta.id}<Chat titulo={`# ${salaAbierta.name}`} volver={pantalla.movil ? aLaLista : undefined} gente={pantalla.movil ? abrirDer : () => alternarPanel('gente')} miembros={grupo.expand?.members ?? []} abrir={() => abrirChat(salaAbierta.id)} enviar={(t, f, r) => enviar(salaAbierta.id, t, f, r)} {borrar} silencio={salaAbierta.id} acciones={puedoSalas ? accionesSala : undefined}
     puedeBorrar={(m) => m.author === sesion.usuario?.id || puedoMensajes} />{/key}
   {:else}<div class="vacio">Elegí una sala de chat</div>{/if}
 
   {#if enSalaVoz && !pantalla.movil}<div popover id="capa-participantes" class="capa"><Participantes {grupo} /></div>
-  {:else}<Cajon lado="der" abierto={cajonDer}><Participantes {grupo} /></Cajon>{/if}
+  {:else if !sinGente}<Cajon lado="der" abierto={cajonDer}><Participantes {grupo} /></Cajon>{/if}
   <MenuPersona bind:this={menuPersona} {grupo} {salasVoz} alError={(m) => (error = m)} />
   <div popover class="menu" bind:this={menuSalaEl}>
     {#if menuSala}{@const r = menuSala}
@@ -258,7 +271,10 @@
 
 <style>
   .grupo { flex: 1; min-height: 0; display: grid; grid-template-columns: 248px minmax(0, 1fr) 240px; }
-  .grupo.enSalaVoz { grid-template-columns: 248px minmax(0, 1fr); }
+  .grupo.enSalaVoz, .grupo.sinGente { grid-template-columns: 248px minmax(0, 1fr); }
+  .grupo.sinSalas { grid-template-columns: 52px minmax(0, 1fr) 240px; }
+  .grupo.sinSalas.enSalaVoz, .grupo.sinSalas.sinGente { grid-template-columns: 52px minmax(0, 1fr); }
+  .salas.plegada { align-items: center; padding: 8px 0; }
   .grupo.movil { grid-template-columns: minmax(0, 1fr); }
   /* Celular: la lista de salas o la sala elegida, nunca las dos. */
   .grupo.movil:not(.lista) > .lado-izq { display: none; }

@@ -47,7 +47,9 @@ export async function entrarPantallaCompleta(sid: string) {
     try {
       const w = await ventana();
       estabaMax = await w.isMaximized();
-      if (estabaMax) await w.unmaximize();
+      // unmaximize vuelve antes de que Windows achique la ventana: si se entraba ya, Tauri la veía todavía
+      // maximizada y la pantalla completa quedaba del tamaño del área de trabajo (franja negra abajo).
+      if (estabaMax) await Promise.all([new Promise((ok) => { const t = setTimeout(ok, 500); addEventListener('resize', () => { clearTimeout(t); setTimeout(ok, 50); }, { once: true }); }), w.unmaximize()]);
       await w.setShadow(false);
     } catch { /* sigue la del navegador sola */ }
   }

@@ -228,3 +228,34 @@ test('el chat solo deja de seguir el final si subís vos; si se mueve solo, vuel
   await p.waitForTimeout(500);
   expect(await distancia()).toBeGreaterThan(200);
 });
+
+test('lo escrito sin mandar queda como borrador al ir a otra sala y volver', async ({ page: p }) => {
+  await crearCuenta(p, 'Borra');
+  await crearGrupo(p, 'Borradores');
+  await p.getByRole('button', { name: 'Sala de chat General' }).click();
+  const caja = p.locator('.compositor textarea, textarea:not(.edicion)').last();
+  await caja.fill('a medio escribir');
+  await p.getByRole('button', { name: 'Sala de voz General' }).click();
+  await p.getByRole('button', { name: 'Sala de chat General' }).click();
+  await expect(caja).toHaveValue('a medio escribir');
+  await caja.press('Enter');
+  await expect(p.getByTestId('mensaje').filter({ hasText: 'a medio escribir' })).toBeVisible();
+  await p.getByRole('button', { name: 'Sala de voz General' }).click();
+  await p.getByRole('button', { name: 'Sala de chat General' }).click();
+  await expect(caja).toHaveValue('');
+});
+
+test('en la PC, las salas y los participantes se pliegan y queda recordado', async ({ page: p }) => {
+  await crearCuenta(p, 'Plega');
+  await crearGrupo(p, 'Plegables');
+  await p.getByRole('button', { name: 'Sala de chat General' }).click();
+  await p.getByRole('button', { name: 'Ocultar las salas' }).click();
+  await expect(p.getByRole('button', { name: 'Sala de chat General' })).toHaveCount(0);
+  await p.getByRole('button', { name: 'Ver participantes' }).click();
+  await expect(p.locator('aside.participantes')).toHaveCount(0);
+  expect(await p.evaluate(() => JSON.parse(localStorage.getItem('dm.paneles')!))).toEqual({ salas: true, gente: true });
+  await p.getByRole('button', { name: 'Ver participantes' }).click();
+  await expect(p.locator('aside.participantes')).toBeVisible();
+  await p.getByRole('button', { name: 'Mostrar las salas' }).click();
+  await expect(p.getByRole('button', { name: 'Sala de chat General' })).toBeVisible();
+});

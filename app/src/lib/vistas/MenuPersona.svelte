@@ -1,9 +1,9 @@
 <script lang="ts">
   import type { RecordModel } from 'pocketbase';
-  import { MessageSquare, Volume2 } from '@lucide/svelte';
+  import { MessageSquare, Volume2, Video } from '@lucide/svelte';
   import { lleno } from '../rango';
   import { leerPrefs } from '../prefs';
-  import { voz, volumen, silenciar, desconectar, moverA, bloquearVoz } from '../voz.svelte';
+  import { voz, volumen, silenciar, desconectar, moverA, bloquearVoz, calidadCamaraDe } from '../voz.svelte';
   import { asignarRol } from '../grupos.svelte';
   import { puedo, rolesDe, rolesDeMiembro, type Permiso } from '../permisos';
   import { sesion, mensajeError } from '../sesion.svelte';
@@ -18,6 +18,7 @@
   let menu = $state<HTMLElement>();
   let elegido = $state<{ id: string; nombre: string } | null>(null);
   let vols = $state<Record<string, number>>({ ...leerPrefs().volumenes });
+  let calCam = $state(leerPrefs().calidadCam);
   // Silencios recién pedidos, hasta que el grupo se refresque con el valor del servidor.
   let pedidos = $state<Record<string, boolean>>({});
   const silenciado = (id: string) => pedidos[id] ?? ((grupo.silenciados ?? []) as string[]).includes(id);
@@ -30,6 +31,7 @@
     if (p.id === sesion.usuario?.id) return;
     elegido = p;
     vols = { ...leerPrefs().volumenes };
+    calCam = leerPrefs().calidadCam;
     void abrirEnPunto(menu, x, y);
   }
 
@@ -54,6 +56,15 @@
         aria-label={`Volumen de ${p.nombre}`} oninput={(e) => cambiar(p.id, +e.currentTarget.value)} />
       <small class="num">{Math.round((vols[p.id] ?? 1) * 100)}%</small>
     </div>
+    {#if voz.participantes.some((x) => x.id === p.id && x.camara)}
+      <label class="volumen" title="Calidad en la que ves su cámara (solo para vos)">
+        <Video size={15} strokeWidth={1.75} />
+        <select aria-label={`Calidad de la cámara de ${p.nombre}`} value={calCam[p.id] ?? ''}
+          onchange={(e) => { const v = (e.currentTarget.value || null) as 'media' | 'baja' | null; calidadCamaraDe(p.id, v); calCam = leerPrefs().calidadCam; }}>
+          <option value="">Cámara: automática</option><option value="media">Cámara: media (720p)</option><option value="baja">Cámara: baja (360p)</option>
+        </select>
+      </label>
+    {/if}
     {#if soyDueno && moderable(p.id) && roles.length}
       <hr /><small class="titulo">Roles</small>
       <div class="roles" role="group" aria-label={`Roles de ${p.nombre}`}>
@@ -86,6 +97,7 @@
   .menu button:not(.peligro) { color: var(--texto); }
   .quien { padding: 2px 8px 4px; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .volumen { display: flex; align-items: center; gap: 8px; padding: 4px 8px; color: var(--icono); }
+  .volumen select { flex: 1; min-width: 0; font-size: 13px; }
   .volumen input { flex: 1; min-width: 0; padding: 0; background: none; border: 0; }
   .volumen small { width: 36px; text-align: right; color: var(--tenue); font-size: 12px; }
   .titulo { padding: 0 8px; color: var(--tenue); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }

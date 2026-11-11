@@ -15,7 +15,7 @@
   import { pb } from '../pb';
   import { foto } from '../foto';
   import { validarAdjunto, duracionVideo } from '../adjuntos';
-  import type { ChatAbierto } from '../chat.svelte';
+  import { borradores, type ChatAbierto } from '../chat.svelte';
   import { mensajeError, sesion } from '../sesion.svelte';
   import Confirmar from './Confirmar.svelte';
   import MenuChat from './MenuChat.svelte';
@@ -61,7 +61,8 @@
   $effect(() => chat.cerrar);
   $effect(() => { const m = chat.mensajes.at(-1); if (m) alVer?.(m); });
 
-  let texto = $state('');
+  let texto = $state(borradores.get(chat.clave) ?? '');
+  $effect(() => { if (texto) borradores.set(chat.clave, texto); else borradores.delete(chat.clave); });
   let archivo = $state<File | null>(null);
   let error = $state('');
   let enviando = $state(false);

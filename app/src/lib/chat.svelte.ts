@@ -17,6 +17,9 @@ export type ChatAbierto = ReturnType<typeof abrirLista>;
 /** Chat de una sala de grupo. */
 export const abrirChat = (roomId: string) => abrirLista('messages', pb.filter('room = {:r}', { r: roomId }));
 
+/** Lo escrito sin mandar en cada chat (por `clave`), para encontrarlo al volver. Dura mientras la app está abierta. */
+export const borradores = new Map<string, string>();
+
 /** Mensajes de `coleccion` que cumplen `filtroSala`: últimos 50 + realtime, en orden cronológico. Llamar `cerrar()` al terminar. */
 export function abrirLista(coleccion: 'messages' | 'privados', filtroSala: string) {
   const estado = $state<{ mensajes: RecordModel[]; hayMas: boolean; error: string }>({ mensajes: [], hayMas: false, error: '' });
@@ -58,6 +61,7 @@ export function abrirLista(coleccion: 'messages' | 'privados', filtroSala: strin
     get mensajes() { return estado.mensajes; },
     get hayMas() { return estado.hayMas; },
     get error() { return estado.error; },
+    clave: `${coleccion}:${filtroSala}`,
     async cargarMas() {
       const primero = estado.mensajes[0];
       if (!primero || cargando) return;

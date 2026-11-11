@@ -178,3 +178,21 @@ test('si apagás y prendés la cámara a mano durante la transmisión, al cortar
   await a.waitForTimeout(1000);
   await expect(a.getByRole('button', { name: 'Apagar la cámara' })).toBeVisible();
 });
+
+test('Beto elige ver la cámara de Ana en calidad baja y la cámara agrandada tapa toda la ventana', async ({ browser }) => {
+  const [a, b] = await grupoDeTres(browser, unico('CalCam'));
+  await entrarVoz([a, b]);
+  await a.getByRole('button', { name: 'Prender la cámara' }).click();
+  await expect(tarjeta(b, 'Ana').locator('video')).toBeVisible({ timeout: 15_000 });
+  await tarjeta(b, 'Ana').click({ button: 'right' });
+  const sel = b.getByLabel(/Calidad de la cámara de Ana/);
+  await sel.selectOption('baja');
+  expect(Object.values(await b.evaluate(() => JSON.parse(localStorage.getItem('dm.voz')!).calidadCam))).toEqual(['baja']);
+  await b.keyboard.press('Escape');
+  await tarjeta(b, 'Ana').getByRole('button', { name: /Agrandar la cámara/ }).click();
+  await expect(tarjeta(b, 'Ana').locator('.cam.completa')).toBeVisible();
+  const caja = await tarjeta(b, 'Ana').locator('.cam').boundingBox();
+  expect(caja?.width).toBe(b.viewportSize()!.width);
+  await a.getByRole('button', { name: 'Apagar la cámara' }).click();
+  await expect.poll(() => b.evaluate(() => document.fullscreenElement)).toBeNull();
+});
