@@ -148,9 +148,9 @@ function limpiar() {
   (r?.disconnect() ?? Promise.resolve()).catch(() => {}).finally(() => c?.close().catch(() => {}));
 }
 
-/** `vuelta`: entra solo, sin que el usuario lo pida (el celular que vuelve de segundo plano); el servidor lo rechaza si
- *  mientras tanto un moderador lo desconectó. */
-export async function entrarVoz(roomId: string, salaNombre = '', grupoId: string | null = null, vuelta = false) {
+/** `vuelta`: entra solo, sin que el usuario lo pida (después de una caída); el servidor lo rechaza si mientras tanto un
+ *  moderador lo desconectó. Devuelve 'red' si no pudo entrar por falta de conexión (vale la pena reintentar). */
+export async function entrarVoz(roomId: string, salaNombre = '', grupoId: string | null = null, vuelta = false): Promise<'red' | undefined> {
   salirVoz();
   const mio = ++intento;
   // El contexto se crea antes de cualquier await, dentro del gesto del usuario (autoplay). 48 kHz: lo exige RNNoise.
@@ -159,7 +159,7 @@ export async function entrarVoz(roomId: string, salaNombre = '', grupoId: string
   Object.assign(voz, { salaId: roomId, salaNombre, grupoId, conectando: true, error: '' });
   const vigente = () => mio === intento;
   try { if (!lk) lk = await import('livekit-client'); }
-  catch { if (vigente()) { voz.error = 'No se pudo conectar a la voz.'; salirVoz(); } return; }
+  catch { if (!vigente()) return; voz.error = 'No se pudo conectar a la voz.'; salirVoz(); return 'red'; }
   if (!vigente()) return;
   const { Room, RoomEvent, Track } = lk;
   // Celular: el sonido sale por <audio> comunes y no por el AudioContext, que el sistema frena con la pantalla
@@ -250,7 +250,7 @@ export async function entrarVoz(roomId: string, salaNombre = '', grupoId: string
     const D = lk.DisconnectReason;
     const buscadas: (typeof motivo)[] = [D.CLIENT_INITIATED, D.PARTICIPANT_REMOVED, D.ROOM_DELETED, D.DUPLICATE_IDENTITY];
     const caida = !buscadas.includes(motivo);
-    const volver = caida && seCayoEnSegundoPlano() ? { sala: roomId, nombre: salaNombre, grupo: grupoId, hasta: Date.now() + VOLVER_HASTA } : null;
+    const volver = caida ? { sala: roomId, nombre: salaNombre, grupo: grupoId, hasta: Date.now() + VOLVER_HASTA } : null;
     if (motivo !== D.CLIENT_INITIATED && !volver) {
       voz.error = motivo === D.PARTICIPANT_REMOVED ? 'Te sacaron de la llamada.'
         : motivo === D.ROOM_DELETED ? 'La sala de voz se borró.'
@@ -267,15 +267,18 @@ export async function entrarVoz(roomId: string, salaNombre = '', grupoId: string
   try {
     ({ token, url } = await pb.send(`/api/rooms/${roomId}/token`, { method: 'POST', ...(vuelta ? { body: { vuelta: true } } : {}) }));
   } catch (e) {
-    if (vigente()) { voz.error = mensajeError(e); salirVoz(); }
-    return;
+    if (!vigente()) return;
+    voz.error = mensajeError(e); salirVoz();
+    const status = (e as { status?: number } | null)?.status ?? 0; // 0: sin red; 5xx: el servidor no responde
+    return status === 0 || status >= 500 ? 'red' : undefined;
   }
   try {
     if (!vigente()) return;
     await r.connect(url, token, { autoSubscribe: false });
   } catch {
-    if (vigente()) { voz.error = 'No se pudo conectar a la voz.'; salirVoz(); }
-    return;
+    if (!vigente()) return;
+    voz.error = 'No se pudo conectar a la voz.'; salirVoz();
+    return 'red';
   }
   if (!vigente()) { r.disconnect(); return; } // por si el connect terminó pese al disconnect de limpiar()
   voz.conectando = false;
@@ -304,23 +307,28 @@ export async function activarSonido() {
   voz.sinSonido = !!room && (!room.canPlaybackAudio || ctx?.state !== 'running');
 }
 
-// Celular: al ir a segundo plano el sistema congela la página (el iPhone siempre, al salir del navegador) y la llamada
-// se cae. Si se cayó así, al volver se reconecta sola a la misma sala, salvo que haya pasado demasiado.
+// La llamada se cayó sin que nadie la cortara (se fue la red, se reinició el router o la placa de red, el celular congeló
+// la página en segundo plano): vuelve sola a la misma sala. Sin red todavía, reintenta cada 5 s hasta media hora.
+// En el celular espera a que la app esté a la vista, porque en segundo plano el sistema la congela igual.
 const VOLVER_HASTA = 30 * 60_000;
+const REINTENTO = 5_000;
 let volverA: { sala: string; nombre: string; grupo: string | null; hasta: number } | null = null;
-let ultimaVezOculta = 0; // al ocultarse y al volver: lo que importa es si estuvo oculta hace poco
-// Dos minutos: al volver, LiveKit todavía intenta reconectar casi un minuto antes de darse por vencido.
-const seCayoEnSegundoPlano = () => esCelular && (document.visibilityState === 'hidden' || Date.now() - ultimaVezOculta < 120_000);
 function volverALaLlamada() {
   const v = volverA;
-  if (!v || document.visibilityState !== 'visible') return;
+  if (!v || (esCelular && document.visibilityState !== 'visible')) return;
   volverA = null;
   if (voz.salaId) return;
-  if (Date.now() < v.hasta) void entrarVoz(v.sala, v.nombre, v.grupo, true);
-  else voz.error = 'Se cortó la llamada mientras estabas en otra app.';
+  if (Date.now() >= v.hasta) { voz.error = esCelular ? 'Se cortó la llamada mientras estabas en otra app.' : 'Se perdió la conexión de voz.'; return; }
+  void entrarVoz(v.sala, v.nombre, v.grupo, true).then((r) => {
+    // Si mientras tanto entró a otra sala, salirVoz ya olvidó la vuelta y este reintento no corre.
+    if (r !== 'red' || voz.salaId || volverA) return;
+    volverA = v;
+    voz.error = 'Sin conexión. Volviendo a entrar a la llamada…';
+    setTimeout(volverALaLlamada, REINTENTO);
+  });
 }
 if (esCelular) {
-  document.addEventListener('visibilitychange', () => { ultimaVezOculta = Date.now(); volverALaLlamada(); });
+  document.addEventListener('visibilitychange', volverALaLlamada);
   // El primer toque después de volver solo destraba el sonido.
   document.addEventListener('click', () => { if (voz.sinSonido) void activarSonido(); }, true); // pointerdown no cuenta como gesto para el audio
 }

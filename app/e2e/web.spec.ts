@@ -549,15 +549,29 @@ test('celular en llamada: pantalla trabada y vuelve solo a la sala si se cayó e
   await expect.poll(() => a.evaluate(() => (window as unknown as { trabas: number }).trabas)).toBe(2);
 });
 
-test('PC en el navegador: si se cae la llamada no vuelve sola', async ({ browser }) => {
+test('PC: si se cae la llamada vuelve sola, también si la red tarda en volver', async ({ browser }) => {
   const a = await (await browser.newContext()).newPage();
   await crearCuenta(a, 'Ana');
   await crearGrupo(a, 'Compu');
   await a.getByRole('button', { name: 'Sala de voz General' }).click();
   await expect(a.locator('section.voz li')).toHaveCount(1, { timeout: 15_000 });
   expect(await a.evaluate(() => (globalThis as unknown as { __voz: { webAudioMix(): boolean } }).__voz.webAudioMix())).toBe(true);
-  await a.evaluate(() => (globalThis as unknown as { __voz: { caer(): void } }).__voz.caer());
-  await expect(a.getByRole('alert').filter({ hasText: 'Se perdió la conexión de voz.' })).toBeVisible();
-  await a.waitForTimeout(1500);
-  await expect(a.locator('section.voz li')).toHaveCount(0);
+  const caer = () => a.evaluate(() => (globalThis as unknown as { __voz: { caer(): void } }).__voz.caer());
+  // Sin llamada se vuelve al chat: el estado se mira en la barra de abajo, no en la vista de la sala.
+  const conectado = a.getByText('Conectado', { exact: true });
+
+  // Corte corto: vuelve sin cartel.
+  await caer();
+  await expect(conectado).toBeVisible({ timeout: 15_000 });
+  await expect(a.getByRole('alert')).toHaveCount(0);
+
+  // Sin red: el pedido de entrada falla, avisa que está volviendo y reintenta hasta que la red vuelve.
+  await a.route('**/api/rooms/*/token', (r) => r.abort('internetdisconnected'));
+  await caer();
+  await expect(a.getByRole('alert').filter({ hasText: 'Volviendo a entrar a la llamada' })).toBeVisible({ timeout: 15_000 });
+  await expect(conectado).toHaveCount(0);
+  await a.unroute('**/api/rooms/*/token');
+  await expect(conectado).toBeVisible({ timeout: 15_000 });
+  await expect(a.getByRole('alert')).toHaveCount(0);
+  await expect(a.getByRole('button', { name: 'Sala de voz General' })).toContainText('1 en voz');
 });
