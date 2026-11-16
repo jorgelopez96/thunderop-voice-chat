@@ -73,6 +73,6 @@ test('al cerrar la app los demás lo ven desconectado en segundos, no al minuto 
   await b.reload(); // recargar corta y vuelve a conectar: no tiene que verse desconectado
   await a.waitForTimeout(6_000);
   await expect(luz).toHaveAttribute('title', 'Disponible');
-  await ctxB.close();
-  await expect(luz).toHaveAttribute('title', 'Desconectado', { timeout: 10_000 });
+  await ctxB.close(); // Beto latió hace segundos: sin el aviso de desconexión tardaría más de 80 s (la tarea arranca al minuto de prender el servidor)
+  await expect(luz).toHaveAttribute('title', 'Desconectado', { timeout: 75_000 });
 });

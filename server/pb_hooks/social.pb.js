@@ -26,24 +26,29 @@ routerAdd("POST", "/api/latido", (e) => {
   return e.json(200, { visto: u.getString("visto") });
 }, $apis.requireAuth("users"));
 
-// Al cerrarse la app (o la pestaña, o apagarse la PC) se corta su conexión en tiempo real: después de e.next() ya se
-// cortó. Se esperan unos segundos por si se reconecta (red que pestañea) y, si no le queda otra conexión (web + escritorio),
-// se borra `visto` y los demás lo ven desconectado al toque, sin esperar los 90 s del latido.
-// ponytail: cada conexión abierta ocupa una VM de hooks mientras dura; si hay cientos a la vez, pasarlo a Go.
-onRealtimeConnectRequest((e) => {
-  e.next();
-  const auth = e.client.get("auth");
-  if (!auth || auth.collection().name !== "users") return;
-  sleep(4000);
-  const clientes = e.app.subscriptionsBroker().clients();
-  for (const id in clientes) {
-    const otro = clientes[id].get("auth");
-    if (id !== e.client.id() && otro && otro.id === auth.id) return;
+// Al cerrarse la app (o la pestaña, o apagarse la PC) se corta su conexión en tiempo real. Una sola tarea mira cada 5 s
+// a los que latieron hace poco: si en dos vueltas seguidas no tienen ninguna conexión (web + escritorio cuentan), se borra
+// `visto` y los demás lo ven desconectado en 5-10 s, sin esperar los 90 s del latido. Dos vueltas: recargar no parpadea.
+// No se engancha a cada conexión (onRealtimeConnectRequest) porque cada una ocuparía una VM de hooks mientras dura.
+cronAdd("desconectados", "* * * * *", () => {
+  let faltaban = {};
+  const fin = Date.now() + 58000;
+  while (Date.now() < fin) {
+    sleep(5000);
+    const conectados = {};
+    const clientes = $app.subscriptionsBroker().clients();
+    for (const id in clientes) { const a = clientes[id].get("auth"); if (a) conectados[a.id] = true; }
+    const desde = new Date(Date.now() - 90000).toISOString().replace("T", " ");
+    const recientes = $app.findRecordsByFilter("users", "visto >= {:desde}", "", 0, 0, { desde });
+    const faltan = {};
+    for (const u of recientes) {
+      if (conectados[u.id]) continue;
+      if (!faltaban[u.id]) { faltan[u.id] = true; continue; }
+      u.set("visto", "");
+      $app.saveNoValidate(u);
+    }
+    faltaban = faltan;
   }
-  try {
-    const u = e.app.findRecordById("users", auth.id);
-    if (u.getString("visto")) { u.set("visto", ""); e.app.saveNoValidate(u); }
-  } catch { /* borrado */ }
 });
 
 // Solicitud de amistad por usuario (normalizado) o id. Si el otro ya me la había pedido, la acepta.
