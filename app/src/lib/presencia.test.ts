@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { enLineaSegun } from './presencia.svelte';
+import { enLineaSegun, estado } from './presencia.svelte';
+import type { RecordModel } from 'pocketbase';
 
 describe('enLineaSegun', () => {
   const t = Date.parse('2026-10-20T12:00:00.000Z');
@@ -12,5 +13,16 @@ describe('enLineaSegun', () => {
     expect(enLineaSegun(undefined, t)).toBe(false);
     expect(enLineaSegun('', t)).toBe(false);
     expect(enLineaSegun('basura', t)).toBe(false);
+  });
+});
+
+describe('estado', () => {
+  const u = (disponibilidad: string, inactivo: boolean) => ({ id: 'x', visto: new Date().toISOString(), disponibilidad, inactivo }) as unknown as RecordModel;
+  it('sin tocar la PC, "Disponible" se ve "Ausente"; "Ocupado" sigue "Ocupado"', () => {
+    expect(estado(u('', false))).toBe('disponible');
+    expect(estado(u('', true))).toBe('ausente');
+    expect(estado(u('disponible', true))).toBe('ausente');
+    expect(estado(u('ocupado', true))).toBe('ocupado');
+    expect(estado(u('ausente', false))).toBe('ausente');
   });
 });

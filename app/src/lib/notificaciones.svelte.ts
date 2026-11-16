@@ -66,6 +66,10 @@ export const atencion = $state({ nuevos: 0 });
 let ctx: AudioContext | undefined;
 function ding() {
   ctx ??= new AudioContext();
+  // Por la salida elegida en Configuración ('' es la predeterminada de Windows para un AudioContext).
+  const salida = leerPrefs().salida, sink = salida === 'default' ? '' : salida ?? '';
+  const c = ctx as AudioContext & { sinkId?: string; setSinkId?: (id: string) => Promise<void> };
+  if (c.setSinkId && c.sinkId !== sink) c.setSinkId(sink).catch(() => {});
   const o = ctx.createOscillator(), g = ctx.createGain(), t = ctx.currentTime;
   o.type = 'sine';
   o.frequency.setValueAtTime(880, t);

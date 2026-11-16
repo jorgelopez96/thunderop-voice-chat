@@ -42,3 +42,37 @@ test('cuentas, grupos, invitaciones y chat', async ({ browser }) => {
   await expect(b.getByRole('heading', { name: /^¡Hola/ })).toBeVisible({ timeout: 15_000 });
   await expect(b.getByRole('button', { name: 'Los pibes' })).toHaveCount(0);
 });
+
+test('sin tocar la PC 10 minutos se ve "Ausente" para los demás, y al volver "Disponible"', async ({ browser }) => {
+  const a = await (await browser.newContext()).newPage();
+  const b = await (await browser.newContext()).newPage();
+  await b.clock.install();
+  await crearCuenta(a, 'Ana');
+  const link = await crearGrupo(a, 'Los quietos');
+  await crearCuenta(b, 'Beto');
+  await unirse(b, link);
+  const luz = a.getByRole('listitem').filter({ hasText: 'Beto' }).locator('.luz');
+  await expect(luz).toHaveAttribute('title', 'Disponible', { timeout: 10_000 });
+  await b.clock.fastForward('10:05');
+  await expect(luz).toHaveAttribute('title', 'Ausente', { timeout: 10_000 });
+  await b.mouse.move(200, 200);
+  await b.clock.fastForward(4_000);
+  await expect(luz).toHaveAttribute('title', 'Disponible', { timeout: 10_000 });
+});
+
+test('al cerrar la app los demás lo ven desconectado en segundos, no al minuto y medio', async ({ browser }) => {
+  const a = await (await browser.newContext()).newPage();
+  const ctxB = await browser.newContext();
+  const b = await ctxB.newPage();
+  await crearCuenta(a, 'Ana');
+  const link = await crearGrupo(a, 'Los que se van');
+  await crearCuenta(b, 'Beto');
+  await unirse(b, link);
+  const luz = a.getByRole('listitem').filter({ hasText: 'Beto' }).locator('.luz');
+  await expect(luz).toHaveAttribute('title', 'Disponible', { timeout: 10_000 });
+  await b.reload(); // recargar corta y vuelve a conectar: no tiene que verse desconectado
+  await a.waitForTimeout(6_000);
+  await expect(luz).toHaveAttribute('title', 'Disponible');
+  await ctxB.close();
+  await expect(luz).toHaveAttribute('title', 'Desconectado', { timeout: 10_000 });
+});

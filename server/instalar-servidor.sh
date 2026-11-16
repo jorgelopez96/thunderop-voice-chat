@@ -32,9 +32,10 @@ rtc:
   port_range_start: 50000
   port_range_end: 50100
   use_external_ip: true
-  # Con REMB la estimación arrancaba en ~5 kbps al empezar a mirar y dejaba la capa más baja por minutos.
+  # Apagado: el reloj de WSL atrasa ~8% y toda estimación por demoras (REMB o send-side) veía congestión que no había
+  # (0 paquetes perdidos, ~120 kbps estimados por espectador): dejaba las cámaras en la capa más baja y a pocos fps.
   congestion_control:
-    enabled: true
+    enabled: false
     allow_pause: false
     use_send_side_bwe_interceptor: true
     use_send_side_bwe: true

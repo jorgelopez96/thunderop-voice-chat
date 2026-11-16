@@ -52,7 +52,13 @@
   const salasVoz = $derived(s.estado.lista.filter((r) => r.kind === 'voz'));
   const salaVoz = $derived(salasVoz.find((r) => r.id === voz.salaId));
 
-  let salaId = $state<string | null>(null);
+  // Al entrar al grupo se abre el último chat que tuviste abierto ahí (o el primero, si no hay o lo borraron).
+  const ULTIMA = 'dm.ultimaSala';
+  const ultimas = (): Record<string, string> => { try { return JSON.parse(localStorage.getItem(ULTIMA) ?? '{}'); } catch { return {}; } };
+  // svelte-ignore state_referenced_locally
+  let salaId = $state<string | null>(ultimas()[grupo.id] ?? null);
+  $effect(() => { if (chat.length && !chat.some((r) => r.id === salaId)) salaId = chat[0].id; });
+  $effect(() => { const id = salaId; if (id) try { localStorage.setItem(ULTIMA, JSON.stringify({ ...ultimas(), [grupo.id]: id })); } catch { /* sin almacenamiento */ } });
   let centroVoz = $state(false); // el centro muestra la voz (si no, el chat elegido)
   $effect(() => { if (!voz.salaId) centroVoz = false; }); // salir desde el dock vuelve al chat
   const enSalaVoz = $derived(centroVoz && !!salaVoz);

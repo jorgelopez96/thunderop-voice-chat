@@ -1,3 +1,4 @@
+mod atajos;
 mod audio;
 mod transmisor;
 
@@ -75,6 +76,7 @@ pub fn run() {
                     if let TrayIconEvent::Click { button: MouseButton::Left, button_state: MouseButtonState::Up, .. } = e { mostrar(t.app_handle()) }
                 })
                 .build(app)?;
+            atajos::iniciar(app.handle().clone());
             Ok(())
         })
         .plugin(tauri_plugin_notification::init())
@@ -82,7 +84,7 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(audio::Captura::default())
         .manage(transmisor::Transmisor::default())
-        .invoke_handler(tauri::generate_handler![audio::iniciar_audio, audio::detener_audio, transmisor::fuentes_transmisor, transmisor::iniciar_transmisor, transmisor::calidad_transmisor, transmisor::detener_transmisor, memoria_baja, salir])
+        .invoke_handler(tauri::generate_handler![audio::iniciar_audio, audio::detener_audio, transmisor::fuentes_transmisor, transmisor::iniciar_transmisor, transmisor::calidad_transmisor, transmisor::detener_transmisor, memoria_baja, animaciones_ventana, inactivo_ms, atajos::atajos_asignar, atajos::atajos_capturar, salir])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
@@ -119,6 +121,40 @@ fn salir(app: AppHandle) { app.exit(0) }
 
 #[tauri::command]
 fn memoria_baja(w: WebviewWindow) { nivel_memoria(&w, true) }
+
+/// Pantalla completa: al entrar y salir la ventana se des-maximiza y re-maximiza, y la animación de Windows la mostraba
+/// achicarse y agrandarse. Mientras dura el salto se apagan las transiciones de la ventana (DWMWA_TRANSITIONS_FORCEDISABLED).
+#[tauri::command]
+fn animaciones_ventana(w: WebviewWindow, si: bool) {
+    #[cfg(windows)]
+    {
+        #[link(name = "dwmapi")]
+        unsafe extern "system" { fn DwmSetWindowAttribute(hwnd: isize, atributo: u32, valor: *const i32, tam: u32) -> i32; }
+        if let Ok(h) = w.hwnd() {
+            let apagadas: i32 = if si { 0 } else { 1 };
+            unsafe { DwmSetWindowAttribute(h.0 as isize, 3, &apagadas, 4) };
+        }
+    }
+    #[cfg(not(windows))]
+    let _ = (w, si);
+}
+
+/// Milisegundos desde la última tecla o movimiento del mouse en toda la PC (no solo en la app): para el "Ausente" solo.
+#[tauri::command]
+fn inactivo_ms() -> u32 {
+    #[cfg(windows)]
+    {
+        #[repr(C)]
+        struct Ultimo { tam: u32, tick: u32 }
+        #[link(name = "user32")]
+        unsafe extern "system" { fn GetLastInputInfo(u: *mut Ultimo) -> i32; }
+        #[link(name = "kernel32")]
+        unsafe extern "system" { fn GetTickCount() -> u32; }
+        let mut u = Ultimo { tam: 8, tick: 0 };
+        if unsafe { GetLastInputInfo(&mut u) } != 0 { return unsafe { GetTickCount() }.wrapping_sub(u.tick); }
+    }
+    0
+}
 
 /// En "bajo" WebView2 recorta cachés y memoria de la página, que sigue viva (presencia, mensajes).
 /// No se usa `TrySuspend`: congela los timers y la app aparecería desconectada.

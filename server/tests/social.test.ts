@@ -53,6 +53,18 @@ describe('presencia', () => {
     await expect(new PocketBase(h.url).send('/api/latido', { method: 'POST' })).rejects.toMatchObject({ status: 401 });
   });
 
+  it('inactivo lo pone el latido y no uno a mano', async () => {
+    const a = await h.nuevoUsuario('ana');
+    const id = a.authStore.record!.id;
+    const inactivo = async () => (await a.collection('users').getOne(id)).inactivo;
+    await a.send('/api/latido', { method: 'POST', body: { inactivo: true } });
+    expect(await inactivo()).toBe(true);
+    await a.collection('users').update(id, { inactivo: false });
+    expect(await inactivo()).toBe(true);
+    await a.send('/api/latido', { method: 'POST' });
+    expect(await inactivo()).toBe(false);
+  });
+
   it('silenciado: por el dueño, sin micrófono o con el micrófono muteado', () => {
     const mic = (muted: boolean, source: unknown = 'MICROPHONE') => ({ identity: 'b', tracks: [{ source, muted }] });
     expect(silenciado(mic(false), [])).toBe(false);

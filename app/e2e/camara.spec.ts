@@ -98,6 +98,17 @@ test('Pantalla + cámara: Beto ve la cámara de Ana abajo a la derecha, y la pue
   await expect(a.locator('.propia .cam-mover')).toBeVisible();
 });
 
+test('la cámara sobre la pantalla no se re-engancha con cada cambio de la sala (titilaba)', async ({ browser }) => {
+  const { a, b } = await streamer(browser);
+  const video = encima(b).locator('video');
+  await expect(video).toBeVisible({ timeout: 15_000 });
+  await video.evaluate((v) => { (v as HTMLVideoElement & { cortes?: number }).cortes = 0; v.addEventListener('emptied', () => (v as HTMLVideoElement & { cortes: number }).cortes++); });
+  // Muteos de Ana: cada uno actualiza la lista de la sala.
+  for (let i = 0; i < 4; i++) await a.getByRole('button', { name: /^(Silenciarme|Activar micrófono)$/ }).first().click();
+  await expect(tarjeta(b, 'Ana').getByLabel('Silenciado')).toHaveCount(0, { timeout: 10_000 });
+  expect(await video.evaluate((v) => (v as HTMLVideoElement & { cortes: number }).cortes)).toBe(0);
+});
+
 test('Ana acomoda la ventanita en su vista previa y a Beto se le mueve', async ({ browser }) => {
   const { a, b } = await streamer(browser);
   await expect(encima(b).locator('video')).toBeVisible({ timeout: 15_000 });

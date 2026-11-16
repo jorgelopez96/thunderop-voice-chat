@@ -125,9 +125,9 @@
       <Volume2 size={18} strokeWidth={1.75} color="var(--icono)" />
       <h2>{sala}</h2>
       <span class="en-voz num">{voz.participantes.length} en voz</span>
-      {#if enEscena}<button class="plano" onclick={() => (ocultarGente = !ocultarGente)}>{#if ocultarGente}<Eye size={16} strokeWidth={1.75} /> Mostrar participantes{:else}<EyeOff size={16} strokeWidth={1.75} /> Ocultar participantes{/if}</button>{/if}
+      {#if enEscena}<button class="plano" onclick={() => (ocultarGente = !ocultarGente)} aria-label={ocultarGente ? 'Mostrar participantes' : 'Ocultar participantes'} title={ocultarGente ? 'Mostrar participantes' : 'Ocultar participantes'}>{#if ocultarGente}<Eye size={16} strokeWidth={1.75} /><span class="rotulo">Mostrar participantes</span>{:else}<EyeOff size={16} strokeWidth={1.75} /><span class="rotulo">Ocultar participantes</span>{/if}</button>{/if}
       <!-- popovertarget: abre y cierra con el mismo botón (con onclick, el clic la cerraba y la volvía a abrir) -->
-      <button class="plano" popovertarget="capa-participantes"><Users size={16} strokeWidth={1.75} /> Participantes · {miembros.length}</button>
+      <button class="plano" popovertarget="capa-participantes" aria-label={`Participantes · ${miembros.length}`} title="Participantes"><Users size={16} strokeWidth={1.75} /><span class="rotulo">Participantes ·</span> {miembros.length}</button>
       {#if !chatAbierto && !pantalla.movil}<button class="icono" onclick={() => plegarChat(true)} aria-label="Abrir chat de la sala" title="Chat de la sala"><MessageSquare size={16} strokeWidth={1.75} /></button>{/if}
     </header>
     {#if avisoLlamada}<p class="aviso-celular">{esIphone ? AVISO_IPHONE : AVISO_ANDROID}
@@ -220,7 +220,12 @@
   .voz.movil .franja { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .voz.movil header { height: calc(52px + env(safe-area-inset-top)); padding-top: env(safe-area-inset-top); }
   .voz.movil .chatSala { position: fixed; inset: 0; z-index: 15; padding-top: env(safe-area-inset-top); border: 0; }
-  .centro { padding: 0 16px 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+  .centro { padding: 0 16px 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; min-width: 0; container-type: inline-size; }
+  /* Con la ventana angosta los textos de la cabecera no se parten en renglones: el nombre se corta con … y los botones
+     quedan solo con el ícono. */
+  header > :global(*) { flex: none; white-space: nowrap; }
+  header h2 { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  @container (max-width: 520px) { header .rotulo { display: none; } }
   header { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 8px; height: 52px; flex: none; margin: 0 -16px; padding: 0 12px 0 16px;
     background: var(--fondo); border-bottom: 1px solid var(--borde); }
   h2 { font-size: 15px; font-weight: 650; letter-spacing: 0; }

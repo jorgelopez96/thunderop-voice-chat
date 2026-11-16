@@ -224,6 +224,13 @@
 
 <style>
   .paneles { flex: 1; min-height: 0; display: grid; grid-template-columns: 330px minmax(0, 1fr) 280px; gap: 8px; padding: 8px; background: var(--hondo); }
+  /* Ventana angosta: Amigos pasa abajo de los grupos y el centro se queda con el ancho (quedaba una palabra por renglón). */
+  @media (max-width: 1100px) {
+    .paneles { grid-template-columns: 290px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) minmax(0, 1fr); }
+    .izq { grid-area: 1 / 1; }
+    .centro { grid-area: 1 / 2 / 3 / 3; }
+    .der { grid-area: 2 / 1; }
+  }
   .panel { min-height: 0; display: flex; flex-direction: column; overflow: hidden; background: var(--panel); border: 1px solid var(--borde); border-radius: 18px; }
   .der :global(.amigos) { border-left: 0; }
 
@@ -295,9 +302,11 @@
   .novedades[open] summary { margin-bottom: 12px; }
   .novedades :global(.encabezado) { display: none; }
 
-  .vacio { margin: 28px; display: flex; flex-direction: column; align-items: flex-start; gap: 12px; padding: 28px; border: 1px dashed var(--borde-fuerte); border-radius: var(--radio-tarjeta); }
+  .vacio { margin: 28px; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 12px; padding: 28px; border: 1px dashed var(--borde-fuerte); border-radius: var(--radio-tarjeta); }
   .vacio-icono { display: grid; place-items: center; width: 64px; height: 64px; border-radius: var(--radio-grande); background: var(--acento-suave); color: var(--acento-texto); }
   .vacio h2 { font-size: 17px; font-weight: 650; }
   .vacio p { margin: 0; color: var(--tenue); }
   .vacio .agregar { width: min(520px, 100%); }
+  .vacio .fila-form { flex-wrap: wrap; justify-content: center; }
+  .vacio .fila-form button { white-space: nowrap; }
 </style>

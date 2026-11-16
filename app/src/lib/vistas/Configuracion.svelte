@@ -1,7 +1,9 @@
 <script lang="ts">
   import { cerrarAfuera } from '../afuera';
   import { lleno } from '../rango';
-  import { User, Mic, Monitor, Bell, Palette, Trash2, Check, X } from '@lucide/svelte';
+  import { User, Mic, Monitor, Bell, Palette, Trash2, Check, X, Keyboard } from '@lucide/svelte';
+  import { isTauri } from '@tauri-apps/api/core';
+  import { atajos, guardarAtajo, capturar, ESC, type Accion } from '../atajos.svelte';
   import { voz, vistaPrevia, dispositivos, elegirEntrada, elegirSalida, elegirCamara, cambiarSupresion, cambiarSupresionFuerte, cambiarGanancia } from '../voz.svelte';
   import { leerPrefs, guardarPrefs } from '../prefs';
   import { dbDePorcentaje, porcentajeDeDb } from '../ganancia';
@@ -22,7 +24,7 @@
   let { cerrar }: { cerrar: () => void } = $props();
   let d: HTMLDialogElement;
   let error = $state('');
-  type Solapa = 'cuenta' | 'audio' | 'transmision' | 'notificaciones' | 'apariencia';
+  type Solapa = 'cuenta' | 'audio' | 'atajos' | 'transmision' | 'notificaciones' | 'apariencia';
   let solapa = $state<Solapa>('cuenta');
   let tema = $state(temaGuardado());
   let modo = $state<Modo>(modoGuardado());
@@ -36,8 +38,26 @@
   let pctMic = $state(porcentajeDeDb(prefs.gananciaDb));
   let entrada = $state(prefs.entrada);
   $effect(() => { if (!d.open) d.showModal(); dispositivos().then((x) => (lista = x)).catch(() => (error = 'No se pudieron listar los dispositivos de audio.')); });
-  const SOLAPAS = [['cuenta', 'Cuenta', User], ['audio', 'Audio', Mic], ['transmision', 'Transmisión', Monitor],
-    ['notificaciones', 'Notificaciones', Bell], ['apariencia', 'Apariencia y rendimiento', Palette]] as const;
+  // Atajos: solo en la app de escritorio (los ganchos de teclado y mouse son de Windows).
+  const SOLAPAS = ([['cuenta', 'Cuenta', User], ['audio', 'Audio', Mic], ['atajos', 'Atajos', Keyboard], ['transmision', 'Transmisión', Monitor],
+    ['notificaciones', 'Notificaciones', Bell], ['apariencia', 'Apariencia y rendimiento', Palette]] as const).filter(([id]) => id !== 'atajos' || isTauri());
+  const ACCIONES: [Accion, string, string][] = [['silenciar', 'Silenciarme', 'Prende o apaga tu micrófono.'], ['ensordecer', 'Ensordecerme', 'Deja de escuchar a la sala (y te silencia).'],
+    ['hablar', 'Pulsar para hablar', 'Estando silenciado, te escuchan mientras la mantenés apretada.']];
+  // Asignando: la próxima tecla o botón del mouse que se apriete (Esc cancela). Otro clic en el mismo botón también.
+  let asignando = $state<{ accion: Accion; cancelar: () => void } | null>(null);
+  async function asignar(a: Accion, boton: HTMLButtonElement) {
+    const antes = asignando;
+    antes?.cancelar();
+    if (antes?.accion === a) return;
+    boton.blur(); // si no, un Espacio o Enter apretado para asignar vuelve a tocar el botón
+    const c = capturar();
+    asignando = { accion: a, cancelar: c.cancelar };
+    const t = await c.tecla;
+    if (asignando?.cancelar !== c.cancelar) return;
+    asignando = null;
+    if (t && t.codigo !== ESC) guardarAtajo(a, t);
+  }
+  $effect(() => () => asignando?.cancelar());
 
   const u = $derived(sesion.usuario);
   let ocupado = $state(false);
@@ -78,7 +98,7 @@
   let escrito = $state('');
 </script>
 
-<dialog class="config" bind:this={d} oncancel={cerrar} onclose={cerrar} use:cerrarAfuera>
+<dialog class="config" bind:this={d} oncancel={(e) => { if (asignando) e.preventDefault(); else cerrar(); }} onclose={cerrar} use:cerrarAfuera>
   <div class="cabecera-modal"><h2>Configuración</h2><button class="icono cerrar-modal" aria-label="Cerrar" title="Cerrar (Esc)" onclick={() => d.close()}><X size={20} strokeWidth={1.75} /></button></div>
   <div class="solapas" role="tablist">
     {#each SOLAPAS as [id, texto, Icono] (id)}
@@ -177,6 +197,20 @@
         </label>
       {/if}
       <MedidorMic {entrada} gananciaDb={esCelular ? 0 : dbDePorcentaje(pctMic)} />
+    </section>
+
+  {:else if solapa === 'atajos'}
+    <section>
+      <p class="ayuda">Andan con la app atrás o en la bandeja, mientras estés en una sala de voz. Usá una tecla que no escribas (F13 a F24, Pausa,
+        las del teclado numérico) o un botón del mouse. Con un juego abierto como administrador, Windows no los deja pasar.</p>
+      {#each ACCIONES as [id, texto, ayuda] (id)}
+        <div class="item"><span>{texto}<small>{ayuda}</small></span>
+          <span class="atajo">
+            <button class:esperando={asignando?.accion === id} onclick={(e) => asignar(id, e.currentTarget)}>
+              {asignando?.accion === id ? 'Apretá una tecla o botón…' : atajos[id]?.nombre ?? 'Sin asignar'}</button>
+            {#if atajos[id] && asignando?.accion !== id}<button class="icono" aria-label={`Quitar el atajo de ${texto}`} title="Quitar" onclick={() => guardarAtajo(id, null)}><X size={16} strokeWidth={1.75} /></button>{/if}
+          </span></div>
+      {/each}
     </section>
 
   {:else if solapa === 'transmision'}
@@ -280,6 +314,10 @@
   :global([data-modo='moderno']) .tilde { animation: pop 260ms var(--curva-resorte); }
   @keyframes pop { from { transform: scale(.5); opacity: 0; } }
   .opciones { display: flex; gap: 4px; }
+  .ayuda { margin: 0; color: var(--tenue); font-size: 13px; line-height: 1.5; }
+  .atajo { display: flex; align-items: center; gap: 4px; flex: none; }
+  .atajo button:not(.icono) { min-width: 180px; justify-content: center; }
+  .atajo .esperando { border-color: var(--acento); color: var(--acento); }
   .opciones button { padding: 4px 12px; border: 1px solid var(--borde); }
   .opciones [aria-checked='true'] { border-color: var(--acento); background: var(--acento-suave); }
 </style>

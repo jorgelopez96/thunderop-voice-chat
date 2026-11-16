@@ -485,6 +485,8 @@
   .mencion { padding: 0 3px; border-radius: 4px; background: var(--acento-medio); color: var(--acento-texto); font-weight: 600; }
   .msg.mencionado { background: color-mix(in srgb, var(--acento) 7%, transparent); box-shadow: inset 2px 0 var(--acento); }
   .composer textarea { flex: 1; min-width: 0; resize: none; field-sizing: content; max-height: 120px; background: none; border: 0; padding: 6px 4px; }
+  /* Con poco ancho el placeholder no baja a otro renglón (field-sizing lo agrandaba a dos): se corta con … */
+  .composer textarea::placeholder { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .clip { cursor: pointer; flex-direction: row; gap: 0; color: var(--icono); }
   .clip:hover { color: var(--texto); background: var(--hover); }
   .unirse { align-self: flex-start; margin-top: 4px; }

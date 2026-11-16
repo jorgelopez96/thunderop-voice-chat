@@ -11,12 +11,14 @@
   import { actualizacion, buscarActualizacion } from '$lib/actualizacion.svelte';
   import Actualizacion from '$lib/vistas/Actualizacion.svelte';
   import BarraTitulo from '$lib/vistas/BarraTitulo.svelte';
+  import { iniciarAtajos } from '$lib/atajos.svelte';
   import { aplicarModo, aplicarTema, modoGuardado, temaGuardado } from '$lib/tema';
 
   aplicarTema(temaGuardado());
   aplicarModo(modoGuardado());
 
   onMount(validarSesionAlIniciar);
+  onMount(iniciarAtajos);
   // Con sesión se consulta qué le falta a la cuenta; sin sesión se limpia.
   $effect(() => {
     if (!sesion.usuario) { cuenta.falta = null; return; }

@@ -4,14 +4,15 @@ export type Novedad = { version: string; fecha: string; cambios: { tipo: 'nuevo'
 
 export const NOVEDADES: Novedad[] = [
   {
-    version: '0.12.0', fecha: '2026-11-11', cambios: [
-      { tipo: 'arreglo', texto: 'Las cámaras se ven mucho mejor: aunque la conexión ande justa, lo peor que llega es 360p (antes se veían en 180p, todas pixeladas).' },
-      { tipo: 'arreglo', texto: 'Las transmisiones gastan menos internet (1080p60 va a 8 Mbps): con varios mirando ya no se traban las cámaras de los demás.' },
-      { tipo: 'nuevo', texto: 'Clic derecho sobre alguien con la cámara prendida: elegís en qué calidad verla (automática, media o baja). Se recuerda para cada uno.' },
-      { tipo: 'arreglo', texto: 'Pantalla completa sin la franja negra abajo, también al agrandar la cámara de alguien.' },
-      { tipo: 'nuevo', texto: 'En la PC podés esconder la lista de salas (botón al lado del nombre del grupo) y la de participantes (botón de la gente en el chat).' },
-      { tipo: 'nuevo', texto: 'Lo que escribiste y no mandaste te espera cuando volvés a ese chat.' },
-      { tipo: 'arreglo', texto: 'Al instalar, Windows muestra el ícono nuevo sin tener que reiniciar.' },
+    version: '0.13.0', fecha: '2026-11-16', cambios: [
+      { tipo: 'nuevo', texto: 'Atajos de teclado y mouse (Configuración → Atajos): silenciarte, ensordecerte y pulsar para hablar sin abrir la app, también con los botones laterales del mouse.' },
+      { tipo: 'nuevo', texto: 'Al entrar a un grupo se abre el último chat en el que estuviste, listo para escribir.' },
+      { tipo: 'nuevo', texto: 'Si estás en "Disponible" y no tocás la PC por 10 minutos, los demás te ven "Ausente"; al volver, "Disponible" otra vez. En una sala de voz no pasa.' },
+      { tipo: 'nuevo', texto: 'Cuando alguien cierra la app o apaga la PC se ve "Desconectado" en unos segundos (antes tardaba hasta un minuto y medio).' },
+      { tipo: 'arreglo', texto: 'La cámara de quien transmite con "Pantalla + cámara" ya no titila (tampoco las de las tarjetas de la llamada).' },
+      { tipo: 'arreglo', texto: 'El sonido sale por la salida que elegiste en Configuración → Audio aunque entres a la sala silenciado (antes se escuchaba por la de Windows).' },
+      { tipo: 'arreglo', texto: 'Entrar y salir de pantalla completa ya no muestra la ventana achicándose y agrandándose.' },
+      { tipo: 'arreglo', texto: 'Con la ventana angosta los textos ya no se cortan ni se montan.' },
     ],
   },
 ];

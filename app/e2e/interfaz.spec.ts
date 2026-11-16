@@ -81,10 +81,13 @@ test('en la sala: mensaje privado a un amigo, ancho del chat y configuración co
   // Configuración: se ve todo sin scroll (en 1280×720) y Guardar la cierra. El nombre del Predeterminado lo prueba dispositivos.test.ts.
   await a.getByRole('button', { name: 'Configuración' }).click();
   const config = a.locator('dialog.config');
+  const altos = new Set<number>(); // todas las solapas del mismo alto: el modal no salta al cambiar
   for (const solapa of ['Cuenta', 'Audio', 'Transmisión', 'Notificaciones', 'Apariencia y rendimiento']) {
     await config.getByRole('tab', { name: solapa }).click();
     expect(await config.evaluate((d) => d.scrollHeight - d.clientHeight), solapa).toBeLessThanOrEqual(1);
+    altos.add(await config.evaluate((d) => Math.round(d.getBoundingClientRect().height)));
   }
+  expect([...altos]).toHaveLength(1);
   await config.getByRole('button', { name: 'Guardar' }).click();
   await expect(config).toBeHidden();
 

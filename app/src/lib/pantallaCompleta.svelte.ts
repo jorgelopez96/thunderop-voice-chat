@@ -1,4 +1,4 @@
-import { isTauri } from '@tauri-apps/api/core';
+import { invoke, isTauri } from '@tauri-apps/api/core';
 
 // Pantalla completa de las transmisiones: va la página entera (<html>) y la transmisión se agranda con CSS (`.completa`).
 // Con la transmisión misma en pantalla completa, todo lo demás (la barrita de la llamada, sus menús) quedaba debajo y
@@ -9,6 +9,10 @@ export const completa = $state<{ sid: string | null }>({ sid: null }); // la tra
 let estabaMax = false;
 
 const ventana = async () => (await import('@tauri-apps/api/window')).getCurrentWindow();
+// Sin la animación de Windows de maximizar/restaurar mientras salta (la tapa el telón): se veía achicarse y agrandarse.
+const animaciones = (si: boolean) => invoke('animaciones_ventana', { si }).catch(() => {});
+// maximize/unmaximize vuelven antes de que Windows cambie el tamaño: se espera el resize (o medio segundo).
+const acomodada = () => new Promise((ok) => { const t = setTimeout(ok, 500); addEventListener('resize', () => { clearTimeout(t); setTimeout(ok, 50); }, { once: true }); });
 
 // Telón: en la app, entrar y salir son dos saltos de la ventana (des-maximizar y pantalla completa, o al revés) y se
 // veía achicarse y agrandarse de golpe. Mientras salta, un negro la tapa con un fundido corto (.telon en app.css).
@@ -36,9 +40,10 @@ async function devolverVentana() {
   try {
     const w = await ventana();
     await w.setShadow(true);
-    if (estabaMax) await w.maximize();
+    if (estabaMax) await Promise.all([acomodada(), w.maximize()]);
   } catch { /* la ventana se está cerrando */ }
   estabaMax = false;
+  void animaciones(true);
 }
 
 export async function entrarPantallaCompleta(sid: string) {
@@ -47,9 +52,10 @@ export async function entrarPantallaCompleta(sid: string) {
     try {
       const w = await ventana();
       estabaMax = await w.isMaximized();
-      // unmaximize vuelve antes de que Windows achique la ventana: si se entraba ya, Tauri la veía todavía
-      // maximizada y la pantalla completa quedaba del tamaño del área de trabajo (franja negra abajo).
-      if (estabaMax) await Promise.all([new Promise((ok) => { const t = setTimeout(ok, 500); addEventListener('resize', () => { clearTimeout(t); setTimeout(ok, 50); }, { once: true }); }), w.unmaximize()]);
+      await animaciones(false);
+      // Si se entraba antes de que se achicara, Tauri la veía todavía maximizada y la pantalla completa quedaba del
+      // tamaño del área de trabajo (franja negra abajo).
+      if (estabaMax) await Promise.all([acomodada(), w.unmaximize()]);
       await w.setShadow(false);
     } catch { /* sigue la del navegador sola */ }
   }

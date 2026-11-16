@@ -87,12 +87,19 @@ function actualizar() {
 const previaNativa = (r: Room) => r.remoteParticipants.get(r.localParticipant.identity + SUFIJO_PANTALLA)?.getTrackPublication(lk.Track.Source.ScreenShare);
 
 /** Publica el micrófono si el usuario no está muteado. Sin permiso del dueño (403 de LiveKit) falla en silencio: queda `silenciado`. */
+/** La salida guardada en Configuración. Si ya no existe (o falta el permiso), sigue la predeterminada de Windows. */
+function aplicarSalida() {
+  const salida = leerPrefs().salida;
+  if (salida) room?.switchActiveDevice('audiooutput', salida).catch(() => {});
+}
+
 async function publicarMic() {
   if (!room || voz.muteado) return;
   try {
     // Un string es "exacto, y si no está, cualquiera" en LiveKit: un micrófono guardado que ya no existe cae al predeterminado.
     // No se consulta enumerateDevices antes: sin permiso de micrófono WebView2 oculta los ids y se perdería el guardado.
     await room.localParticipant.setMicrophoneEnabled(true, opcionesMic(), { dtx: false });
+    aplicarSalida(); // con el permiso del micrófono recién concedido ya se puede elegir otra salida
   } catch (e) {
     const n = (e as Error)?.name;
     if (n === 'NotAllowedError') voz.error = 'No hay permiso para usar el micrófono. Habilitalo en el navegador para hablar.';
@@ -279,12 +286,10 @@ export async function entrarVoz(roomId: string, salaNombre = '', grupoId: string
   for (const p of r.remoteParticipants.values()) for (const pub of p.trackPublications.values()) if (pub.source === Track.Source.Microphone || pub.source === Track.Source.Camera) pub.setSubscribed(true);
   actualizar();
   await publicarMic();
-  // La salida va después del micrófono: recién con el permiso concedido se ven los ids de los dispositivos.
-  // Si la guardada ya no existe, se sigue con la predeterminada.
-  const salida = leerPrefs().salida;
-  if (!salida || !vigente()) return;
-  const hay = await navigator.mediaDevices.enumerateDevices().then((d) => d.some((x) => x.kind === 'audiooutput' && x.deviceId === salida), () => false);
-  if (hay && vigente()) r.switchActiveDevice('audiooutput', salida).catch(() => {});
+  // La salida elegida, sin mirar antes enumerateDevices: entrando muteado no se pide el micrófono, sin ese permiso los
+  // ids vienen vacíos y la salida guardada no se aplicaba (todo sonaba por la predeterminada de Windows).
+  // Si ya no existe, setSinkId falla y se sigue con la predeterminada.
+  if (vigente()) aplicarSalida();
 }
 
 export function salirVoz() {

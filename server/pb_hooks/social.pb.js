@@ -1,6 +1,6 @@
 /// <reference path="../pb_data/types.d.ts" />
 // Hooks sociales. `fundador` y `verificado` solo los cambia un superuser (panel de PocketBase).
-// Latido: el cliente lo manda cada 45 s; en línea = `visto` de hace menos de 90 s.
+// Latido: el cliente lo manda cada 45 s (y al toque si deja de tocar la PC o vuelve, con `inactivo`); en línea = `visto` de hace menos de 90 s.
 onRecordCreateRequest((e) => {
   if (!e.hasSuperuserAuth()) { e.record.set("fundador", false); e.record.set("verificado", false); }
   e.next();
@@ -11,6 +11,7 @@ onRecordUpdateRequest((e) => {
     e.record.set("fundador", e.record.original().getBool("fundador"));
     e.record.set("verificado", e.record.original().getBool("verificado"));
     e.record.set("visto", e.record.original().get("visto")); // solo lo cambia el latido
+    e.record.set("inactivo", e.record.original().getBool("inactivo"));
     if (e.record.getString("disponibilidad") === "invisible") e.record.set("visto", ""); // se ve desconectado al instante
   }
   e.next();
@@ -20,9 +21,30 @@ routerAdd("POST", "/api/latido", (e) => {
   const u = e.app.findRecordById("users", e.auth.id);
   if (u.getString("disponibilidad") === "invisible" || u.getBool("desactivada")) return e.json(200, { visto: "" });
   u.set("visto", new DateTime());
+  u.set("inactivo", e.requestInfo().body.inactivo === true);
   e.app.saveNoValidate(u);
   return e.json(200, { visto: u.getString("visto") });
 }, $apis.requireAuth("users"));
+
+// Al cerrarse la app (o la pestaña, o apagarse la PC) se corta su conexión en tiempo real: después de e.next() ya se
+// cortó. Se esperan unos segundos por si se reconecta (red que pestañea) y, si no le queda otra conexión (web + escritorio),
+// se borra `visto` y los demás lo ven desconectado al toque, sin esperar los 90 s del latido.
+// ponytail: cada conexión abierta ocupa una VM de hooks mientras dura; si hay cientos a la vez, pasarlo a Go.
+onRealtimeConnectRequest((e) => {
+  e.next();
+  const auth = e.client.get("auth");
+  if (!auth || auth.collection().name !== "users") return;
+  sleep(4000);
+  const clientes = e.app.subscriptionsBroker().clients();
+  for (const id in clientes) {
+    const otro = clientes[id].get("auth");
+    if (id !== e.client.id() && otro && otro.id === auth.id) return;
+  }
+  try {
+    const u = e.app.findRecordById("users", auth.id);
+    if (u.getString("visto")) { u.set("visto", ""); e.app.saveNoValidate(u); }
+  } catch { /* borrado */ }
+});
 
 // Solicitud de amistad por usuario (normalizado) o id. Si el otro ya me la había pedido, la acepta.
 // En una transacción: dos solicitudes cruzadas a la vez dejan una sola amistad.
