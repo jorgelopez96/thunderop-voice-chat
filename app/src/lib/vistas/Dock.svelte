@@ -1,8 +1,8 @@
 <script lang="ts">
   import { puedo } from '../permisos';
   import { alTocar, estabaAbierto } from '../menu';
-  import { Mic, MicOff, Headphones, HeadphoneOff, ChevronDown, Monitor, Video, VideoOff, AudioWaveform, Music, TvMinimalPlay, PhoneOff, MessageSquare, Ellipsis, Check } from '@lucide/svelte';
-  import { voz, alternarMute, ensordecer, alternarCamara, salirVoz, transmitir, transmitirNavegador, dejarDeTransmitir, cambiarCalidad, dispositivos, elegirEntrada, elegirSalida, type Dispositivo } from '../voz.svelte';
+  import { Mic, MicOff, Headphones, HeadphoneOff, ChevronDown, Monitor, Video, VideoOff, AudioWaveform, Music, TvMinimalPlay, PhoneOff, MessageSquare, Ellipsis, Check, RotateCw } from '@lucide/svelte';
+  import { voz, alternarMute, ensordecer, alternarCamara, girarCamara, salirVoz, transmitir, transmitirNavegador, dejarDeTransmitir, cambiarCalidad, dispositivos, elegirEntrada, elegirSalida, type Dispositivo } from '../voz.svelte';
   import { grupos } from '../grupos.svelte';
   import { CALIDADES, leerPrefs, guardarPrefs, type Calidad } from '../prefs';
   import Botonera from './Botonera.svelte';
@@ -207,6 +207,7 @@
 <div popover id="dock-mas" class="menu mas">
   <button class="plano" popovertarget="dock-sonidos" onclick={ubicarPanel}><AudioWaveform size={18} strokeWidth={1.75} /> Sonidos</button>
   <button class="plano" popovertarget="dock-youtube" onclick={ubicarPanel}><TvMinimalPlay size={18} strokeWidth={1.75} /> YouTube juntos</button>
+  {#if voz.camara}<button class="plano" onclick={girarCamara}><RotateCw size={18} strokeWidth={1.75} /> Girar la cámara</button>{/if}
   {#if puedeTransmitir()}
     {#if voz.transmitiendo}<button class="plano" onclick={() => (cortando = true)}><Monitor size={18} strokeWidth={1.75} /> Dejar de transmitir</button>
     {:else}<button class="plano" onclick={abrirTransmision}><Monitor size={18} strokeWidth={1.75} /> Transmitir</button>{/if}

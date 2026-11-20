@@ -149,7 +149,7 @@
         <li style:--i={Math.min(i, 5)} class:hablando={p.hablando} class:transmite={p.transmite} style="background:{fondo(m?.color, p.nombre)};--habla:{m?.color || 'var(--acento)'}" oncontextmenu={(e) => abrirMenu(e, p)} use:mantener={(x, y) => { mantuvo = Date.now(); abrirMenu({ clientX: x, clientY: y, preventDefault() {} } as MouseEvent, p); }}>
           {#if p.transmite}<span class="chips-vivo"><span class="vivo"><span class="punto-vivo"></span>EN VIVO</span>{@render espectadores(p.espectadores)}</span>{/if}
           {#if p.camara && pistaCamara(p.id)}<!-- Clic (o tocar) agranda la cámara a pantalla completa; de nuevo, vuelve. -->
-            <button class="plano cam" class:completa={completa.sid === `cam:${p.id}`} aria-label={`Agrandar la cámara de ${m?.name || p.nombre}`}
+            <button class="plano cam" data-giro={p.giro || undefined} class:completa={completa.sid === `cam:${p.id}`} aria-label={`Agrandar la cámara de ${m?.name || p.nombre}`}
               onclick={() => { if (Date.now() - mantuvo < 800) return; void (completa.sid !== null ? salirPantallaCompleta() : entrarPantallaCompleta(`cam:${p.id}`)); }}>
               <Video pista={pistaCamara(p.id)!} clase="video-cam" etiqueta={`Cámara de ${m?.name || p.nombre}`} /></button>
           {:else}<img class="avatar" alt="" src={foto(m, '256x256')} />{/if}
@@ -207,7 +207,14 @@
   /* Con la cámara de fondo, el nombre, el EN VIVO y "Ver" van encima (son ítems de la grilla: z-index anda sin position). */
   .franja li > .etiqueta-nombre, .franja li > .chips-vivo, .franja li > .ver { z-index: 1; }
   .cam :global(.video-cam) { width: 100%; height: 100%; object-fit: cover; }
-  .cam.completa { position: fixed; z-index: 100; border-radius: 0; }
+  /* Cámara girada (girarCamara): de costado, el video ocupa el alto de la tarjeta como ancho y viceversa (unidades cq). */
+  .cam[data-giro] { container-type: size; }
+  .cam[data-giro] :global(.video-cam) { position: absolute; left: 50%; top: 50%; translate: -50% -50%; rotate: calc(var(--g) * 1deg); }
+  .cam[data-giro='90'] :global(.video-cam), .cam[data-giro='270'] :global(.video-cam) { width: 100cqh; height: 100cqw; }
+  .cam[data-giro='90'] { --g: 90; } .cam[data-giro='180'] { --g: 180; } .cam[data-giro='270'] { --g: 270; }
+  /* El fondo va también en :hover: el de button.plano:hover (translúcido) le ganaba y en pantalla completa se veía la app
+     detrás de la cámara al mover el mouse. */
+  .cam.completa, .cam.completa:hover:not(:disabled) { position: fixed; z-index: 100; border-radius: 0; background: #000; }
   .cam.completa :global(.video-cam) { object-fit: contain; }
   .voz { display: grid; grid-template-columns: 1fr; min-height: 0; min-width: 0; }
   .voz.conChat { grid-template-columns: minmax(0, 1fr) clamp(296px, var(--ancho-chat), 60%); }

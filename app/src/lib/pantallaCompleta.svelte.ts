@@ -11,6 +11,9 @@ let estabaMax = false;
 const ventana = async () => (await import('@tauri-apps/api/window')).getCurrentWindow();
 // Sin la animación de Windows de maximizar/restaurar mientras salta (la tapa el telón): se veía achicarse y agrandarse.
 const animaciones = (si: boolean) => invoke('animaciones_ventana', { si }).catch(() => {});
+// En vez de unmaximize/maximize de Tauri: des-maximiza ya del tamaño del monitor (con unmaximize pasaba un instante por
+// su tamaño normal, más chico, y se veía una ventana que aparecía y parpadeaba) y al volver le devuelve ese tamaño.
+const maximizada = (si: boolean) => invoke('maximizada', { si });
 // maximize/unmaximize vuelven antes de que Windows cambie el tamaño: se espera el resize (o medio segundo).
 const acomodada = () => new Promise((ok) => { const t = setTimeout(ok, 500); addEventListener('resize', () => { clearTimeout(t); setTimeout(ok, 50); }, { once: true }); });
 
@@ -40,7 +43,7 @@ async function devolverVentana() {
   try {
     const w = await ventana();
     await w.setShadow(true);
-    if (estabaMax) await Promise.all([acomodada(), w.maximize()]);
+    if (estabaMax) await Promise.all([acomodada(), maximizada(true)]);
   } catch { /* la ventana se está cerrando */ }
   estabaMax = false;
   void animaciones(true);
@@ -55,7 +58,7 @@ export async function entrarPantallaCompleta(sid: string) {
       await animaciones(false);
       // Si se entraba antes de que se achicara, Tauri la veía todavía maximizada y la pantalla completa quedaba del
       // tamaño del área de trabajo (franja negra abajo).
-      if (estabaMax) await Promise.all([acomodada(), w.unmaximize()]);
+      if (estabaMax) await Promise.all([acomodada(), maximizada(false)]);
       await w.setShadow(false);
     } catch { /* sigue la del navegador sola */ }
   }

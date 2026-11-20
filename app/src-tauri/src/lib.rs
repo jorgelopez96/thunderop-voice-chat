@@ -84,7 +84,7 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(audio::Captura::default())
         .manage(transmisor::Transmisor::default())
-        .invoke_handler(tauri::generate_handler![audio::iniciar_audio, audio::detener_audio, transmisor::fuentes_transmisor, transmisor::iniciar_transmisor, transmisor::calidad_transmisor, transmisor::detener_transmisor, memoria_baja, animaciones_ventana, inactivo_ms, atajos::atajos_asignar, atajos::atajos_capturar, salir])
+        .invoke_handler(tauri::generate_handler![audio::iniciar_audio, audio::detener_audio, transmisor::fuentes_transmisor, transmisor::iniciar_transmisor, transmisor::calidad_transmisor, transmisor::detener_transmisor, memoria_baja, animaciones_ventana, maximizada, inactivo_ms, atajos::atajos_asignar, atajos::atajos_capturar, salir])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
@@ -137,6 +137,65 @@ fn animaciones_ventana(w: WebviewWindow, si: bool) {
     }
     #[cfg(not(windows))]
     let _ = (w, si);
+}
+
+/// Pantalla completa con la ventana maximizada: des-maximizarla la mostraba un instante en su tamaño normal (una ventana
+/// más chica que aparecía y parpadeaba antes de agrandarse). `si = false` la des-maximiza ya del tamaño del monitor, sin
+/// pasar por el chico; `si = true` la vuelve a maximizar de un salto y le devuelve el tamaño normal que tenía.
+#[tauri::command]
+fn maximizada(w: WebviewWindow, si: bool) {
+    #[cfg(windows)]
+    {
+        if let Ok(h) = w.hwnd() { ubicacion::maximizada(h.0 as isize, si) }
+    }
+    #[cfg(not(windows))]
+    let _ = (w, si);
+}
+
+#[cfg(windows)]
+mod ubicacion {
+    use std::sync::Mutex;
+
+    #[repr(C)]
+    #[derive(Clone, Copy, Default)]
+    pub struct Rect { l: i32, t: i32, r: i32, b: i32 }
+    #[repr(C)]
+    #[derive(Default)]
+    struct Ubicacion { tam: u32, flags: u32, mostrar: u32, min: [i32; 2], max: [i32; 2], normal: Rect } // WINDOWPLACEMENT
+    #[repr(C)]
+    #[derive(Default)]
+    struct Monitor { tam: u32, todo: Rect, trabajo: Rect, flags: u32 } // MONITORINFO
+    #[link(name = "user32")]
+    unsafe extern "system" {
+        fn GetWindowPlacement(h: isize, u: *mut Ubicacion) -> i32;
+        fn SetWindowPlacement(h: isize, u: *const Ubicacion) -> i32;
+        fn MonitorFromWindow(h: isize, flags: u32) -> isize;
+        fn GetMonitorInfoW(m: isize, i: *mut Monitor) -> i32;
+    }
+    const NORMAL: u32 = 1; // SW_SHOWNORMAL
+    const MAXIMIZADA: u32 = 3; // SW_SHOWMAXIMIZED
+
+    static TAMANIO_NORMAL: Mutex<Option<Rect>> = Mutex::new(None);
+
+    pub fn maximizada(h: isize, si: bool) {
+        let mut u = Ubicacion { tam: size_of::<Ubicacion>() as u32, ..Default::default() };
+        if unsafe { GetWindowPlacement(h, &mut u) } == 0 { return; }
+        let mut guardado = TAMANIO_NORMAL.lock().unwrap_or_else(|e| e.into_inner());
+        if si {
+            if let Some(r) = guardado.take() { u.normal = r; }
+            u.mostrar = MAXIMIZADA;
+        } else {
+            let mut m = Monitor { tam: size_of::<Monitor>() as u32, ..Default::default() };
+            if unsafe { GetMonitorInfoW(MonitorFromWindow(h, 2 /* MONITOR_DEFAULTTONEAREST */), &mut m) } == 0 { return; }
+            *guardado = Some(u.normal);
+            // `normal` va en coordenadas del área de trabajo: con la barra de tareas arriba o a la izquierda se corre.
+            let (dx, dy) = (m.trabajo.l - m.todo.l, m.trabajo.t - m.todo.t);
+            u.normal = Rect { l: m.todo.l - dx, t: m.todo.t - dy, r: m.todo.r - dx, b: m.todo.b - dy };
+            u.mostrar = NORMAL;
+        }
+        u.flags = 0;
+        unsafe { SetWindowPlacement(h, &u) };
+    }
 }
 
 /// Milisegundos desde la última tecla o movimiento del mouse en toda la PC (no solo en la app): para el "Ausente" solo.

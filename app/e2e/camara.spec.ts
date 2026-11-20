@@ -23,6 +23,23 @@ test('ensordecido se ve en la tarjeta, la lista de salas y participantes, tambi�
   await expect(c.locator('aside.participantes li', { hasText: 'Beto' }).getByLabel('Ensordecido')).toBeVisible();
 });
 
+test('ensordecerse corta el sonido de una (sin bajar de a poco) y lo devuelve igual', async ({ browser }) => {
+  const [a, b] = await grupoDeTres(browser, unico('Corte'));
+  await entrarVoz([a, b]);
+  // Clic y lectura casi en el mismo instante: con la rampa de LiveKit, a los 30 ms seguía cerca del volumen de antes.
+  const clicYGanancia = (boton: string | null) => b.evaluate(async (boton) => {
+    if (boton) (document.querySelector(`[aria-label="${boton}"]`) as HTMLButtonElement).click();
+    await new Promise((r) => setTimeout(r, 30));
+    const g = (globalThis as unknown as { __voz: { ganancias(): Record<string, number | undefined> } }).__voz.ganancias();
+    return Object.entries(g).find(([n]) => n.startsWith('Ana'))?.[1];
+  }, boton);
+  await expect.poll(() => clicYGanancia(null), { timeout: 15_000 }).toBeGreaterThan(0);
+  await b.waitForTimeout(1000); // al entrar LiveKit también lo sube con rampa: que llegue a su valor
+  const antes = await clicYGanancia(null);
+  expect(await clicYGanancia('Ensordecerme')).toBe(0);
+  expect(await clicYGanancia('Activar sonido')).toBe(antes);
+});
+
 test('al salir y volver a entrar ya no figura ensordecido', async ({ browser }) => {
   const [a, b] = await grupoDeTres(browser, unico('Vuelta'));
   await entrarVoz([a, b]);
@@ -204,6 +221,26 @@ test('Beto elige ver la cámara de Ana en calidad baja y la cámara agrandada ta
   await expect(tarjeta(b, 'Ana').locator('.cam.completa')).toBeVisible();
   const caja = await tarjeta(b, 'Ana').locator('.cam').boundingBox();
   expect(caja?.width).toBe(b.viewportSize()!.width);
+  // Con el mouse encima el fondo sigue negro (el hover de los botones planos dejaba ver la app detrás).
+  await tarjeta(b, 'Ana').locator('.cam').hover();
+  await expect(tarjeta(b, 'Ana').locator('.cam')).toHaveCSS('background-color', 'rgb(0, 0, 0)');
   await a.getByRole('button', { name: 'Apagar la cámara' }).click();
   await expect.poll(() => b.evaluate(() => document.fullscreenElement)).toBeNull();
+});
+
+test('Ana, desde el celular, gira la cámara y Beto la ve de costado', async ({ browser }) => {
+  const [a, b] = await grupoDeTres(browser, unico('Giro'));
+  await entrarVoz([a, b]);
+  await a.setViewportSize({ width: 390, height: 844 });
+  await a.getByRole('button', { name: 'Prender la cámara' }).click();
+  const video = tarjeta(b, 'Ana').locator('video');
+  await expect(video).toBeVisible({ timeout: 15_000 });
+  await a.getByRole('button', { name: 'Más opciones' }).click();
+  await a.getByRole('button', { name: 'Girar la cámara' }).click();
+  await expect(tarjeta(b, 'Ana').locator('.cam')).toHaveAttribute('data-giro', '90', { timeout: 10_000 });
+  // Girado 90°: ocupa la tarjeta entera (menos el borde del botón, 1 px por lado).
+  const cam = (await tarjeta(b, 'Ana').locator('.cam').boundingBox())!, v = (await video.boundingBox())!;
+  expect(Math.abs(v.width - cam.width)).toBeLessThanOrEqual(2);
+  expect(Math.abs(v.height - cam.height)).toBeLessThanOrEqual(2);
+  expect(await video.evaluate((e) => getComputedStyle(e).rotate)).toBe('90deg');
 });

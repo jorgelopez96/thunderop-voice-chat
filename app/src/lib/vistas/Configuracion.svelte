@@ -208,7 +208,8 @@
           <span class="atajo">
             <button class:esperando={asignando?.accion === id} onclick={(e) => asignar(id, e.currentTarget)}>
               {asignando?.accion === id ? 'Apretá una tecla o botón…' : atajos[id]?.nombre ?? 'Sin asignar'}</button>
-            {#if atajos[id] && asignando?.accion !== id}<button class="icono" aria-label={`Quitar el atajo de ${texto}`} title="Quitar" onclick={() => guardarAtajo(id, null)}><X size={16} strokeWidth={1.75} /></button>{/if}
+            <!-- La ✕ siempre ocupa su lugar (escondida si no hay atajo): si no, al asignar uno el botón se corría. -->
+            <button class="icono" class:sin={!atajos[id] || asignando?.accion === id} aria-label={`Quitar el atajo de ${texto}`} title="Quitar" onclick={() => guardarAtajo(id, null)}><X size={16} strokeWidth={1.75} /></button>
           </span></div>
       {/each}
     </section>
@@ -316,7 +317,9 @@
   .opciones { display: flex; gap: 4px; }
   .ayuda { margin: 0; color: var(--tenue); font-size: 13px; line-height: 1.5; }
   .atajo { display: flex; align-items: center; gap: 4px; flex: none; }
-  .atajo button:not(.icono) { min-width: 180px; justify-content: center; }
+  /* Ancho fijo: con nombres largos ("Botón lateral de atrás") los botones de cada fila quedaban de distinto ancho. */
+  .atajo button:not(.icono) { width: 240px; justify-content: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .atajo .sin { visibility: hidden; }
   .atajo .esperando { border-color: var(--acento); color: var(--acento); }
   .opciones button { padding: 4px 12px; border: 1px solid var(--borde); }
   .opciones [aria-checked='true'] { border-color: var(--acento); background: var(--acento-suave); }

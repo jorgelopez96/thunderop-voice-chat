@@ -13,13 +13,13 @@ import { POR_DEFECTO, ajustar, escribirCam, leerCam, type Cam } from './camEnPan
 
 /** `silenciado`: no está mandando audio (muteado, sin permiso del dueño o sin micrófono publicado). */
 /** `pantalla`: sid de la pantalla que comparte. `espectadores`: cuántos lo están mirando. `camara`: sid de su cámara prendida. */
-export type Participante = { id: string; nombre: string; hablando: boolean; silenciado: boolean; ensordecido: boolean; camara: string | undefined; local: boolean; transmite: boolean; pantalla: string | undefined; espectadores: number };
+export type Participante = { id: string; nombre: string; hablando: boolean; silenciado: boolean; ensordecido: boolean; camara: string | undefined; giro: number; local: boolean; transmite: boolean; pantalla: string | undefined; espectadores: number };
 
 /** `sinPermiso`: el dueño nos silenció (los permisos de LiveKit no dejan publicar el micrófono). `viendo`: sids de las pantallas que miramos
  *  (en el orden en que se eligieron). */
 /** `sinSonido`: el navegador no deja reproducir hasta que se toque la pantalla (celular que volvió solo a la llamada). */
-export const voz = $state<{ salaId: string | null; salaNombre: string; grupoId: string | null; conectando: boolean; error: string; muteado: boolean; ensordecido: boolean; sinPermiso: boolean; supresion: boolean; supresionFuerte: boolean; participantes: Participante[]; senal: 'buena' | 'regular' | 'mala'; transmitiendo: boolean; viendo: string[]; vistaPrevia: boolean; calidadEnVivo: Calidad | null; sinSonido: boolean; camara: boolean; camEnPantalla: Cam | null }>({
-  salaId: null, salaNombre: '', grupoId: null, conectando: false, error: '', muteado: false, ensordecido: false, sinPermiso: false, supresion: leerPrefs().supresion, supresionFuerte: leerPrefs().supresionFuerte, participantes: [], senal: 'buena', transmitiendo: false, viendo: [], vistaPrevia: leerPrefs().vistaPrevia, calidadEnVivo: null, sinSonido: false, camara: false, camEnPantalla: null,
+export const voz = $state<{ salaId: string | null; salaNombre: string; grupoId: string | null; conectando: boolean; error: string; muteado: boolean; ensordecido: boolean; sinPermiso: boolean; supresion: boolean; supresionFuerte: boolean; participantes: Participante[]; senal: 'buena' | 'regular' | 'mala'; transmitiendo: boolean; viendo: string[]; vistaPrevia: boolean; calidadEnVivo: Calidad | null; sinSonido: boolean; camara: boolean; giroCam: number; camEnPantalla: Cam | null }>({
+  salaId: null, salaNombre: '', grupoId: null, conectando: false, error: '', muteado: false, ensordecido: false, sinPermiso: false, supresion: leerPrefs().supresion, supresionFuerte: leerPrefs().supresionFuerte, participantes: [], senal: 'buena', transmitiendo: false, viendo: [], vistaPrevia: leerPrefs().vistaPrevia, calidadEnVivo: null, sinSonido: false, camara: false, giroCam: 0, camEnPantalla: null,
 });
 
 // LiveKit se carga recién al entrar a la voz: el arranque de la app no lo paga. Mientras haya `room`, `lk` está cargado.
@@ -69,6 +69,7 @@ function actualizar() {
     return { id: x.identity, nombre: x.name || x.identity, hablando: hablandoAhora(x), silenciado: !x.isMicrophoneEnabled, local,
       // Ensordecido viaja como atributo (las apps viejas no lo mandan: se ven como antes).
       ensordecido: local ? voz.ensordecido : x.attributes.ensordecido === '1', camara: cam && !cam.isMuted ? cam.trackSid : undefined,
+      giro: local ? voz.giroCam : Number(x.attributes.giroCam) || 0,
       transmite: !!pantalla || (local && voz.transmitiendo), pantalla, espectadores: mirando.filter((m) => duenio(m) === x.identity).length };
   };
   // El transmisor nativo no es una persona: su pantalla se le muestra a su dueño.
@@ -132,13 +133,28 @@ function aplicarProcesador() {
   return cola;
 }
 
+/** Tono corto que va de `desde` a `hasta` Hz, `en` segundos desde ahora. Ensordecido no suena (salvo `siempre`). */
+function tono(desde: number, hasta: number, en = 0, siempre = false) {
+  const c = ctx;
+  if (!c || (voz.ensordecido && !siempre)) return;
+  const o = c.createOscillator(), g = c.createGain(), t = c.currentTime + en;
+  o.frequency.setValueAtTime(desde, t);
+  o.frequency.linearRampToValueAtTime(hasta, t + 0.12);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(0.35, t + 0.02); // antes 0.12: no se oía bien quién entraba o salía
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.18);
+  o.connect(g).connect(c.destination);
+  o.start(t);
+  o.stop(t + 0.2);
+}
+
 /** Corta la sala actual y la olvida. El contexto se cierra después de desconectar (LiveKit desarma el procesador ahí). */
 function limpiar() {
   const r = room, c = ctx;
   room = null; ctx = null; tx++;
   if (typeof document !== 'undefined') for (const el of document.querySelectorAll('audio[data-voz]')) el.remove();
   if (voz.ensordecido && !muteadoAntes) voz.muteado = false; // la sordera no deja el mic apagado para la próxima sala
-  Object.assign(voz, { salaId: null, salaNombre: '', grupoId: null, conectando: false, ensordecido: false, sinPermiso: false, participantes: [], senal: 'buena', transmitiendo: false, viendo: [], sinSonido: false, camara: false, camEnPantalla: null });
+  Object.assign(voz, { salaId: null, salaNombre: '', grupoId: null, conectando: false, ensordecido: false, sinPermiso: false, participantes: [], senal: 'buena', transmitiendo: false, viendo: [], sinSonido: false, camara: false, giroCam: 0, camEnPantalla: null });
   camPorTransmision = false;
   if (esCelular) terminarLlamada();
   void detenerAudioPantalla();
@@ -167,19 +183,6 @@ export async function entrarVoz(roomId: string, salaNombre = '', grupoId: string
   const r = new Room({ adaptiveStream: true, dynacast: true, ...(esCelular ? {} : { webAudioMix: { audioContext: c } }) });
   room = r;
 
-  // Tono corto que va de `desde` a `hasta` Hz, `en` segundos desde ahora. Ensordecido no suena.
-  const tono = (desde: number, hasta: number, en = 0) => {
-    if (voz.ensordecido) return;
-    const o = c.createOscillator(), g = c.createGain(), t = c.currentTime + en;
-    o.frequency.setValueAtTime(desde, t);
-    o.frequency.linearRampToValueAtTime(hasta, t + 0.12);
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(0.35, t + 0.02); // antes 0.12: no se oía bien quién entraba o salía
-    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.18);
-    o.connect(g).connect(c.destination);
-    o.start(t);
-    o.stop(t + 0.2);
-  };
   // Al entrar alguien (o yo) sube; al irse baja.
   const pitido = (sube: boolean) => (sube ? tono(520, 780) : tono(700, 460));
   r.on(RoomEvent.Connected, () => pitido(true));
@@ -333,7 +336,13 @@ if (esCelular) {
   document.addEventListener('click', () => { if (voz.sinSonido) void activarSonido(); }, true); // pointerdown no cuenta como gesto para el audio
 }
 
+/** Prende o apaga el micrófono con un pitido (baja al silenciarse, sube al prenderlo), como la sordera. */
 export async function alternarMute() {
+  tono(...(voz.muteado ? [360, 480] : [480, 360]) as [number, number], 0, true); // prenderlo también saca la sordera
+  await cambiarMic();
+}
+
+async function cambiarMic() {
   voz.muteado = !voz.muteado;
   if (!voz.muteado && voz.ensordecido) { // prender el mic también devuelve el sonido
     voz.ensordecido = false; aplicarSordera(); room?.localParticipant.setAttributes({ ensordecido: '' }).catch(() => {});
@@ -389,16 +398,25 @@ export function volumen(userId: string, v: number) {
 
 /** Ensordecerse (auriculares): no escucho a nadie y apago el micrófono; al volver, el micrófono vuelve como estaba. */
 let muteadoAntes = false;
+// setVolume de LiveKit lleva el volumen con una rampa (se escuchaba bajar hasta 0 en medio segundo) y en el iPhone no
+// hace nada (iOS no deja cambiar el volumen de un <audio>). La sordera corta y devuelve el sonido de una.
 function aplicarSordera() {
   const vols = leerPrefs().volumenes;
-  for (const p of room?.remoteParticipants.values() ?? []) p.setVolume(voz.ensordecido ? 0 : ganancia(vols[p.identity]));
+  for (const p of room?.remoteParticipants.values() ?? []) {
+    const v = voz.ensordecido ? 0 : ganancia(vols[p.identity]);
+    p.setVolume(v);
+    const t = p.getTrackPublication(lk.Track.Source.Microphone)?.track as { gainNode?: GainNode; attachedElements: HTMLMediaElement[] } | undefined;
+    if (t?.gainNode) { t.gainNode.gain.cancelScheduledValues(0); t.gainNode.gain.setValueAtTime(v, 0); }
+    else for (const el of t?.attachedElements ?? []) el.muted = voz.ensordecido;
+  }
 }
 export async function ensordecer(si: boolean) {
   voz.ensordecido = si;
   aplicarSordera();
+  tono(...(si ? [400, 260] : [260, 400]) as [number, number], 0, true);
   room?.localParticipant.setAttributes({ ensordecido: si ? '1' : '' }).catch(() => {});
-  if (si) { muteadoAntes = voz.muteado; if (!voz.muteado) await alternarMute(); }
-  else if (voz.muteado && !muteadoAntes) await alternarMute();
+  if (si) { muteadoAntes = voz.muteado; if (!voz.muteado) await cambiarMic(); }
+  else if (voz.muteado && !muteadoAntes) await cambiarMic();
 }
 
 /** Suscribe lo que tiene que estar suscrito y no lo está: todos los micrófonos y cámaras y las pantallas que se miran (con su sonido). */
@@ -687,6 +705,7 @@ function reenviarAtributos(r: Room) {
   const a: Record<string, string> = {};
   if (voz.ensordecido) a.ensordecido = '1';
   if (voz.camEnPantalla) a.camEnPantalla = escribirCam(voz.camEnPantalla);
+  if (voz.giroCam) a.giroCam = String(voz.giroCam);
   if (Object.keys(a).length) r.localParticipant.setAttributes(a).catch(() => {});
 }
 
@@ -709,6 +728,14 @@ export async function alternarCamara(desdeTransmision = false) {
       : n === 'NotReadableError' ? 'La cámara la está usando otro programa. Cerralo y probá de nuevo.' : 'No se pudo usar la cámara.';
     voz.camara = false;
   }
+  actualizar();
+}
+
+/** Gira la cámara un cuarto de vuelta para todos (celular: el iPhone la manda parada aunque se lo ponga de costado).
+ *  No toca el video: viaja como atributo y cada uno lo gira al mostrarlo (Voz.svelte, data-giro). */
+export function girarCamara() {
+  voz.giroCam = (voz.giroCam + 90) % 360;
+  room?.localParticipant.setAttributes({ giroCam: voz.giroCam ? String(voz.giroCam) : '' }).catch(() => {});
   actualizar();
 }
 
@@ -777,6 +804,9 @@ if (import.meta.env.DEV) {
     // LiveKit se dio por vencido reconectando (lo que pasa cuando el celular congela la página).
     caer: () => room?.emit(lk.RoomEvent.Disconnected, lk.DisconnectReason.UNKNOWN_REASON),
     webAudioMix: () => !!room?.options.webAudioMix,
+    // Volumen al que suena el micrófono de cada uno ahora mismo (sin rampa: la sordera corta de una).
+    ganancias: () => Object.fromEntries([...room?.remoteParticipants.values() ?? []].map((p) =>
+      [p.name || p.identity, (p.getTrackPublication(lk.Track.Source.Microphone)?.track as { gainNode?: GainNode } | undefined)?.gainNode?.gain.value])),
     async stats() {
       const remotos: Record<string, { mic: boolean; bytes: number }> = {};
       for (const p of room?.remoteParticipants.values() ?? []) {
