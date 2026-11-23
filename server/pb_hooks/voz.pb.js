@@ -32,7 +32,7 @@ routerAdd("POST", "/api/rooms/{id}/token-pantalla", (e) => {
   const { room, group } = lk.salaDeVoz(e.app, e.request.pathValue("id"), e.auth.id);
   if (group.getStringSlice("bloqueados").includes(e.auth.id)) throw new ForbiddenError("El dueño no te deja entrar a la voz por ahora.");
 
-  const video = { room: room.id, roomJoin: true, canSubscribe: false, canPublish: true, canPublishData: false, canPublishSources: ["screen_share"] };
+  const video = { room: room.id, roomJoin: true, canSubscribe: false, canPublish: true, canPublishData: false, canUpdateOwnMetadata: true, canPublishSources: ["screen_share"] };
   const token = lk.token(c, { sub: `${e.auth.id}.pantalla`, name: `${e.auth.getString("name")} (pantalla)`, video }, 600);
   return e.json(200, { token, url: c.url });
 }, $apis.requireAuth("users"));

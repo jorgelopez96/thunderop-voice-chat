@@ -4,12 +4,10 @@ export type Novedad = { version: string; fecha: string; cambios: { tipo: 'nuevo'
 
 export const NOVEDADES: Novedad[] = [
   {
-    version: '0.13.2', fecha: '2026-11-20', cambios: [
-      { tipo: 'nuevo', texto: 'Silenciarte y ensordecerte hacen un sonidito, así sabés que se hizo (también con los atajos).' },
-      { tipo: 'nuevo', texto: 'Desde el celular, "Girar la cámara" (en Más) la pone de costado para todos.' },
-      { tipo: 'arreglo', texto: 'Ensordecerte corta el sonido al instante, en vez de bajarlo de a poco. En iPhone ahora sí lo corta.' },
-      { tipo: 'arreglo', texto: 'Una cámara en pantalla completa ya no deja ver la app de fondo al mover el mouse.' },
-      { tipo: 'arreglo', texto: 'En Configuración → Atajos los botones quedan fijos al elegir una tecla.' },
+    version: '0.14.0', fecha: '2026-11-22', cambios: [
+      { tipo: 'nuevo', texto: 'Al prender la cámara primero te ves vos solo en una vista previa; los demás te ven recién cuando tocás "Compartir cámara".' },
+      { tipo: 'nuevo', texto: 'Fondo difuminado para la cámara, suave o fuerte. Se elige en la vista previa y se puede cambiar en vivo con la flechita al lado del botón (en el celular, en Más).' },
+      { tipo: 'nuevo', texto: 'Desde el celular podés pasar a la cámara trasera, en la vista previa o en Más.' },
     ],
   },
 ];

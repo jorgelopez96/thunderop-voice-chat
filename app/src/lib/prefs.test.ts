@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { leerPrefs, guardarPrefs, volumenPantallaDe, guardarVolumenPantalla } from './prefs';
 import { volumen } from './voz.svelte';
 
-const DEFAULTS = { conCamara: false, supresion: true, supresionFuerte: false, volumenes: {}, calidadCam: {}, calidad: '1080p60', vistaPrevia: true, volBotonera: 0.8, volMusica: 50, gananciaDb: 0, sonidoMensajes: true, notificaciones: true, avisoMensajes: true, avisoMenciones: true, hora24: true };
+const DEFAULTS = { conCamara: false, supresion: true, supresionFuerte: false, volumenes: {}, calidadCam: {}, calidad: '1080p60', vistaPrevia: true, volBotonera: 0.8, volMusica: 50, gananciaDb: 0, sonidoMensajes: true, notificaciones: true, avisoMensajes: true, avisoMenciones: true, hora24: true, fondoCam: 'no' };
 
 describe('prefs de voz', () => {
   // Vitest corre en Node (sin localStorage): uno en memoria por test.
@@ -69,6 +69,14 @@ describe('prefs de voz', () => {
   it('gpu guardada se ignora', () => {
     localStorage.setItem('dm.voz', JSON.stringify({ gpu: false }));
     expect(leerPrefs()).not.toHaveProperty('gpu');
+  });
+
+  it('fondoCam: default no, guarda suave/fuerte y descarta basura', () => {
+    expect(leerPrefs().fondoCam).toBe('no');
+    guardarPrefs({ fondoCam: 'fuerte' });
+    expect(leerPrefs().fondoCam).toBe('fuerte');
+    localStorage.setItem('dm.voz', JSON.stringify({ fondoCam: 'arcoiris' }));
+    expect(leerPrefs().fondoCam).toBe('no');
   });
 
   it('vistaPrevia: default true y false se respeta', () => {

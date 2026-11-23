@@ -10,14 +10,17 @@ export const CALIDADES: Record<Calidad, { alto: number; fps: number; mbps: numbe
 };
 /** Hasta qué calidad baja la cámara de alguien, para quien mira. Sin dato: automática (lo que entra en la tarjeta). */
 export type CalidadCam = 'media' | 'baja';
+/** Fondo de la cámara propia: sin efecto, difuminado suave o fuerte (fondo.ts). */
+export type FondoCam = 'no' | 'suave' | 'fuerte';
+const FONDOS: FondoCam[] = ['no', 'suave', 'fuerte'];
 export type PrefsVoz = { entrada?: string; salida?: string; camara?: string; conCamara: boolean; supresion: boolean; supresionFuerte: boolean; volumenes: Record<string, number>; calidadCam: Record<string, CalidadCam>; calidad: Calidad; vistaPrevia: boolean; volBotonera: number; volMusica: number; gananciaDb: number; sonidoMensajes: boolean; notificaciones: boolean;
-  avisoMensajes: boolean; avisoMenciones: boolean; hora24: boolean };
+  avisoMensajes: boolean; avisoMenciones: boolean; hora24: boolean; fondoCam: FondoCam };
 
 const CLAVE = 'dm.voz';
 // Versión del formato: lo guardado antes de la 2 tenía la supresión apagada por defecto; se reenciende una vez.
 // Antes de la 3, los volúmenes eran la ganancia directa; ahora la ganancia es el doble (ver voz.svelte.ts): se dividen a la mitad.
 const VERSION = 3;
-const DEFAULTS: PrefsVoz = { conCamara: false, supresion: true, supresionFuerte: false, volumenes: {}, calidadCam: {}, calidad: '1080p60', vistaPrevia: true, volBotonera: 0.8, volMusica: 50, gananciaDb: 0, sonidoMensajes: true, notificaciones: true, avisoMensajes: true, avisoMenciones: true, hora24: true };
+const DEFAULTS: PrefsVoz = { conCamara: false, supresion: true, supresionFuerte: false, volumenes: {}, calidadCam: {}, calidad: '1080p60', vistaPrevia: true, volBotonera: 0.8, volMusica: 50, gananciaDb: 0, sonidoMensajes: true, notificaciones: true, avisoMensajes: true, avisoMenciones: true, hora24: true, fondoCam: 'no' };
 
 export function leerPrefs(): PrefsVoz {
   try {
@@ -33,6 +36,7 @@ export function leerPrefs(): PrefsVoz {
       volBotonera: rango(p.volBotonera, 1, DEFAULTS.volBotonera), volMusica: rango(p.volMusica, 100, DEFAULTS.volMusica),
       sonidoMensajes: p.sonidoMensajes !== false, notificaciones: p.notificaciones !== false,
       avisoMensajes: p.avisoMensajes !== false, avisoMenciones: p.avisoMenciones !== false, hora24: p.hora24 !== false,
+      fondoCam: FONDOS.find((f) => f === p.fondoCam) ?? DEFAULTS.fondoCam,
       gananciaDb: typeof p.gananciaDb === 'number' && p.gananciaDb >= -20 && p.gananciaDb <= 20 ? p.gananciaDb : DEFAULTS.gananciaDb };
   } catch { return { ...DEFAULTS, volumenes: {}, calidadCam: {} }; }
 }

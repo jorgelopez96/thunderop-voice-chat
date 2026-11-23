@@ -1,9 +1,9 @@
 import type { ProcesadorMic } from './ruido';
-import type { LocalAudioTrack, Participant, RemoteTrack, RemoteTrackPublication, Room, Track } from 'livekit-client';
+import type { LocalAudioTrack, LocalVideoTrack, Participant, RemoteTrack, RemoteTrackPublication, Room, Track } from 'livekit-client';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { pb } from './pb';
 import { mensajeError } from './sesion.svelte';
-import { leerPrefs, guardarPrefs, CALIDADES, volumenPantallaDe, guardarVolumenPantalla, type Calidad, type CalidadCam } from './prefs';
+import { leerPrefs, guardarPrefs, CALIDADES, volumenPantallaDe, guardarVolumenPantalla, type Calidad, type CalidadCam, type FondoCam } from './prefs';
 import { iniciarAudioPantalla, detenerAudioPantalla } from './audioPantalla';
 import { mensajeTransmision } from './transmision';
 import { duenio, esPantallaNativa, iniciarNativo, detenerNativo, calidadNativo, cortarSimulado, SUFIJO_PANTALLA } from './transmisorNativo';
@@ -18,8 +18,10 @@ export type Participante = { id: string; nombre: string; hablando: boolean; sile
 /** `sinPermiso`: el dueño nos silenció (los permisos de LiveKit no dejan publicar el micrófono). `viendo`: sids de las pantallas que miramos
  *  (en el orden en que se eligieron). */
 /** `sinSonido`: el navegador no deja reproducir hasta que se toque la pantalla (celular que volvió solo a la llamada). */
-export const voz = $state<{ salaId: string | null; salaNombre: string; grupoId: string | null; conectando: boolean; error: string; muteado: boolean; ensordecido: boolean; sinPermiso: boolean; supresion: boolean; supresionFuerte: boolean; participantes: Participante[]; senal: 'buena' | 'regular' | 'mala'; transmitiendo: boolean; viendo: string[]; vistaPrevia: boolean; calidadEnVivo: Calidad | null; sinSonido: boolean; camara: boolean; giroCam: number; camEnPantalla: Cam | null }>({
+export const voz = $state<{ salaId: string | null; salaNombre: string; grupoId: string | null; conectando: boolean; error: string; muteado: boolean; ensordecido: boolean; sinPermiso: boolean; supresion: boolean; supresionFuerte: boolean; participantes: Participante[]; senal: 'buena' | 'regular' | 'mala'; transmitiendo: boolean; viendo: string[]; vistaPrevia: boolean; calidadEnVivo: Calidad | null; sinSonido: boolean; camara: boolean; giroCam: number; camEnPantalla: Cam | null;
+  previaCam: boolean; fondoCam: FondoCam; fondoListo: boolean; fondoSoportado: boolean; camTrasera: boolean }>({
   salaId: null, salaNombre: '', grupoId: null, conectando: false, error: '', muteado: false, ensordecido: false, sinPermiso: false, supresion: leerPrefs().supresion, supresionFuerte: leerPrefs().supresionFuerte, participantes: [], senal: 'buena', transmitiendo: false, viendo: [], vistaPrevia: leerPrefs().vistaPrevia, calidadEnVivo: null, sinSonido: false, camara: false, giroCam: 0, camEnPantalla: null,
+  previaCam: false, fondoCam: leerPrefs().fondoCam, fondoListo: true, fondoSoportado: true, camTrasera: false,
 });
 
 // LiveKit se carga recién al entrar a la voz: el arranque de la app no lo paga. Mientras haya `room`, `lk` está cargado.
@@ -156,6 +158,7 @@ function limpiar() {
   if (voz.ensordecido && !muteadoAntes) voz.muteado = false; // la sordera no deja el mic apagado para la próxima sala
   Object.assign(voz, { salaId: null, salaNombre: '', grupoId: null, conectando: false, ensordecido: false, sinPermiso: false, participantes: [], senal: 'buena', transmitiendo: false, viendo: [], sinSonido: false, camara: false, giroCam: 0, camEnPantalla: null });
   camPorTransmision = false;
+  cancelarPreviaCamara();
   if (esCelular) terminarLlamada();
   void detenerAudioPantalla();
   if (nativo) { nativo = false; voz.calidadEnVivo = null; void detenerNativo(); }
@@ -607,9 +610,9 @@ async function camEnTransmision(si: boolean) {
   if (si) {
     const mio = tx;
     if (!voz.camara) {
-      await alternarCamara(true);
+      await prenderCamaraDirecto();
       // Mientras arrancaba la cámara se pudo cortar la transmisión (o salir): se apaga la que prendimos y listo.
-      if (mio !== tx || !voz.transmitiendo || room !== r) { if (voz.camara && room === r) await alternarCamara(true); return; }
+      if (mio !== tx || !voz.transmitiendo || room !== r) { if (voz.camara && room === r) await apagarCamara(true); return; }
       camPorTransmision = voz.camara;
     }
     if (!voz.camara) return; // sin cámara: la transmisión sigue sola (el aviso ya salió)
@@ -622,14 +625,15 @@ async function camEnTransmision(si: boolean) {
   voz.camEnPantalla = null;
   calidadCamara(r, false);
   await r.localParticipant.setAttributes({ camEnPantalla: '' }).catch(() => {});
-  if (camPorTransmision && voz.camara) await alternarCamara(true);
+  if (camPorTransmision && voz.camara) await apagarCamara(true);
   camPorTransmision = false;
 }
 
 /** Con la pantalla saliendo al mismo tiempo, la cámara (que va chica, en la ventanita) baja a 720p30: la pantalla y la
  *  cámara juntas en calidad máxima saturaban la subida y la transmisión se cortaba de a ratos. Al cortar, vuelve. */
 function calidadCamara(r: Room, liviana: boolean) {
-  const t = r.localParticipant.getTrackPublication(lk.Track.Source.Camera)?.track?.mediaStreamTrack;
+  const pub = r.localParticipant.getTrackPublication(lk.Track.Source.Camera)?.track as LocalVideoTrack | undefined;
+  const t = pub && pistaFuente(pub);
   t?.applyConstraints(liviana ? { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30, max: 30 } }
     : { width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 60 } }).catch(() => {});
 }
@@ -709,26 +713,170 @@ function reenviarAtributos(r: Room) {
   if (Object.keys(a).length) r.localParticipant.setAttributes(a).catch(() => {});
 }
 
-/** Prende o apaga la cámara. La mejor calidad que dé (tope 1080p60), con simulcast: a quien la ve chica le llega una
- *  versión liviana, y una tarjeta fuera de la vista no baja video (adaptiveStream). Las capas livianas son 360p y 720p
- *  (las de fábrica, 180p y 360p, con la subida justa dejaban a todos viendo 180p). */
-export async function alternarCamara(desdeTransmision = false) {
-  const r = room;
-  if (!r || voz.conectando) return;
-  if (!desdeTransmision) camPorTransmision = false; // la tocó a mano: al cortar la transmisión queda como la dejó
-  const si = !voz.camara;
+// Cámara: el botón abre una vista previa que solo ve uno (con el fondo elegido) y "Compartir" publica esa misma pista,
+// sin reabrir la cámara. La mejor calidad que dé (tope 1080p60), con simulcast: a quien la ve chica le llega una versión
+// liviana y una tarjeta fuera de la vista no baja video (adaptiveStream). Las capas livianas son 360p y 720p (las de
+// fábrica, 180p y 360p, con la subida justa dejaban a todos viendo 180p).
+let camPrevia = $state.raw<LocalVideoTrack | undefined>(undefined);
+let genPrevia = 0; // cada apertura o cierre de la previa: lo que termina de abrir tarde se descarta
+// Mientras se publica (o "Pantalla + cámara" la está abriendo) no se puede abrir otra: quedaban dos cámaras publicadas.
+let camOcupada = $state(false);
+export const camaraOcupada = () => camOcupada;
+let fondoMod: Promise<typeof import('./fondo')> | undefined;
+// MediaPipe pesa: se carga recién al usar la cámara. Si falla (p. ej. la web se actualizó y el archivo ya no está), se reintenta la próxima vez.
+const fondoLib = () => (fondoMod ??= import('./fondo').catch((e) => { fondoMod = undefined; throw e; }));
+
+// LiveKit devuelve en `mediaStreamTrack` la pista ya procesada (con el fondo): los constraints van a la de la cámara.
+const pistaFuente = (t: LocalVideoTrack) => (t as unknown as { _mediaStreamTrack: MediaStreamTrack })._mediaStreamTrack;
+const camPublicada = () => room?.localParticipant.getTrackPublication(lk.Track.Source.Camera)?.track as LocalVideoTrack | undefined;
+const marcarListo = () => { if (!voz.fondoListo) voz.fondoListo = true; };
+
+function errorCamara(e: unknown) {
+  const n = (e as Error)?.name;
+  return n === 'NotAllowedError' ? 'No hay permiso para usar la cámara. Habilitala en el navegador.'
+    : n === 'NotFoundError' || n === 'OverconstrainedError' ? 'No se encontró una cámara.'
+    : n === 'NotReadableError' ? 'La cámara la está usando otro programa. Cerralo y probá de nuevo.' : 'No se pudo usar la cámara.';
+}
+
+const RESOLUCION_CAM = { width: 1920, height: 1080, frameRate: 60 };
+// En el celular se elige frontal o trasera; en la PC, el dispositivo guardado en Configuración.
+const opcionesCamara = () => (esCelular ? { facingMode: voz.camTrasera ? 'environment' as const : 'user' as const, resolution: RESOLUCION_CAM }
+  : { deviceId: leerPrefs().camara ?? 'default', resolution: RESOLUCION_CAM });
+
+/** Abre la cámara con el fondo guardado, sin publicarla. Si el fondo falla, la cámara anda igual sin él. */
+async function crearPistaCamara(): Promise<LocalVideoTrack> {
+  const t = await lk.createLocalVideoTrack(opcionesCamara());
   try {
-    await r.localParticipant.setCameraEnabled(si, si ? { deviceId: leerPrefs().camara ?? 'default', resolution: { width: 1920, height: 1080, frameRate: 60 } } : undefined,
-      si ? { simulcast: true, videoSimulcastLayers: [lk.VideoPresets.h360, lk.VideoPresets.h720] } : undefined);
-    if (room === r) voz.camara = si;
-  } catch (e) {
-    const n = (e as Error)?.name;
-    voz.error = n === 'NotAllowedError' ? 'No hay permiso para usar la cámara. Habilitala en el navegador.'
-      : n === 'NotFoundError' || n === 'OverconstrainedError' ? 'No se encontró una cámara.'
-      : n === 'NotReadableError' ? 'La cámara la está usando otro programa. Cerralo y probá de nuevo.' : 'No se pudo usar la cámara.';
+    const f = await fondoLib();
+    voz.fondoSoportado = f.fondoDisponible();
+    voz.fondoListo = voz.fondoCam === 'no' || !voz.fondoSoportado;
+    await f.aplicarFondo(t, voz.fondoCam, marcarListo);
+  } catch { voz.fondoSoportado = false; voz.fondoListo = true; }
+  return t;
+}
+
+/** Si mientras cargaba el difuminado se eligió otro fondo, se pone el último elegido. */
+async function alinearFondo(t: LocalVideoTrack) {
+  try {
+    const f = await fondoLib();
+    if (f.fondoAplicado(t) !== voz.fondoCam) await f.aplicarFondo(t, voz.fondoCam, marcarListo);
+  } catch { /* sin efecto: la cámara sigue igual */ }
+}
+
+async function soltar(t: LocalVideoTrack) {
+  try { await (await fondoLib()).quitarFondo(t); }
+  catch { /* stop() igual desarma el procesador */ }
+  finally { t.stop(); }
+}
+
+async function publicarCamara(r: Room, t: LocalVideoTrack) {
+  camOcupada = true;
+  try {
+    await r.localParticipant.publishTrack(t, { source: lk.Track.Source.Camera, simulcast: true, videoSimulcastLayers: [lk.VideoPresets.h360, lk.VideoPresets.h720] });
+    if (room === r) { voz.camara = true; await alinearFondo(t); }
+    else await soltar(t);
+  } catch {
+    voz.error = 'No se pudo compartir la cámara.';
     voz.camara = false;
+    await soltar(t);
+  } finally { camOcupada = false; }
+  actualizar();
+}
+
+/** La pista de la vista previa (solo mientras está abierta y la cámara ya arrancó). */
+export const pistaPreviaCam = () => (voz.previaCam ? camPrevia : undefined);
+
+/** Abre la vista previa: la ventana aparece al toque ("Abriendo la cámara…") y la pista llega cuando arranca. */
+export async function abrirPreviaCamara() {
+  const r = room;
+  if (!r || voz.conectando || voz.camara || voz.previaCam || camOcupada) return;
+  const g = ++genPrevia;
+  voz.previaCam = true;
+  voz.camTrasera = false;
+  try {
+    const t = await crearPistaCamara();
+    if (g !== genPrevia || room !== r || voz.camara) { await soltar(t); return; } // se cerró o se salió mientras abría
+    camPrevia = t;
+    await alinearFondo(t);
+  } catch (e) {
+    if (g !== genPrevia) return;
+    voz.error = errorCamara(e);
+    voz.previaCam = false;
+  }
+}
+
+/** Cierra la vista previa sin compartir: la cámara se apaga y nadie vio nada. */
+export function cancelarPreviaCamara() {
+  genPrevia++;
+  voz.previaCam = false;
+  const t = camPrevia;
+  camPrevia = undefined;
+  if (t) void soltar(t);
+}
+
+/** Publica la pista de la vista previa (la misma: no titila ni se reabre la cámara). */
+export async function compartirCamara() {
+  const r = room, t = camPrevia;
+  if (!r || !t || voz.camara) return;
+  camPorTransmision = false; // la tocó a mano: al cortar la transmisión queda como la dejó
+  genPrevia++;
+  camPrevia = undefined;
+  voz.previaCam = false;
+  await publicarCamara(r, t);
+}
+
+/** "Pantalla + cámara": se prende sin vista previa (ya se eligió a propósito), con el fondo guardado. */
+async function prenderCamaraDirecto() {
+  const r = room;
+  if (!r || voz.camara || camOcupada) return;
+  if (voz.previaCam) cancelarPreviaCamara();
+  camOcupada = true;
+  let t: LocalVideoTrack;
+  try { t = await crearPistaCamara(); }
+  catch (e) { camOcupada = false; voz.error = errorCamara(e); voz.camara = false; return; }
+  if (room !== r || voz.camara) { camOcupada = false; await soltar(t); return; }
+  await publicarCamara(r, t); // deja camOcupada en false al terminar
+}
+
+/** Apaga la cámara al toque: deja de publicarla y la frena. */
+export async function apagarCamara(desdeTransmision = false) {
+  const r = room;
+  if (!r) return;
+  if (!desdeTransmision) camPorTransmision = false;
+  const t = camPublicada();
+  voz.camara = false;
+  if (t) {
+    await r.localParticipant.unpublishTrack(t, false).catch(() => {});
+    await soltar(t);
   }
   actualizar();
+}
+
+/** Celular: pasa de la cámara frontal a la trasera o al revés, en la vista previa o ya compartida (sigue con el mismo fondo).
+ *  Cada vez que se prende arranca con la frontal. */
+export async function voltearCamara() {
+  const t = camPrevia ?? camPublicada();
+  voz.camTrasera = !voz.camTrasera;
+  if (!t) return;
+  try { await t.restartTrack(opcionesCamara()); }
+  catch (e) {
+    voz.camTrasera = !voz.camTrasera;
+    voz.error = errorCamara(e);
+    await t.restartTrack(opcionesCamara()).catch(() => {}); // vuelve a la que andaba
+  }
+}
+
+/** Cambia el fondo (se guarda) en la vista previa o en la cámara ya compartida, sin apagarla. */
+export async function cambiarFondo(f: FondoCam) {
+  guardarPrefs({ fondoCam: f });
+  voz.fondoCam = f;
+  const t = camPrevia ?? camPublicada();
+  if (!t) return; // todavía abriendo o publicando: alinearFondo lo pone cuando llega
+  try {
+    const lib = await fondoLib();
+    if (f !== 'no' && voz.fondoSoportado && lib.cuadrosProcesados(t) === 0) voz.fondoListo = false;
+    await lib.aplicarFondo(t, f, marcarListo);
+  } catch { voz.fondoSoportado = false; voz.fondoListo = true; }
 }
 
 /** Gira la cámara un cuarto de vuelta para todos (celular: el iPhone la manda parada aunque se lo ponga de costado).
@@ -740,7 +888,7 @@ export function girarCamara() {
 }
 
 // Con adaptiveStream la calidad que se pide es un tope: nunca llega más de lo que entra en la tarjeta.
-const TOPE_CAM = { media: 'MEDIUM', baja: 'LOW' } as const; // 720p y 360p (capas de alternarCamara)
+const TOPE_CAM = { media: 'MEDIUM', baja: 'LOW' } as const; // 720p y 360p (capas de publicarCamara)
 function topeCamara(pub: RemoteTrackPublication, identidad: string) {
   const c = leerPrefs().calidadCam[identidad];
   pub.setVideoQuality(lk.VideoQuality[c ? TOPE_CAM[c] : 'HIGH']);
@@ -757,7 +905,8 @@ export function calidadCamaraDe(identidad: string, c: CalidadCam | null) {
 /** Cambia la cámara (se guarda); si está prendida, sigue con la nueva. */
 export async function elegirCamara(deviceId: string) {
   guardarPrefs({ camara: deviceId });
-  if (voz.camara) await room?.switchActiveDevice('videoinput', deviceId).catch(() => {});
+  if (camPrevia) await camPrevia.setDeviceId(deviceId).catch(() => {});
+  else if (voz.camara) await room?.switchActiveDevice('videoinput', deviceId).catch(() => {});
 }
 
 /** La pista de cámara de alguien de la sala (o la propia), para hacerle `attach`. */
@@ -803,6 +952,15 @@ if (import.meta.env.DEV) {
     terminarCaptura: cortarSimulado,
     // LiveKit se dio por vencido reconectando (lo que pasa cuando el celular congela la página).
     caer: () => room?.emit(lk.RoomEvent.Disconnected, lk.DisconnectReason.UNKNOWN_REASON),
+    // Fondo de la cámara propia (previa o compartida) y cuántos cuadros pasaron por el difuminado; null sin cámara.
+    async fondo() {
+      const t = camPrevia ?? camPublicada();
+      const f = await fondoLib();
+      return t ? { modo: f.fondoAplicado(t), cuadros: f.cuadrosProcesados(t) } : null;
+    },
+    // Pistas de cámara propias vivas (previa + publicada): tiene que haber como mucho una.
+    camara: () => { const t = camPrevia ?? camPublicada(); return t ? { trasera: voz.camTrasera, facingMode: t.constraints.facingMode } : null; },
+    pistasCamara: () => [camPrevia, camPublicada()].filter((t) => t && t.mediaStreamTrack?.readyState === 'live').length,
     webAudioMix: () => !!room?.options.webAudioMix,
     // Volumen al que suena el micrófono de cada uno ahora mismo (sin rampa: la sordera corta de una).
     ganancias: () => Object.fromEntries([...room?.remoteParticipants.values() ?? []].map((p) =>

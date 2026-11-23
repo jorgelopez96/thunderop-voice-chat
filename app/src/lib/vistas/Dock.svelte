@@ -1,8 +1,8 @@
 <script lang="ts">
   import { puedo } from '../permisos';
   import { alTocar, estabaAbierto } from '../menu';
-  import { Mic, MicOff, Headphones, HeadphoneOff, ChevronDown, Monitor, Video, VideoOff, AudioWaveform, Music, TvMinimalPlay, PhoneOff, MessageSquare, Ellipsis, Check, RotateCw } from '@lucide/svelte';
-  import { voz, alternarMute, ensordecer, alternarCamara, girarCamara, salirVoz, transmitir, transmitirNavegador, dejarDeTransmitir, cambiarCalidad, dispositivos, elegirEntrada, elegirSalida, type Dispositivo } from '../voz.svelte';
+  import { Mic, MicOff, Headphones, HeadphoneOff, ChevronDown, Monitor, Video, VideoOff, AudioWaveform, Music, TvMinimalPlay, PhoneOff, MessageSquare, Ellipsis, Check, RotateCw, SwitchCamera } from '@lucide/svelte';
+  import { voz, alternarMute, ensordecer, abrirPreviaCamara, apagarCamara, camaraOcupada, cambiarFondo, voltearCamara, girarCamara, salirVoz, transmitir, transmitirNavegador, dejarDeTransmitir, cambiarCalidad, dispositivos, elegirEntrada, elegirSalida, type Dispositivo } from '../voz.svelte';
   import { grupos } from '../grupos.svelte';
   import { CALIDADES, leerPrefs, guardarPrefs, type Calidad } from '../prefs';
   import Botonera from './Botonera.svelte';
@@ -12,8 +12,9 @@
   import YoutubeJuntos from './YoutubeJuntos.svelte';
   import { sesion } from '../sesion.svelte';
   import { fuentes, conNativo, type Fuente } from '../transmisorNativo';
-  import { puedeTransmitir, pantalla } from '../plataforma.svelte';
+  import { puedeTransmitir, pantalla, esCelular } from '../plataforma.svelte';
   import Confirmar from './Confirmar.svelte';
+  import CamaraPrevia, { FONDOS } from './CamaraPrevia.svelte';
   import { navMovil, conAtras } from '../navMovil.svelte';
   import { elegirFuente } from '../transmision';
   import { completa } from '../pantallaCompleta.svelte';
@@ -123,6 +124,16 @@
   const nombreCalidad = (c: Calidad) => `${CALIDADES[c].alto}p · ${CALIDADES[c].fps} fps`;
 
   // Menú de calidad mientras se transmite.
+  // Fondo de la cámara ya compartida (escritorio: flecha al lado del botón; celular: en "Más").
+  let menuFondo = $state<HTMLElement>();
+  let posFondo = $state({ x: 0, y: 0 });
+  function abrirFondo(e: MouseEvent) {
+    if (estabaAbierto(menuFondo)) return;
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    posFondo = { x: r.left, y: innerHeight - r.top + 8 };
+    menuFondo?.showPopover();
+  }
+
   let menuCalidad = $state<HTMLElement>();
   let posCalidad = $state({ x: 0, y: 0 });
   function abrirCalidad(e: MouseEvent) {
@@ -176,7 +187,12 @@
     {:else}
     {#if puedeTransmitir()}<button class="icono cian" onclick={abrirTransmision} disabled={voz.conectando} aria-label="Transmitir" title="Transmitir pantalla"><Monitor size={20} strokeWidth={1.75} /></button>{/if}
     {/if}
-    {@render botonCamara(20)}
+    {#if voz.camara}
+      <div class="doble">
+        {@render botonCamara(20)}
+        <button class="icono flecha" aria-label="Fondo de la cámara" title="Fondo de la cámara" onpointerdown={() => alTocar(menuFondo)} onclick={abrirFondo}><ChevronDown size={14} strokeWidth={1.75} /></button>
+      </div>
+    {:else}{@render botonCamara(20)}{/if}
     <button class="icono magenta" aria-pressed={abiertoSonidos} popovertarget="dock-sonidos" onclick={ubicarPanel} aria-label="Sonidos" title="Sonidos"><AudioWaveform size={20} strokeWidth={1.75} /></button>
     <button class="icono violeta" aria-pressed={abiertoMusica} popovertarget="dock-musica" onclick={ubicarPanel} aria-label="Música" title="Música"><Music size={20} strokeWidth={1.75} /></button>
     <button class="icono rojo-yt" aria-pressed={abiertoYoutube} popovertarget="dock-youtube" onclick={ubicarPanel} aria-label="YouTube juntos" title="Ver un video de YouTube juntos"><TvMinimalPlay size={20} strokeWidth={1.75} /></button>
@@ -186,7 +202,7 @@
 {/snippet}
 
 {#snippet botonCamara(tam: number)}
-  <button class="icono" class:encendida={voz.camara} onclick={() => alternarCamara()} disabled={voz.conectando} aria-pressed={voz.camara}
+  <button class="icono" class:encendida={voz.camara} onclick={() => (voz.camara ? apagarCamara() : abrirPreviaCamara())} disabled={voz.conectando || voz.previaCam || camaraOcupada()} aria-pressed={voz.camara}
     aria-label={voz.camara ? 'Apagar la cámara' : 'Prender la cámara'} title={voz.camara ? 'Apagar la cámara' : 'Prender la cámara'}>
     {#if voz.camara}<Video size={tam} strokeWidth={1.75} />{:else}<VideoOff size={tam} strokeWidth={1.75} />{/if}</button>
 {/snippet}
@@ -207,7 +223,12 @@
 <div popover id="dock-mas" class="menu mas">
   <button class="plano" popovertarget="dock-sonidos" onclick={ubicarPanel}><AudioWaveform size={18} strokeWidth={1.75} /> Sonidos</button>
   <button class="plano" popovertarget="dock-youtube" onclick={ubicarPanel}><TvMinimalPlay size={18} strokeWidth={1.75} /> YouTube juntos</button>
-  {#if voz.camara}<button class="plano" onclick={girarCamara}><RotateCw size={18} strokeWidth={1.75} /> Girar la cámara</button>{/if}
+  {#if voz.camara}{#if esCelular}<button class="plano" onclick={voltearCamara}><SwitchCamera size={18} strokeWidth={1.75} /> {voz.camTrasera ? 'Usar la cámara frontal' : 'Usar la cámara trasera'}</button>{/if}
+    <button class="plano" onclick={girarCamara}><RotateCw size={18} strokeWidth={1.75} /> Girar la cámara</button>
+    {#if voz.fondoSoportado}<h3>Fondo</h3>
+      {#each FONDOS as f (f.valor)}<button class="plano" aria-pressed={voz.fondoCam === f.valor} onclick={() => cambiarFondo(f.valor)}>{f.nombre}{#if voz.fondoCam === f.valor}<Check size={16} strokeWidth={2.25} />{/if}</button>{/each}
+    {/if}
+  {/if}
   {#if puedeTransmitir()}
     {#if voz.transmitiendo}<button class="plano" onclick={() => (cortando = true)}><Monitor size={18} strokeWidth={1.75} /> Dejar de transmitir</button>
     {:else}<button class="plano" onclick={abrirTransmision}><Monitor size={18} strokeWidth={1.75} /> Transmitir</button>{/if}
@@ -248,6 +269,17 @@
     <button class="plano" aria-pressed={x.deviceId === elegido} onclick={() => elegir(x.deviceId)}>{x.label || 'Dispositivo sin nombre'}{#if x.deviceId === elegido}<Check size={16} strokeWidth={2.25} />{/if}</button>
   {:else}<small>No se ven dispositivos (falta el permiso del micrófono).</small>{/each}
 </div>
+
+<div popover bind:this={menuFondo} class="menu" style="left:{posFondo.x}px;bottom:{posFondo.y}px">
+  <h3>Fondo</h3>
+  {#if voz.fondoSoportado}
+    {#each FONDOS as f (f.valor)}
+      <button class="plano" aria-pressed={voz.fondoCam === f.valor} onclick={() => { menuFondo?.hidePopover(); void cambiarFondo(f.valor); }}>{f.nombre}{#if voz.fondoCam === f.valor}<Check size={16} strokeWidth={2.25} />{/if}</button>
+    {/each}
+  {:else}<small>Tu equipo no permite difuminar el fondo.</small>{/if}
+</div>
+
+<CamaraPrevia />
 
 <div popover bind:this={menuCalidad} class="menu" style="left:{posCalidad.x}px;bottom:{posCalidad.y}px">
   <h3>Calidad</h3>
