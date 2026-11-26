@@ -397,10 +397,20 @@ describe('cuenta completa', () => {
     const anon = new PocketBase(h.url);
     expect((await error(validar(anon, {})))?.status).toBe(401);
     expect((await error(validar(anon, { codigo: 'OTRO' })))?.status).toBe(401);
-    const link = { url: `${(await h.admin.settings.getAll()).meta.appURL.replace(/\/+$/, '')}/descargas/thunderop-setup.exe` };
-    expect(await validar(anon, { codigo: 'PRUEBA26' })).toEqual(link);
-    expect(await validar(await h.nuevoUsuario('desc'), {})).toEqual(link);
+    const base = `${(await h.admin.settings.getAll()).meta.appURL.replace(/\/+$/, '')}/api/descarga/archivo?t=`;
+    const { url } = await validar(anon, { codigo: 'PRUEBA26' }) as { url: string };
+    expect(url.startsWith(base)).toBe(true);
+    expect((await validar(await h.nuevoUsuario('desc'), {}) as { url: string }).url.startsWith(base)).toBe(true);
     expect((await error(validar(await h.nuevoUsuario('desc', { incompleta: true }), {})))?.status).toBe(401);
+    // El link firmado baja el archivo de la carpeta privada (el servidor de pruebas está en h.url, no en appURL).
+    const bajar = (u: string) => fetch(`${h.url}/api/descarga/archivo${u.slice(u.indexOf('?'))}`);
+    const r = await bajar(url);
+    expect([r.status, r.headers.get('content-disposition'), await r.text()]).toEqual([200, 'attachment; filename="thunderop-setup.exe"', 'instalador de prueba']);
+    const apk = await bajar((await validar(anon, { codigo: 'PRUEBA26', version: 'android' }) as { url: string }).url);
+    expect([apk.status, apk.headers.get('content-type'), await apk.text()]).toEqual([200, 'application/vnd.android.package-archive', 'apk de prueba']);
+    // Sin token, con uno trucho o firmado con otra clave: no.
+    expect((await bajar('?t=')).status).toBe(401);
+    expect((await bajar(`?t=${url.slice(url.indexOf('t=') + 2, -4)}xxxx`)).status).toBe(401);
   });
 });
 
@@ -444,9 +454,7 @@ describe('Google/Microsoft, configuración y limpieza', () => {
       const s = await h2.admin.settings.getAll();
       expect(s.meta).toMatchObject({ appURL: 'https://ejemplo.test', appName: 'Thunderop', senderName: 'Thunderop' });
       expect(await new PocketBase(h2.url).send('/api/descarga/validar', { method: 'POST', body: { codigo: 'PRUEBA26' } }))
-        .toEqual({ url: 'https://ejemplo.test/descargas/thunderop-setup.exe' });
-      expect(await new PocketBase(h2.url).send('/api/descarga/validar', { method: 'POST', body: { codigo: 'PRUEBA26', version: 'android' } }))
-        .toEqual({ url: 'https://ejemplo.test/descargas/thunderop.apk' });
+        .toMatchObject({ url: expect.stringMatching(/^https:\/\/ejemplo\.test\/api\/descarga\/archivo\?t=/) });
     } finally { await h2.stop(); }
   });
 

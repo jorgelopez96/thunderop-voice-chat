@@ -253,17 +253,33 @@ routerAdd("POST", "/api/cuenta/terminos", (e) => {
 }, $apis.requireAuth("users"));
 
 // La página web pregunta antes de dar el instalador: vale el código de invitación o una sesión de cuenta completa.
+// El archivo no está a la vista: sale de INSTALADORES_DIR (carpeta privada) solo con un link firmado que vence a los 10 min.
+// (El autoactualizador de Windows baja aparte, de /descargas, con el nombre que lista latest.json.)
 routerAdd("POST", "/api/descarga/validar", (e) => {
   const r = require(`${__hooks}/reglas.js`);
   const porCodigo = r.codigoValido(e.requestInfo().body.codigo);
   const porCuenta = !!e.auth && e.auth.collection().name === "users" && !r.falta(e.auth).length;
   if (!porCodigo && !porCuenta) return e.json(401, {});
-  // El link del instalador solo sale en esta respuesta (la página no lo tiene en el HTML ni en el código).
+  const secreto = $os.getenv("DESCARGAS_SECRETO");
+  if (!secreto) throw new ApiError(503, "Las descargas no están configuradas.");
   const base = ($os.getenv("APP_URL") || e.app.settings().meta.appURL).replace(/\/+$/, "");
-  // `version: "beta"` da el instalador de prueba (la actualización automática sigue con el estable); `"android"`, el APK.
+  // `version: "beta"` da el instalador de prueba; `"android"`, el APK.
   const ARCHIVOS = { beta: "thunderop-setup-beta.exe", android: "thunderop.apk" };
   const archivo = ARCHIVOS[e.requestInfo().body.version] || "thunderop-setup.exe";
-  return e.json(200, { url: `${base}/descargas/${archivo}` });
+  const t = $security.createJWT({ archivo }, secreto, 600);
+  return e.json(200, { url: `${base}/api/descarga/archivo?t=${encodeURIComponent(t)}` });
+});
+
+routerAdd("GET", "/api/descarga/archivo", (e) => {
+  const secreto = $os.getenv("DESCARGAS_SECRETO");
+  if (!secreto) throw new ApiError(503, "Las descargas no están configuradas.");
+  let archivo;
+  try { archivo = $security.parseJWT(e.request.url.query().get("t"), secreto).archivo; }
+  catch (_) { throw new UnauthorizedError("El link de descarga venció. Pedilo de nuevo en thunderop.com."); }
+  if (!["thunderop-setup.exe", "thunderop-setup-beta.exe", "thunderop.apk"].includes(archivo)) throw new BadRequestError("Archivo desconocido.");
+  e.response.header().set("Content-Disposition", `attachment; filename="${archivo}"`);
+  if (archivo.endsWith(".apk")) e.response.header().set("Content-Type", "application/vnd.android.package-archive");
+  return e.fileFS($os.dirFS($os.getenv("INSTALADORES_DIR") || "/opt/thunderop/instaladores"), archivo);
 });
 
 // Desactivar la cuenta: se ve desconectada, no recibe solicitudes de amistad y se cierran todas sus sesiones.

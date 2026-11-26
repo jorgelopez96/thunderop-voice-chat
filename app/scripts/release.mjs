@@ -1,9 +1,11 @@
 // npm run release -- midominio.duckdns.org [--beta]: arma el instalador apuntando al servidor.
-// Deja en app/release/ el instalador y sus .json de actualizaciones: se copian a /opt/thunderop/descargas del servidor.
+// Deja en app/release/ el instalador (va a /opt/thunderop/instaladores: solo se baja con el código, por link firmado) y,
+// para el autoactualizador, una copia con nombre que cambia en cada versión + los .json (van a /opt/thunderop/descargas).
 // Con --beta la app busca sus actualizaciones en latest-beta.json (thunderop-setup-beta.exe); la estable, en latest.json,
 // que también se escribe como latest-beta.json para que los de la beta reciban las estables nuevas.
 // Para publicar una actualización (beta o estable), subí antes "version" en src-tauri/tauri.conf.json.
 import { copyFileSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -50,16 +52,19 @@ const exe = readdirSync(nsis).find((f) => f.endsWith(`_${conf.version}_x64-setup
 const salida = fileURLToPath(new URL('../release/', import.meta.url));
 mkdirSync(salida, { recursive: true });
 copyFileSync(join(nsis, exe), join(salida, `thunderop-setup${sufijo}.exe`));
+// El autoactualizador baja de /descargas, que es público: el nombre sale del contenido, así no se adivina sin latest.json.
+const act = `thunderop-act${sufijo}-${createHash('sha256').update(readFileSync(join(nsis, exe))).digest('hex').slice(0, 16)}.exe`;
+copyFileSync(join(nsis, exe), join(salida, act));
 const json = JSON.stringify({
   version: conf.version,
   pub_date: new Date().toISOString(),
   platforms: {
     'windows-x86_64': {
       signature: readFileSync(join(nsis, `${exe}.sig`), 'utf8'),
-      url: `https://${dominio}/descargas/thunderop-setup${sufijo}.exe`,
+      url: `https://${dominio}/descargas/${act}`,
     },
   },
 }, null, 2);
 writeFileSync(join(salida, 'latest-beta.json'), json);
 if (!beta) writeFileSync(join(salida, 'latest.json'), json);
-console.log(`\nListo: ${salida}\nDescarga para tus amigos: https://${dominio}/descargas/thunderop-setup${sufijo}.exe`);
+console.log(`\nListo: ${salida}\nActualización: ${act}. Descarga para tus amigos: https://www.thunderop.com (con el código).`);

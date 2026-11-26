@@ -92,7 +92,8 @@ export async function startPocketBase(opts: { rateLimits?: boolean; port?: numbe
   const proc: ChildProcess = spawn(
     exe,
     ['serve', `--http=127.0.0.1:${puerto}`, '--dir', dir, '--migrationsDir', 'pb_migrations', '--hooksDir', 'pb_hooks', '--automigrate=false'], // un test que cambie reglas por la API no escribe migraciones
-    { cwd: raiz, stdio: 'ignore', env: { ...process.env, TERMINOS_VERSION: '1', THUNDEROP_CODIGO: 'PRUEBA26', THUNDEROP_MAIL: 'log', ...opts.env } },
+    { cwd: raiz, stdio: 'ignore', env: { ...process.env, TERMINOS_VERSION: '1', THUNDEROP_CODIGO: 'PRUEBA26', THUNDEROP_MAIL: 'log',
+      DESCARGAS_SECRETO: 'secreto-de-prueba', INSTALADORES_DIR: join(raiz, 'tests', 'fixtures', 'instaladores'), ...opts.env } },
   );
   const salida = new Promise<never>((_, fail) => proc.once('exit', (c) => fail(new Error(`pocketbase salió (${c})`))));
   const limpiar = async () => {
