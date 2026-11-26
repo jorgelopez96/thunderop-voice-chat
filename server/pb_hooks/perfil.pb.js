@@ -1,9 +1,16 @@
 /// <reference path="../pb_data/types.d.ts" />
 // Tarjeta de perfil: valida juegos y redes, y arma `cumple` (MM-DD) desde `nacimiento` solo si el dueño lo quiere mostrar.
+// También al crear la cuenta: si no, un registro armado a mano podría traer un cumpleaños inventado o redes inválidas.
+onRecordCreateRequest((e) => {
+  const mal = require(`${__hooks}/reglas.js`).errorPerfil(e.record);
+  if (mal) throw new BadRequestError(mal);
+  e.record.set("mostrarCumple", false);
+  e.record.set("cumple", "");
+  e.next();
+}, "users");
+
 onRecordUpdateRequest((e) => {
-  const r = require(`${__hooks}/reglas.js`);
-  const json = (c) => { const s = e.record.getString(c); return s && s !== "null" ? JSON.parse(s) : null; };
-  const mal = r.errorJuegos(json("juegos")) || r.errorRedes(json("redes"));
+  const mal = require(`${__hooks}/reglas.js`).errorPerfil(e.record);
   if (mal) throw new BadRequestError(mal);
   const nacimiento = e.record.getString("nacimiento"); // "1996-03-14 00:00:00.000Z"
   e.record.set("cumple", e.record.getBool("mostrarCumple") && nacimiento ? nacimiento.slice(5, 10) : "");

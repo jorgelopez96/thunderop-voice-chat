@@ -118,6 +118,14 @@ describe('tarjeta de perfil', () => {
     expect((await b.collection('users').getOne(id)).cumple).toBe('');
   });
 
+  it('al crear la cuenta tampoco entra un cumpleaños inventado ni redes inválidas', async () => {
+    const datos = (extra: object) => ({ email: `x${Math.random().toString(36).slice(2, 8)}@test.local`, password: 'clave-larga-123', passwordConfirm: 'clave-larga-123',
+      username: `x${Math.random().toString(36).slice(2, 10)}`, name: 'X', terminos: 1, perfilCompleto: true, nacimiento: '1996-01-01', ...extra });
+    const u = await h.admin.collection('users').create(datos({ cumple: '12-25', mostrarCumple: true }));
+    expect([u.cumple, u.mostrarCumple]).toEqual(['', false]);
+    await expect(h.admin.collection('users').create(datos({ redes: { instagram: 'a/b?c' } }))).rejects.toMatchObject({ status: 400 });
+  });
+
   it('código para invitar: solo con sesión', async () => {
     const a = await h.nuevoUsuario('ana');
     expect(await a.send('/api/invitacion', {})).toHaveProperty('codigo');

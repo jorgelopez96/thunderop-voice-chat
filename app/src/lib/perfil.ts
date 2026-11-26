@@ -1,9 +1,9 @@
 // Datos de la tarjeta de perfil: redes (se guarda el usuario, el link se arma acá) y cumpleaños (MM-DD, sin año).
 export const REDES = [
-  ['instagram', 'Instagram', (u: string) => `https://www.instagram.com/${u}`],
-  ['youtube', 'YouTube', (u: string) => `https://www.youtube.com/@${u}`],
-  ['twitch', 'Twitch', (u: string) => `https://www.twitch.tv/${u}`],
-  ['steam', 'Steam', (u: string) => `https://steamcommunity.com/id/${u}`],
+  ['instagram', 'Instagram', (u: string) => `https://www.instagram.com/${encodeURIComponent(u)}`],
+  ['youtube', 'YouTube', (u: string) => `https://www.youtube.com/@${encodeURIComponent(u)}`],
+  ['twitch', 'Twitch', (u: string) => `https://www.twitch.tv/${encodeURIComponent(u)}`],
+  ['steam', 'Steam', (u: string) => `https://steamcommunity.com/id/${encodeURIComponent(u)}`],
 ] as const;
 export type Red = (typeof REDES)[number][0];
 export type Redes = Partial<Record<Red, string>>;

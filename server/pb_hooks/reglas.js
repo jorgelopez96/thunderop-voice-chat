@@ -111,5 +111,10 @@ function errorRedes(r) {
   }
   return "";
 }
+// Juegos y redes de un registro de `users` (los campos JSON llegan como texto).
+function errorPerfil(record) {
+  const json = (c) => { const s = record.getString(c); return s && s !== "null" ? JSON.parse(s) : null; };
+  return errorJuegos(json("juegos")) || errorRedes(json("redes"));
+}
 
-module.exports = { bloqueo, normalizarUsuario, datosOAuth, errorOAuthMail, errorUsuario, errorClave, edad, errorEdad, errorTerminos, terminosVigente, codigoValido, falta, errorJuegos, errorRedes, MSG_TERMINOS };
+module.exports = { bloqueo, normalizarUsuario, datosOAuth, errorOAuthMail, errorUsuario, errorClave, edad, errorEdad, errorTerminos, terminosVigente, codigoValido, falta, errorJuegos, errorRedes, errorPerfil, MSG_TERMINOS };
