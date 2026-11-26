@@ -95,4 +95,21 @@ function bloqueo(app, a, b) {
   return tiene(a, b) || tiene(b, a);
 }
 
-module.exports = { bloqueo, normalizarUsuario, datosOAuth, errorOAuthMail, errorUsuario, errorClave, edad, errorEdad, errorTerminos, terminosVigente, codigoValido, falta, MSG_TERMINOS };
+// Tarjeta de perfil: hasta 5 juegos favoritos (texto de 1 a 30) y redes por nombre de usuario (la app arma el link).
+const REDES = ["twitch", "youtube", "instagram", "steam"];
+function errorJuegos(j) {
+  if (j == null) return "";
+  if (!Array.isArray(j) || j.length > 5) return "Podés poner hasta 5 juegos.";
+  return j.every((x) => typeof x === "string" && x.trim().length >= 1 && x.trim().length <= 30) ? "" : "Cada juego va de 1 a 30 letras.";
+}
+function errorRedes(r) {
+  if (r == null) return "";
+  if (typeof r !== "object" || Array.isArray(r)) return "Redes inválidas.";
+  for (const k in r) {
+    if (!REDES.includes(k)) return "Redes inválidas.";
+    if (typeof r[k] !== "string" || !/^[A-Za-z0-9._-]{0,40}$/.test(r[k])) return "El usuario de una red solo puede tener letras, números, punto, guion y guion bajo.";
+  }
+  return "";
+}
+
+module.exports = { bloqueo, normalizarUsuario, datosOAuth, errorOAuthMail, errorUsuario, errorClave, edad, errorEdad, errorTerminos, terminosVigente, codigoValido, falta, errorJuegos, errorRedes, MSG_TERMINOS };

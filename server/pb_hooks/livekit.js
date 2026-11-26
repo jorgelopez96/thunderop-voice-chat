@@ -21,8 +21,8 @@ function token(c, claims, segundos) {
   return $security.createJWT(payload, c.secret, segundos);
 }
 
-// POST a la RoomService (Twirp) con un token de admin de `room` (+ roomCreate, que DeleteRoom exige;
-// el token no sale del servidor). Devuelve el JSON;
+// POST a la RoomService (Twirp) con un token de admin de `room` (+ roomCreate, que DeleteRoom exige, y roomList
+// para ListRooms; el token no sale del servidor). Devuelve el JSON;
 // si LiveKit no responde 200, tira un Error con `status` = código de LiveKit.
 function roomService(c, method, body, room) {
   const res = $http.send({
@@ -31,7 +31,7 @@ function roomService(c, method, body, room) {
     body: JSON.stringify(body),
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${token(c, { video: { roomAdmin: true, roomCreate: true, room } }, 60)}`,
+      Authorization: `Bearer ${token(c, { video: { roomAdmin: true, roomCreate: true, roomList: true, room } }, 60)}`,
     },
     timeout: 10,
   });

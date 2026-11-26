@@ -4,10 +4,12 @@ export type Novedad = { version: string; fecha: string; cambios: { tipo: 'nuevo'
 
 export const NOVEDADES: Novedad[] = [
   {
-    version: '0.14.0', fecha: '2026-11-22', cambios: [
-      { tipo: 'nuevo', texto: 'Al prender la cámara primero te ves vos solo en una vista previa; los demás te ven recién cuando tocás "Compartir cámara".' },
-      { tipo: 'nuevo', texto: 'Fondo difuminado para la cámara, suave o fuerte. Se elige en la vista previa y se puede cambiar en vivo con la flechita al lado del botón (en el celular, en Más).' },
-      { tipo: 'nuevo', texto: 'Desde el celular podés pasar a la cámara trasera, en la vista previa o en Más.' },
+    version: '0.14.1', fecha: '2026-11-26', cambios: [
+      { tipo: 'nuevo', texto: 'Las salas de voz con gente muestran hace cuánto hay gente, con el tiempo corriendo.' },
+      { tipo: 'nuevo', texto: 'Nuevo menú de tu foto: estado personalizado ("Jugando Fortnite"), No molestar por un rato, novedades e invitar gente a Thunderop.' },
+      { tipo: 'nuevo', texto: 'Perfil renovado: portada, color del nombre, juegos favoritos, redes y cumpleaños (sin la edad). Al lado ves cómo te ven los demás, y ellos lo ven en "Ver perfil".' },
+      { tipo: 'arreglo', texto: 'Si abrís un chat por otro lado, sus notificaciones de la campanita se dan por leídas.' },
+      { tipo: 'arreglo', texto: 'En la versión web (también en Android) ya se puede prender la cámara: el navegador te pide permiso.' },
     ],
   },
 ];

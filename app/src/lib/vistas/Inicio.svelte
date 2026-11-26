@@ -10,13 +10,14 @@
   import Avatar from './Avatar.svelte';
   import Novedades from './Novedades.svelte';
   import { pantalla } from '../plataforma.svelte';
+  import { desdeHace } from '../hora.svelte';
 
   // Inicio del celular (en la PC va InicioPaneles). `vista: 'grupos'`: la pestaña Grupos (solo la lista de grupos).
   let { vista = 'todo' }: { vista?: 'todo' | 'grupos' } = $props();
 
 
   // Quiénes están en voz en cada sala de cada grupo (presencia del servidor), refrescado cada 15 s mientras se ve la portada.
-  type EnVoz = { id: string; name: string };
+  type EnVoz = { id: string; name: string; desde?: number };
   let enVozDe = $state<Record<string, Record<string, EnVoz[]>>>({});
   $effect(() => {
     const cargar = () => {
@@ -104,12 +105,13 @@
         </section>
       {:else}
         {#if vista === 'grupos'}{:else if voz.salaId && miGrupo}
+          {@const d = enVozDe[miGrupo.id]?.[voz.salaId]?.[0]?.desde}
           <section>
             <div class="encabezado"><h2>Ahora en voz</h2></div>
             <div class="en-voz">
               {@render icono(miGrupo)}
               <div class="info">
-                <span class="kicker"><span class="punto"></span>Estás en esta sala</span>
+                <span class="kicker"><span class="punto"></span>Estás en esta sala{#if d}<span class="num">{` · ${desdeHace(d)}`}</span>{/if}</span>
                 <strong>{voz.salaNombre} <span>en {miGrupo.name}</span></strong>
                 {@render chips(miGrupo, voz.participantes)}
               </div>
@@ -124,7 +126,7 @@
                 <div class="en-voz">
                   {@render icono(a.grupo)}
                   <div class="info">
-                    <span class="kicker"><span class="punto"></span>{a.gente.length === 1 ? `${a.gente[0].name} está en voz` : `${a.gente.length} personas están en voz`}</span>
+                    <span class="kicker"><span class="punto"></span>{a.gente.length === 1 ? `${a.gente[0].name} está en voz` : `${a.gente.length} personas están en voz`}{#if a.gente[0].desde}<span class="num">{` · ${desdeHace(a.gente[0].desde)}`}</span>{/if}</span>
                     <strong>{nombresSala[a.sala] || 'Sala de voz'} <span>en {a.grupo.name}</span></strong>
                     {@render chips(a.grupo, a.gente.map((p) => ({ id: p.id, nombre: p.name })))}
                   </div>

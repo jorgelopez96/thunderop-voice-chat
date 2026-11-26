@@ -1,5 +1,6 @@
 import type { RecordModel } from 'pocketbase';
-import { invoke, isTauri } from '@tauri-apps/api/core';
+import { invoke } from '@tauri-apps/api/core';
+import { esEscritorio } from './plataforma.svelte';
 import { pb } from './pb';
 import { voz } from './voz.svelte';
 
@@ -66,7 +67,7 @@ export function iniciarPresencia(): () => void {
   const toco = () => (toque = Date.now());
   const EVENTOS = ['pointermove', 'pointerdown', 'keydown', 'wheel'];
   for (const ev of EVENTOS) addEventListener(ev, toco, { passive: true });
-  const quieto = () => (isTauri() ? invoke<number>('inactivo_ms') : Promise.resolve(Date.now() - toque));
+  const quieto = () => (esEscritorio ? invoke<number>('inactivo_ms') : Promise.resolve(Date.now() - toque));
   const mirar = setInterval(() => quieto().then((ms) => {
     const si = ms >= INACTIVO_MS && !voz.salaId;
     if (si === yoInactivo) return;

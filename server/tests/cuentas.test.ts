@@ -445,6 +445,8 @@ describe('Google/Microsoft, configuración y limpieza', () => {
       expect(s.meta).toMatchObject({ appURL: 'https://ejemplo.test', appName: 'Thunderop', senderName: 'Thunderop' });
       expect(await new PocketBase(h2.url).send('/api/descarga/validar', { method: 'POST', body: { codigo: 'PRUEBA26' } }))
         .toEqual({ url: 'https://ejemplo.test/descargas/thunderop-setup.exe' });
+      expect(await new PocketBase(h2.url).send('/api/descarga/validar', { method: 'POST', body: { codigo: 'PRUEBA26', version: 'android' } }))
+        .toEqual({ url: 'https://ejemplo.test/descargas/thunderop.apk' });
     } finally { await h2.stop(); }
   });
 

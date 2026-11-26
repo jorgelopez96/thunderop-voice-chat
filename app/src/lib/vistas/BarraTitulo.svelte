@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { isTauri } from '@tauri-apps/api/core';
+  import { esEscritorio } from '../plataforma.svelte';
   import type { Snippet } from 'svelte';
 
   // Barra de título propia (la ventana va sin decoraciones de Windows). Se arrastra desde la barra y desde
@@ -8,7 +8,7 @@
   // `flotante`: pantallas sin barra propia (login, actualización): va encima, sin fondo.
   let { children, flotante = false }: { children?: Snippet; flotante?: boolean } = $props();
 
-  const ventana = isTauri() ? import('@tauri-apps/api/window').then((m) => m.getCurrentWindow()) : null;
+  const ventana = esEscritorio ? import('@tauri-apps/api/window').then((m) => m.getCurrentWindow()) : null;
   let maximizada = $state(false);
   $effect(() => {
     if (!ventana) return;

@@ -462,6 +462,48 @@ test('tocar una notificación de mención lleva a ese chat', async ({ browser })
   await expect(a.locator('h2.titulo', { hasText: '# General' })).toBeVisible();
 });
 
+test('abrir el chat por otro lado da por leída su notificación en la campanita', async ({ browser }) => {
+  const a = await (await browser.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
+  const b = await (await browser.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
+  await crearCuenta(a, 'Ana');
+  const link = await crearGrupo(a, 'Leelo');
+  const nombreAna = (await a.locator('button.yo > span:not(.caja)').first().textContent())!.trim();
+  await crearCuenta(b, 'Beto');
+  await b.getByRole('button', { name: 'Unirme con código' }).click();
+  await b.getByPlaceholder('Código o link de invitación').fill(link);
+  await b.getByRole('button', { name: 'Unirme', exact: true }).click();
+  await b.getByRole('button', { name: 'Sala de chat general' }).click();
+  await a.getByRole('button', { name: 'Inicio' }).first().click();
+  await b.getByPlaceholder('Escribí un mensaje').fill(`@${nombreAna} che`);
+  await b.getByPlaceholder('Escribí un mensaje').press('Escape');
+  await b.getByRole('button', { name: 'Enviar' }).click();
+  await expect(a.getByRole('button', { name: 'Notificaciones: 1' })).toBeVisible({ timeout: 10_000 });
+  await a.getByRole('option', { name: /Leelo/ }).click();
+  await a.getByRole('button', { name: / che$/ }).click(); // el último mensaje en la portada del grupo
+  await expect(a.getByRole('button', { name: 'Notificaciones', exact: true })).toBeVisible();
+});
+
+test('la sala de voz con gente muestra hace cuánto hay gente y el tiempo corre', async ({ browser }) => {
+  const a = await (await browser.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
+  const b = await (await browser.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
+  await crearCuenta(a, 'Ana');
+  const link = await crearGrupo(a, 'Reloj');
+  await crearCuenta(b, 'Beto');
+  await b.getByRole('button', { name: 'Unirme con código' }).click();
+  await b.getByPlaceholder('Código o link de invitación').fill(link);
+  await b.getByRole('button', { name: 'Unirme', exact: true }).click();
+  await b.getByRole('button', { name: 'Inicio' }).first().click();
+  await a.getByRole('button', { name: 'Sala de voz General' }).click();
+  await expect(a.getByText('Conectado', { exact: true })).toBeVisible({ timeout: 15_000 });
+  await b.getByRole('option', { name: /Reloj/ }).click();
+  await expect(b.getByRole('heading', { name: /En voz en General 0:\d\d/ })).toBeVisible({ timeout: 15_000 }); // portada
+  await b.getByRole('button', { name: 'Abrir el grupo' }).click();
+  const sala = b.getByRole('button', { name: 'Sala de voz General' });
+  await expect(sala).toContainText(/1 en voz · 0:\d\d/, { timeout: 15_000 });
+  const antes = (await sala.textContent())!;
+  await expect.poll(() => sala.textContent(), { timeout: 5_000 }).not.toBe(antes);
+});
+
 test('celular: Google es solo el logo y la Configuración entra en la pantalla con solapas deslizables', async ({ browser }) => {
   const p = await (await browser.newContext({ viewport: CELULAR })).newPage();
   await p.goto('/');

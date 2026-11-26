@@ -68,7 +68,7 @@ describe('voz', () => {
     const c = verificar(res.token, lk.secret);
     expect(c.sub).toBe(`${b.authStore.record!.id}.pantalla`);
     expect(c.name).toBe(`${b.authStore.record!.name} (pantalla)`);
-    expect(c.video).toEqual({ room: voz.id, roomJoin: true, canSubscribe: false, canPublish: true, canPublishData: false, canPublishSources: ['screen_share'] });
+    expect(c.video).toEqual({ room: voz.id, roomJoin: true, canSubscribe: false, canPublish: true, canPublishData: false, canUpdateOwnMetadata: true, canPublishSources: ['screen_share'] });
     await expect(otro.send(`/api/rooms/${voz.id}/token-pantalla`, { method: 'POST' })).rejects.toMatchObject({ status: 403 });
   });
 

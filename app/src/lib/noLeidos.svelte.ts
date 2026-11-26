@@ -1,6 +1,6 @@
 import { pb } from './pb';
 import { menciona } from './menciones';
-import { avisar, ver, silenciadoHasta, resumen } from './notificaciones.svelte';
+import { avisar, ver, silenciadoHasta, resumen, leerAvisosDe } from './notificaciones.svelte';
 
 // Mensajes sin leer por sala (chats y chats de salas de voz). Lo leído se guarda en este dispositivo:
 // `localStorage['dm.leido.<usuario>']` = { sala: fecha del último mensaje visto }.
@@ -28,6 +28,7 @@ export function mirar(sala: string) {
 export function marcarLeida(sala: string) {
   guardar({ ...leer(), [sala]: ahora() });
   noLeidos.salas[sala] = 0;
+  leerAvisosDe(sala);
 }
 
 /** Cuenta lo pendiente de cada sala y escucha los mensajes nuevos. Para el $effect de Principal. */
@@ -55,7 +56,7 @@ export function iniciarNoLeidos() {
     if (!noLeidos.grupoDe[s]) pb.collection('rooms').getOne(s, { fields: 'id,group' }).then((r) => (noLeidos.grupoDe[s] = r.group), () => {});
     const meNombran = menciona(e.record.text, pb.authStore.record?.name);
     if (!silenciadoHasta(s) || meNombran) pb.collection('messages').getOne(e.record.id, { expand: 'author,room' })
-      .then((m) => avisar(s, `${m.expand?.author?.name ?? 'Alguien'} ${meNombran ? 'te mencionó en' : '·'} ${m.expand?.room?.name ?? ''}`, resumen(m), meNombran, meNombran,
+      .then((m) => avisar(s, `${m.expand?.author?.name ?? 'Alguien'} ${meNombran ? 'te mencionó en' : '·'} ${m.expand?.room?.name ?? ''}`, resumen(m), meNombran, meNombran && !mirando.has(s),
         { tipo: 'sala', grupo: (m.expand?.room?.group as string | undefined) ?? noLeidos.grupoDe[s], sala: s }), () => {});
     if (mirando.has(s)) return marcarLeida(s);
     noLeidos.salas[s] = (noLeidos.salas[s] ?? 0) + 1;

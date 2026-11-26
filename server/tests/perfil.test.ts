@@ -83,3 +83,44 @@ describe('perfil de usuario', () => {
     expect(r.expand!.members.map((m: any) => m.name)).toContain(a.authStore.record!.name);
   });
 });
+
+describe('tarjeta de perfil', () => {
+  it('guarda estado, juegos y redes válidos', async () => {
+    const a = await h.nuevoUsuario('ana');
+    const id = a.authStore.record!.id;
+    await a.collection('users').update(id, { actividad: 'Jugando Fortnite', juegos: ['Fortnite', 'GTA IV'], redes: { instagram: 'osidis', youtube: '' } });
+    const u = await a.collection('users').getOne(id);
+    expect([u.actividad, u.juegos, u.redes]).toEqual(['Jugando Fortnite', ['Fortnite', 'GTA IV'], { instagram: 'osidis', youtube: '' }]);
+  });
+
+  it('rechaza más de 5 juegos, redes desconocidas y usuarios con caracteres raros', async () => {
+    const a = await h.nuevoUsuario('ana');
+    const id = a.authStore.record!.id;
+    for (const datos of [{ juegos: ['a', 'b', 'c', 'd', 'e', 'f'] }, { juegos: [''] }, { redes: { tiktok: 'x' } }, { redes: { instagram: 'a/b?c' } }]) {
+      await expect(a.collection('users').update(id, datos)).rejects.toMatchObject({ status: 400 });
+    }
+  });
+
+  it('cumpleaños: solo día y mes, solo si lo muestra, y no se puede inventar', async () => {
+    const a = await h.nuevoUsuario('ana');
+    const b = await h.nuevoUsuario('beto');
+    const g = await a.collection('groups').create({ name: 'g' });
+    const inv = await a.collection('invites').create({ group: g.id });
+    await b.send('/api/invites/join', { method: 'POST', body: { code: inv.code } });
+    const id = a.authStore.record!.id;
+    await a.collection('users').update(id, { cumple: '12-25' });
+    expect((await b.collection('users').getOne(id)).cumple).toBe('');
+    await a.collection('users').update(id, { mostrarCumple: true });
+    const visto = await b.collection('users').getOne(id);
+    expect(visto.cumple).toBe('01-01'); // el harness crea las cuentas con nacimiento 1996-01-01
+    expect(visto.nacimiento).toBeUndefined();
+    await a.collection('users').update(id, { mostrarCumple: false });
+    expect((await b.collection('users').getOne(id)).cumple).toBe('');
+  });
+
+  it('código para invitar: solo con sesión', async () => {
+    const a = await h.nuevoUsuario('ana');
+    expect(await a.send('/api/invitacion', {})).toHaveProperty('codigo');
+    expect((await fetch(`${h.url}/api/invitacion`)).status).toBe(401);
+  });
+});

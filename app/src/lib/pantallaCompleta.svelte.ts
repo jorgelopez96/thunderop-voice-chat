@@ -1,4 +1,5 @@
-import { invoke, isTauri } from '@tauri-apps/api/core';
+import { invoke } from '@tauri-apps/api/core';
+import { esEscritorio } from './plataforma.svelte';
 
 // Pantalla completa de las transmisiones: va la página entera (<html>) y la transmisión se agranda con CSS (`.completa`).
 // Con la transmisión misma en pantalla completa, todo lo demás (la barrita de la llamada, sus menús) quedaba debajo y
@@ -22,7 +23,7 @@ const acomodada = () => new Promise((ok) => { const t = setTimeout(ok, 500); add
 let telonEl: HTMLDivElement | null = null;
 const esperar = (ms: number) => new Promise((r) => setTimeout(r, ms));
 async function bajarTelon(fundido = true) {
-  if (!isTauri()) return;
+  if (!esEscritorio) return;
   const t = (telonEl ??= Object.assign(document.createElement('div'), { className: 'telon' }));
   document.body.append(t);
   if (!fundido) t.style.transitionDuration = '0ms';
@@ -39,7 +40,7 @@ function subirTelon() {
 }
 
 async function devolverVentana() {
-  if (!isTauri()) return;
+  if (!esEscritorio) return;
   try {
     const w = await ventana();
     await w.setShadow(true);
@@ -51,7 +52,7 @@ async function devolverVentana() {
 
 export async function entrarPantallaCompleta(sid: string) {
   await bajarTelon();
-  if (isTauri()) {
+  if (esEscritorio) {
     try {
       const w = await ventana();
       estabaMax = await w.isMaximized();

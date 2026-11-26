@@ -15,6 +15,7 @@
   import { privado } from '../privados.svelte';
   import Avatar from './Avatar.svelte';
   import Insignia from './Insignia.svelte';
+  import TarjetaPerfil from './TarjetaPerfil.svelte';
   import Confirmar from './Confirmar.svelte';
 
   let { grupo }: { grupo: RecordModel } = $props();
@@ -72,7 +73,7 @@
         <Avatar usuario={m} hablando={p?.hablando} />
         <div class="quien">
           <strong>{m.name}<Insignia usuario={m} dueno={m.id === grupo.owner} /></strong>
-          {#if m.status}<small>{m.status}</small>{/if}
+          {#if m.actividad || m.status}<small>{m.actividad || m.status}</small>{/if}
         </div>
         <span class="estados">
           <EstadoVoz {...estadoVoz(m.id)} tam={16} />
@@ -107,11 +108,8 @@
 
 <dialog class="perfil" bind:this={perfil} onclose={() => (viendo = null)}>
   {#if viendo}
-    <Avatar usuario={viendo} tam={72} />
-    <h2>{viendo.name}<Insignia usuario={viendo} dueno={viendo.id === grupo.owner} /></h2>
-    {#if viendo.status}<p class="tenue">{viendo.status}</p>{/if}
-    <small>{enLinea(viendo) ? 'En línea' : 'Desconectado'}</small>
-    <button onclick={() => perfil?.close()}>Cerrar</button>
+    <TarjetaPerfil u={viendo} dueno={viendo.id === grupo.owner} />
+    <div class="pie-perfil"><small>{enLinea(viendo) ? 'En línea' : 'Desconectado'}</small><button onclick={() => perfil?.close()}>Cerrar</button></div>
   {/if}
 </dialog>
 
@@ -146,7 +144,7 @@
   [popover] hr { border: 0; border-top: 1px solid var(--borde); margin: 4px 0; width: 100%; }
   .vol { padding: 4px 8px; }
   .vol input { padding: 0; background: none; border: 0; }
-  .perfil[open] { display: flex; flex-direction: column; align-items: center; gap: 8px; min-width: 280px; text-align: center; }
-  .perfil h2 { font-size: 20px; }
-  .tenue { color: var(--tenue); margin: 0; }
+  .perfil { width: min(320px, 94vw); padding: 12px; }
+  .perfil[open] { display: flex; flex-direction: column; gap: 10px; }
+  .pie-perfil { display: flex; align-items: center; justify-content: space-between; }
 </style>

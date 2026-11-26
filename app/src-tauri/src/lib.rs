@@ -3,10 +3,15 @@ mod audio;
 mod transmisor;
 
 use tauri::webview::{NewWindowResponse, PageLoadEvent, PermissionKind, PermissionResponse};
+#[cfg(desktop)]
 use tauri::menu::{Menu, MenuItem};
+#[cfg(desktop)]
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::{AppHandle, Emitter, Manager, Url, WebviewWindow, WebviewWindowBuilder, WindowEvent};
+#[cfg(desktop)]
+use tauri::{Emitter, WindowEvent};
+use tauri::{AppHandle, Manager, Url, WebviewWindow, WebviewWindowBuilder};
 
+#[cfg(desktop)]
 fn mostrar(app: &AppHandle) {
     if let Some(w) = app.get_webview_window("main") {
         nivel_memoria(&w, false);
@@ -29,18 +34,25 @@ fn dev_url<R: tauri::Runtime>(m: &impl Manager<R>) -> Option<Url> { m.config().b
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let builder = tauri::Builder::default();
+    // Solo escritorio: instancia única, bandeja y autoactualizador. En el celular la app la maneja el sistema.
+    #[cfg(desktop)]
+    let builder = builder
         // Con la app en la bandeja, abrirla de nuevo (menú Inicio, acceso directo) muestra la que ya corre.
         .plugin(tauri_plugin_single_instance::init(|app, _, _| mostrar(app)))
+        .plugin(tauri_plugin_updater::Builder::new().build())
         // La X la manda a la bandeja (la voz sigue); se sale desde el menú del ícono.
         .on_window_event(|w, e| if let WindowEvent::CloseRequested { api, .. } = e {
             api.prevent_close();
             let _ = w.hide();
             let _ = w.emit("a-la-bandeja", ());
-        })
+        });
+    builder
         // Como Discord: la app se da sola el micrófono, pero solo a su propio origen (los ajustes de privacidad de Windows siguen mandando).
         .on_permission_request(|w, kind| match kind {
             PermissionKind::Microphone if w.url().is_ok_and(|u| es_origen_app(&u, dev_url(&w).as_ref())) => PermissionResponse::Allow,
+            // En el celular también la cámara: el permiso del sistema lo pide Android al instalar/usar (MainActivity).
+            PermissionKind::Camera if cfg!(mobile) && w.url().is_ok_and(|u| es_origen_app(&u, dev_url(&w).as_ref())) => PermissionResponse::Allow,
             _ => PermissionResponse::Default,
         })
         .on_page_load(|w, p| {
@@ -60,33 +72,40 @@ pub fn run() {
                 .on_navigation(move |u| es_origen_app(u, dev.as_ref()))
                 .on_new_window(|_, _| NewWindowResponse::Deny)
                 .build()?;
-            let abrir = MenuItem::with_id(app, "abrir", "Abrir Thunderop", true, None::<&str>)?;
-            let salir = MenuItem::with_id(app, "salir", "Salir", true, None::<&str>)?;
-            TrayIconBuilder::new()
-                .icon(app.default_window_icon().cloned().ok_or("sin ícono")?)
-                .tooltip("Thunderop")
-                .menu(&Menu::with_items(app, &[&abrir, &salir])?)
-                .show_menu_on_left_click(false)
-                .on_menu_event(|app, e| match e.id.as_ref() {
-                    "abrir" => mostrar(app),
-                    "salir" => app.exit(0),
-                    _ => {}
-                })
-                .on_tray_icon_event(|t, e| {
-                    if let TrayIconEvent::Click { button: MouseButton::Left, button_state: MouseButtonState::Up, .. } = e { mostrar(t.app_handle()) }
-                })
-                .build(app)?;
+            #[cfg(desktop)]
+            bandeja(app)?;
             atajos::iniciar(app.handle().clone());
             Ok(())
         })
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_opener::init())
-        .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(audio::Captura::default())
         .manage(transmisor::Transmisor::default())
         .invoke_handler(tauri::generate_handler![audio::iniciar_audio, audio::detener_audio, transmisor::fuentes_transmisor, transmisor::iniciar_transmisor, transmisor::calidad_transmisor, transmisor::detener_transmisor, memoria_baja, animaciones_ventana, maximizada, inactivo_ms, atajos::atajos_asignar, atajos::atajos_capturar, salir])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+/// Ícono en la bandeja de Windows: tocarlo abre la app; el menú tiene Abrir y Salir.
+#[cfg(desktop)]
+fn bandeja(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
+    let abrir = MenuItem::with_id(app, "abrir", "Abrir Thunderop", true, None::<&str>)?;
+    let salir = MenuItem::with_id(app, "salir", "Salir", true, None::<&str>)?;
+    TrayIconBuilder::new()
+        .icon(app.default_window_icon().cloned().ok_or("sin ícono")?)
+        .tooltip("Thunderop")
+        .menu(&Menu::with_items(app, &[&abrir, &salir])?)
+        .show_menu_on_left_click(false)
+        .on_menu_event(|app, e| match e.id.as_ref() {
+            "abrir" => mostrar(app),
+            "salir" => app.exit(0),
+            _ => {}
+        })
+        .on_tray_icon_event(|t, e| {
+            if let TrayIconEvent::Click { button: MouseButton::Left, button_state: MouseButtonState::Up, .. } = e { mostrar(t.app_handle()) }
+        })
+        .build(app)?;
+    Ok(())
 }
 
 #[cfg(test)]

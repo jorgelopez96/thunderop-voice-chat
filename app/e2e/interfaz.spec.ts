@@ -262,3 +262,48 @@ test('en la PC, las salas y los participantes se pliegan y queda recordado', asy
   await p.getByRole('button', { name: 'Mostrar las salas' }).click();
   await expect(p.getByRole('button', { name: 'Sala de chat General' })).toBeVisible();
 });
+
+test('perfil: estado personalizado, No molestar y la tarjeta (color, juegos, redes, cumpleaños) que ven los demás', async ({ browser }) => {
+  const a = await (await browser.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
+  await crearCuenta(a, 'Ana');
+  const link = await crearGrupo(a, 'Tarjetas');
+  const menu = a.locator('#menu-perfil');
+  await a.locator('button.yo').click();
+  await menu.getByRole('button', { name: '+ ¿Qué estás haciendo?' }).click();
+  await menu.getByLabel('Estado personalizado').fill('Jugando Fortnite');
+  await menu.getByLabel('Estado personalizado').press('Enter');
+  await expect(menu.getByRole('button', { name: 'Jugando Fortnite' })).toBeVisible();
+  await menu.getByRole('button', { name: /No molestar/ }).click();
+  await menu.getByRole('button', { name: '1 h' }).click();
+  await expect(menu.getByRole('button', { name: /No molestar\s*hasta \d/ })).toBeVisible();
+  await expect(menu).not.toContainText('@test.local'); // sin mail en el menú: solo el @usuario
+  await menu.getByRole('button', { name: /Novedades/ }).click();
+  await expect(a.locator('dialog.novedades')).toBeVisible();
+  await a.keyboard.press('Escape');
+
+  await a.locator('button.yo').click();
+  await menu.getByRole('button', { name: 'Editar perfil' }).click();
+  const perfil = a.locator('dialog.editar');
+  await perfil.getByRole('radio', { name: 'Color #e25c6f' }).click();
+  await perfil.getByRole('tab', { name: 'Sobre mí' }).click();
+  for (const j of ['Fortnite', 'GTA IV']) { await perfil.getByLabel('Agregar juego').fill(j); await perfil.getByLabel('Agregar juego').press('Enter'); }
+  await perfil.getByLabel('Instagram').fill('https://www.instagram.com/osidis/');
+  await perfil.getByRole('checkbox', { name: /Mostrar mi cumpleaños/ }).check();
+  await perfil.getByRole('button', { name: 'Guardar cambios' }).click();
+  await expect(perfil.getByText('Perfil guardado.')).toBeVisible();
+  const previa = perfil.locator('.previa');
+  for (const t of ['Jugando Fortnite', 'Fortnite', 'GTA IV', 'Instagram: osidis', '1 de enero']) await expect(previa).toContainText(t);
+  await expect(perfil).not.toContainText('@test.local'); // el mail ya no está en Editar perfil
+
+  // Beto entra al grupo: ve el estado en Participantes y la tarjeta completa en Ver perfil.
+  const b = await (await browser.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
+  await crearCuenta(b, 'Beto');
+  await unirse(b, link);
+  const ana = b.locator('aside.participantes li', { hasText: 'Jugando Fortnite' });
+  await expect(ana).toBeVisible();
+  await ana.click({ button: 'right' });
+  await b.getByRole('button', { name: 'Ver perfil' }).click();
+  const tarjeta = b.locator('dialog.perfil');
+  for (const t of ['Jugando Fortnite', 'Fortnite', 'GTA IV', 'Instagram: osidis', '1 de enero', 'En Thunderop desde']) await expect(tarjeta).toContainText(t);
+  await expect(tarjeta.locator('.nombre')).toHaveCSS('color', 'rgb(226, 92, 111)');
+});

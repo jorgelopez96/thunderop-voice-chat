@@ -1,7 +1,9 @@
 import { isTauri } from '@tauri-apps/api/core';
 
-// Dónde corre la app: escritorio (Tauri) o navegador, y si la pantalla es de celular (768 px o menos).
-export const esEscritorio = isTauri();
+// Dónde corre la app: escritorio (Tauri en la PC), app del celular (Tauri en Android/iOS) o navegador,
+// y si la pantalla es de celular (768 px o menos). La app del celular se porta como la web en el celular.
+const sistemaMovil = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+export const esEscritorio = isTauri() && !sistemaMovil;
 
 // Celular: angosto, o pantalla táctil y bajita (celular apaisado). En el escritorio nunca (el zoom no lo cambia).
 const consulta = typeof matchMedia === 'function' && !esEscritorio ? matchMedia('(max-width: 768px), (pointer: coarse) and (max-height: 500px)') : null;

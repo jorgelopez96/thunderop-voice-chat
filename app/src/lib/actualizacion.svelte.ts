@@ -1,4 +1,4 @@
-import { isTauri } from '@tauri-apps/api/core';
+import { esEscritorio } from './plataforma.svelte';
 import type { Update } from '@tauri-apps/plugin-updater';
 
 // Al abrir, si el servidor tiene una versión nueva se descarga e instala antes de dejar entrar
@@ -17,7 +17,7 @@ export function progresoDe(bajado: number, total: number | undefined): number {
 }
 
 export async function buscarActualizacion(silenciosa = false) {
-  if (import.meta.env.DEV || !isTauri()) { actualizacion.estado = 'lista'; return; }
+  if (import.meta.env.DEV || !esEscritorio) { actualizacion.estado = 'lista'; return; }
   if (silenciosa && bajada) return;
   try {
     const { check } = await import('@tauri-apps/plugin-updater');

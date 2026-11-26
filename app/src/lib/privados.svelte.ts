@@ -1,7 +1,7 @@
 import type { RecordModel } from 'pocketbase';
 import { pb } from './pb';
 import { abrirLista } from './chat.svelte';
-import { avisar, silenciadoHasta, resumen } from './notificaciones.svelte';
+import { avisar, silenciadoHasta, resumen, leerAvisosDe } from './notificaciones.svelte';
 
 // Mensajes privados entre amigos. Lo leído se guarda en esta PC (`localStorage['dm.leido.' + yo]`: { amigo: created }).
 
@@ -26,6 +26,7 @@ pb.authStore.onChange(() => {
 /** Marca leído hasta `created` (el último mensaje visto) con ese amigo. */
 export function marcarLeido(amigoId: string, created: string) {
   noLeidos[amigoId] = 0;
+  leerAvisosDe(amigoId);
   const l = leidos();
   if (l[amigoId] && l[amigoId] >= created) return;
   l[amigoId] = created;
@@ -69,7 +70,7 @@ export function iniciarPrivados(): () => void {
     if (e.action !== 'create' || e.record.para !== yo()) return;
     const de = e.record.author as string;
     noLeidos[de] = (noLeidos[de] ?? 0) + 1;
-    if (!silenciadoHasta(de)) pb.collection('users').getOne(de, { fields: 'name' }).then((u) => avisar(de, u.name, resumen(e.record), false, true, { tipo: 'privado', id: de }), () => {});
+    if (!silenciadoHasta(de)) pb.collection('users').getOne(de, { fields: 'name' }).then((u) => avisar(de, u.name, resumen(e.record), false, privado.con?.id !== de, { tipo: 'privado', id: de }), () => {});
   }, { filter: recibidos });
   return () => { sub.then((f) => f()).catch(() => {}); };
 }

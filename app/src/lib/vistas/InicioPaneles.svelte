@@ -9,7 +9,7 @@
   import { voz, entrarVoz } from '../voz.svelte';
   import { delGrupo } from '../noLeidos.svelte';
   import { resumen } from '../notificaciones.svelte';
-  import { horaDe } from '../hora.svelte';
+  import { horaDe, desdeHace } from '../hora.svelte';
   import Avatar from './Avatar.svelte';
   import Amigos from './Amigos.svelte';
   import Invitar from './Invitar.svelte';
@@ -17,7 +17,7 @@
   import { NOVEDADES } from '../novedades';
 
   // Inicio de la PC: grupos a la izquierda, vista previa del grupo marcado al centro y amigos a la derecha.
-  type Persona = { id: string; name: string; silenciado?: boolean; ensordecido?: boolean; camara?: boolean };
+  type Persona = { id: string; name: string; silenciado?: boolean; ensordecido?: boolean; camara?: boolean; desde?: number };
   let enVozDe = $state<Record<string, Record<string, Persona[]>>>({});
   $effect(() => {
     const cargar = () => {
@@ -179,7 +179,7 @@
         {#if s}
           {@const mia = voz.salaId === s[0]}
           {@const quienes = mia ? voz.participantes.map((p) => ({ id: p.id, name: p.nombre, hablando: p.hablando, transmite: p.transmite, silenciado: p.silenciado, ensordecido: p.ensordecido, camara: !!p.camara })) : s[1].map((p) => ({ ...p, hablando: false, transmite: false }))}
-          <h3><span class="vivo"></span>En voz en {nombreSala(s[0])}
+          <h3><span class="vivo"></span>En voz en {nombreSala(s[0])}{#if s[1][0]?.desde}<span class="num tiempo" title="Hace cuánto hay gente">{desdeHace(s[1][0].desde)}</span>{/if}
             <button class="primario" onclick={() => entrar(g, s[0])}><Volume2 size={16} strokeWidth={1.75} /> {mia ? 'Ir a la sala' : 'Entrar'}</button></h3>
           <div class="mosaico">
             {#each quienes as p (p.id)}
@@ -278,6 +278,7 @@
   .sec h3 { display: flex; align-items: center; gap: 8px; min-height: 36px; margin: 0 0 12px; font-size: 13px; font-weight: 650; text-transform: none; letter-spacing: 0; color: var(--tenue); }
   .sec h3 button { margin-left: auto; }
   .vivo { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 4px var(--ok-suave); }
+  .tiempo { color: var(--ok); font-weight: 600; }
 
   .mosaico { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
   .baldosa { position: relative; aspect-ratio: 16 / 10; border-radius: 14px; overflow: hidden; display: grid; place-items: center; --anillo: var(--superficie);

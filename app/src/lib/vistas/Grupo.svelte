@@ -8,6 +8,7 @@
   import { pb } from '../pb';
   import { puedo } from '../permisos';
   import { salas, enVoz, presencia, crearSala, renombrarSala, borrarSala, ordenarSalas, miga } from '../grupos.svelte';
+  import { desdeHace } from '../hora.svelte';
   import Chat from './Chat.svelte';
   import { abrirChat, enviar, borrar } from '../chat.svelte';
   import Participantes from './Participantes.svelte';
@@ -157,7 +158,7 @@
     use:mantener={(x, y) => { if (!puedoSalas) return; menuSala = r; abrirEnPunto(menuSalaEl, x, y); }} class:activa={r.kind === 'chat' ? r.id === salaId && !centroVoz : r.id === voz.salaId && centroVoz}>
       <button class="plano nombre" class:sin-leer={!!noLeidos.salas[r.id]} aria-label={`${r.kind === 'chat' ? 'Sala de chat' : 'Sala de voz'} ${r.name}`} onclick={() => { hacer(() => abrir(r)); entrarSala(); }}>
         {#if r.kind === 'chat'}<Hash size={16} strokeWidth={1.75} />{:else}<Volume2 size={16} strokeWidth={1.75} />{/if}<span>{r.name}</span>
-        {#if r.kind === 'voz'}<small class:verde={q.length}>{q.length ? `${q.length} en voz` : 'vacía'}</small>{/if}
+        {#if r.kind === 'voz'}{@const d = enVoz.grupo === grupo.id ? enVoz.salas[r.id]?.[0]?.desde : undefined}<small class:verde={q.length}>{q.length ? `${q.length} en voz` : 'vacía'}{#if q.length && d}<span class="num" title="Hace cuánto hay gente">{` · ${desdeHace(d)}`}</span>{/if}</small>{/if}
         {#if noLeidos.salas[r.id]}<span class="contador num" aria-label={`${noLeidos.salas[r.id]} sin leer`}>{noLeidos.salas[r.id]}</span>{/if}
       </button>
     {#if q.length}

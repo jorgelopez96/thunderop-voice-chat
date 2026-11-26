@@ -2,7 +2,6 @@
   import { cerrarAfuera } from '../afuera';
   import { lleno } from '../rango';
   import { User, Mic, Monitor, Bell, Palette, Trash2, Check, X, Keyboard } from '@lucide/svelte';
-  import { isTauri } from '@tauri-apps/api/core';
   import { atajos, guardarAtajo, capturar, ESC, type Accion } from '../atajos.svelte';
   import { voz, vistaPrevia, dispositivos, elegirEntrada, elegirSalida, elegirCamara, cambiarSupresion, cambiarSupresionFuerte, cambiarGanancia } from '../voz.svelte';
   import { leerPrefs, guardarPrefs } from '../prefs';
@@ -40,7 +39,7 @@
   $effect(() => { if (!d.open) d.showModal(); dispositivos().then((x) => (lista = x)).catch(() => (error = 'No se pudieron listar los dispositivos de audio.')); });
   // Atajos: solo en la app de escritorio (los ganchos de teclado y mouse son de Windows).
   const SOLAPAS = ([['cuenta', 'Cuenta', User], ['audio', 'Audio', Mic], ['atajos', 'Atajos', Keyboard], ['transmision', 'Transmisión', Monitor],
-    ['notificaciones', 'Notificaciones', Bell], ['apariencia', 'Apariencia y rendimiento', Palette]] as const).filter(([id]) => id !== 'atajos' || isTauri());
+    ['notificaciones', 'Notificaciones', Bell], ['apariencia', 'Apariencia y rendimiento', Palette]] as const).filter(([id]) => id !== 'atajos' || esEscritorio);
   const ACCIONES: [Accion, string, string][] = [['silenciar', 'Silenciarme', 'Prende o apaga tu micrófono.'], ['ensordecer', 'Ensordecerme', 'Deja de escuchar a la sala (y te silencia).'],
     ['hablar', 'Pulsar para hablar', 'Estando silenciado, te escuchan mientras la mantenés apretada.']];
   // Asignando: la próxima tecla o botón del mouse que se apriete (Esc cancela). Otro clic en el mismo botón también.

@@ -51,6 +51,24 @@ const anotar = (titulo: string, texto: string, ir?: Ir) =>
   guardarAvisos([{ id: crypto.randomUUID(), titulo, texto, fecha: new Date().toISOString(), leido: false, ir }, ...avisos.lista].slice(0, 50));
 export const marcarAvisosLeidos = () => { if (avisos.lista.some((a) => !a.leido)) guardarAvisos(avisos.lista.map((a) => ({ ...a, leido: true }))); };
 export const borrarAvisos = () => guardarAvisos([]);
+/** Abrir un chat (desde donde sea) da por leídos sus avisos: `chat` es el id del amigo o de la sala. */
+export function leerAvisosDe(chat: string) {
+  const es = (a: Aviso) => !a.leido && (a.ir?.tipo === 'privado' ? a.ir.id : a.ir?.sala) === chat;
+  if (avisos.lista.some(es)) guardarAvisos(avisos.lista.map((a) => (es(a) ? { ...a, leido: true } : a)));
+}
+
+// No molestar (menú de perfil): hasta esa hora los mensajes no suenan ni notifican, solo quedan en la campanita.
+// En este dispositivo: `localStorage['dm.nomolestar.<usuario>']` = hasta (ms).
+const claveNoMolestar = () => `dm.nomolestar.${pb.authStore.record?.id}`;
+const leerNoMolestar = () => { try { return Number(localStorage.getItem(claveNoMolestar())) || 0; } catch { return 0; } };
+export const noMolestar = $state({ hasta: leerNoMolestar() });
+/** Hasta cuándo (ms) está en No molestar, o 0. */
+export const noMolestarHasta = () => (noMolestar.hasta > Date.now() ? noMolestar.hasta : 0);
+/** `minutos` 0 = apagar. */
+export function ponerNoMolestar(minutos: number) {
+  noMolestar.hasta = minutos ? Date.now() + minutos * 60_000 : 0;
+  try { localStorage.setItem(claveNoMolestar(), String(noMolestar.hasta)); } catch { /* sin almacenamiento: dura esta sesión */ }
+}
 
 // Chats a la vista: no avisan mientras la ventana tenga el foco.
 const viendo = new Set<string>();
@@ -91,6 +109,7 @@ export async function avisar(chat: string, titulo: string, texto: string, aunSil
     silenciado: !!silenciadoHasta(chat), aLaVista, viendoChat: viendo.has(chat) });
   if (!q.avisa) return;
   if (guardar) anotar(titulo, texto, ir);
+  if (noMolestarHasta()) return; // queda en la campanita, sin sonido ni notificación
   if (p.sonidoMensajes) ding();
   if (q.destacar) atencion.nuevos++;
   if (!q.notificar) return;

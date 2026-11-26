@@ -1,4 +1,5 @@
-import { invoke, isTauri } from '@tauri-apps/api/core';
+import { invoke } from '@tauri-apps/api/core';
+import { esEscritorio } from './plataforma.svelte';
 import { voz, alternarMute, ensordecer } from './voz.svelte';
 
 // Atajos de teclado y mouse que andan con la app atrás (ganchos en src-tauri/src/atajos.rs), solo en la app de escritorio
@@ -55,7 +56,7 @@ function alApretar(codigo: number, abajo: boolean) {
 
 /** Arranca los atajos (una vez, al abrir la app). Devuelve la limpieza. */
 export function iniciarAtajos(): () => void {
-  if (!isTauri()) return () => {};
+  if (!esEscritorio) return () => {};
   void avisarAsignadas();
   const parar = import('@tauri-apps/api/event').then(({ listen }) => listen<{ codigo: number; abajo: boolean }>('atajo', (e) => alApretar(e.payload.codigo, e.payload.abajo)));
   return () => { parar.then((f) => f()).catch(() => {}); };

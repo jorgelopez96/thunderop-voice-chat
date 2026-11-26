@@ -1,3 +1,4 @@
+#![cfg_attr(not(windows), allow(dead_code))] // los ganchos de teclado y mouse son de Windows
 //! Atajos globales (silenciar, ensordecer, pulsar para hablar): ganchos de bajo nivel de teclado y mouse de Windows,
 //! así andan con la app atrás o en la bandeja. A la página solo le llegan las teclas asignadas (no es un registro de todo
 //! lo que se escribe), salvo la próxima que se apriete mientras se asigna una. Las teclas siguen llegando a donde iban.

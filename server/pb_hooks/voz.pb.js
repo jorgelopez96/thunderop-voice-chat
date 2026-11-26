@@ -49,6 +49,15 @@ routerAdd("GET", "/api/groups/{id}/voz", (e) => {
     const participantes = lk.roomService(c, "ListParticipants", { room: r.id }, r.id).participants || [];
     res[r.id] = participantes.filter((p) => !p.identity.endsWith(".pantalla")).map((p) => lk.persona(p, silenciados));
   });
+  // `desde` (ms) en cada persona: desde cuándo hay gente en la sala. LiveKit la crea con el primero que entra y la
+  // cierra 20 s después de que se va el último. Va en cada persona para no cambiar la forma de la respuesta (versiones viejas).
+  const conGente = Object.keys(res).filter((id) => res[id].length);
+  if (conGente.length) {
+    (lk.roomService(c, "ListRooms", { names: conGente }).rooms || []).forEach((s) => {
+      const desde = Number(s.creation_time) * 1000;
+      if (res[s.name] && desde) res[s.name].forEach((p) => (p.desde = desde));
+    });
+  }
   return e.json(200, res);
 }, $apis.requireAuth("users"));
 

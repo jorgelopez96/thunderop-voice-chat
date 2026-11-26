@@ -2,13 +2,13 @@
   import type { RecordModel } from 'pocketbase';
   import { foto } from '../foto';
   import { estado } from '../presencia.svelte';
-  let { usuario, tam = 32, hablando = false }: { usuario: RecordModel; tam?: number; hablando?: boolean } = $props();
+  let { usuario, tam = 32, hablando = false, src }: { usuario: RecordModel; tam?: number; hablando?: boolean; src?: string } = $props(); // src: otra foto (vista previa)
   const e = $derived(estado(usuario));
   const TITULOS = { disponible: 'Disponible', ausente: 'Ausente', ocupado: 'Ocupado', desconectado: 'Desconectado' };
 </script>
 
 <span class="caja" class:hablando style="width:{tam}px;height:{tam}px;--habla:{usuario.color || 'var(--acento)'}">
-  <img class="avatar" alt="" style="width:100%;height:100%" src={foto(usuario)} />
+  <img class="avatar" alt="" style="width:100%;height:100%" src={src || foto(usuario)} />
   <span class="luz {e}" title={TITULOS[e]}></span>
 </span>
 

@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Capability for the main window",
+  "description": "Ventana principal en la PC",
   "windows": [
     "main"
   ],
@@ -23,5 +23,10 @@
     "updater:default",
     "notification:default",
     "opener:default"
+  ],
+  "platforms": [
+    "windows",
+    "linux",
+    "macOS"
   ]
 }
