@@ -414,6 +414,21 @@ describe('cuenta completa', () => {
   });
 });
 
+describe('actualizaciones con sesión', () => {
+  it('latest.json e instalador solo con sesión, con el link a la ruta privada', async () => {
+    expect((await fetch(`${h.url}/api/actualizacion/latest.json`)).status).toBe(401);
+    expect((await fetch(`${h.url}/api/actualizacion/thunderop-setup.exe`)).status).toBe(401);
+    const pb = await h.nuevoUsuario('act');
+    const token = pb.authStore.token;
+    const j = await (await fetch(`${h.url}/api/actualizacion/latest.json`, { headers: { Authorization: token } })).json();
+    expect(j.version).toBe('9.9.9');
+    expect(j.platforms['windows-x86_64']).toMatchObject({ signature: 'firma-de-prueba', url: expect.stringMatching(/\/api\/actualizacion\/thunderop-setup\.exe$/) });
+    const exe = await fetch(`${h.url}/api/actualizacion/thunderop-setup.exe`, { headers: { Authorization: token } });
+    expect([exe.status, await exe.text()]).toEqual([200, 'instalador de prueba']);
+    expect((await fetch(`${h.url}/api/actualizacion/thunderop.apk`, { headers: { Authorization: token } })).status).toBe(404);
+  });
+});
+
 describe('Google/Microsoft, configuración y limpieza', () => {
   const error = (p: Promise<unknown>) => p.then(() => null, (e) => e);
 

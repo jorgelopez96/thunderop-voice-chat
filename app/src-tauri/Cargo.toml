@@ -38,6 +38,10 @@ opt-level = 3
 panic = "abort"
 strip = true
 
+# Linux: WebKitGTK trae WebRTC y la cámara apagados; se prenden en la ventana (misma versión y feature que usa wry).
+[target.'cfg(target_os = "linux")'.dependencies]
+webkit2gtk = { version = "2.0", features = ["v2_40"] }
+
 [target."cfg(windows)".dependencies]
 wasapi = "0.26"
 # Las mismas versiones que ya trae wry (Cargo.lock): no se duplica nada.

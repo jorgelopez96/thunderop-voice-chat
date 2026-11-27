@@ -1,0 +1,10 @@
+{
+  "version": "9.9.9",
+  "pub_date": "2026-11-26T00:00:00.000Z",
+  "platforms": {
+    "windows-x86_64": {
+      "signature": "firma-de-prueba",
+      "url": "https://ejemplo.test/descargas/thunderop-act-0000000000000000.exe"
+    }
+  }
+}

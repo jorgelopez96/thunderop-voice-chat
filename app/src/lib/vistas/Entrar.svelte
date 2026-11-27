@@ -1,4 +1,5 @@
 <script lang="ts">
+  import CampoClave from './CampoClave.svelte';
   import LogoThunderop from './LogoThunderop.svelte';
   import { entrar, registrarse, mensajeError, emailRecordado } from '../sesion.svelte';
   import { entrarCon, leerTerminos } from '../cuenta.svelte';
@@ -86,8 +87,7 @@
       <label>Usuario o email <input bind:value={identidad} required autocomplete="username" /></label>
     {/if}
     <label>Contraseña
-      <input type="password" bind:value={pass} required
-        autocomplete={modo === 'entrar' ? 'current-password' : 'new-password'} />
+      <CampoClave bind:value={pass} autocomplete={modo === 'entrar' ? 'current-password' : 'new-password'} />
     </label>
     {#if modo === 'crear'}
       <Requisitos clave={pass} />

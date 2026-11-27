@@ -1,4 +1,4 @@
-import { esEscritorio } from './plataforma.svelte';
+import { isTauri } from '@tauri-apps/api/core';
 import { pb } from './pb';
 import { anotar, mensajeError } from './sesion.svelte';
 
@@ -51,8 +51,8 @@ export async function completar(datos: { username: string; nacimiento: string; t
 export async function aceptarTerminos(version: number) { await post('terminos', { version }); await cargarEstado(); }
 
 export async function entrarCon(proveedor: 'google' | 'microsoft') {
-  // Escritorio: el navegador del sistema (el WebView no abre ventanas). Navegador: el popup normal de PocketBase.
-  if (esEscritorio) {
+  // App (PC o celular): el navegador del sistema (el WebView no abre ventanas). Navegador: el popup normal de PocketBase.
+  if (isTauri()) {
     const { openUrl } = await import('@tauri-apps/plugin-opener');
     await pb.collection('users').authWithOAuth2({ provider: proveedor, urlCallback: (url) => { void openUrl(url); } });
   } else await pb.collection('users').authWithOAuth2({ provider: proveedor });

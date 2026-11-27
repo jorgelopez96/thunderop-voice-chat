@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // Pulsar para hablar y los atajos de alternar, con la app y la voz de mentira.
 const h = vi.hoisted(() => ({ voz: { salaId: 'sala' as string | null, muteado: true, ensordecido: false }, oyente: null as null | ((e: { payload: { codigo: number; abajo: boolean } }) => void) }));
 vi.mock('@tauri-apps/api/core', () => ({ isTauri: () => true, invoke: vi.fn(async () => {}) }));
+vi.mock('./plataforma.svelte', async (original) => ({ ...(await original<typeof import('./plataforma.svelte')>()), esWindows: true }));
 vi.mock('@tauri-apps/api/event', () => ({ listen: vi.fn(async (_: string, f: typeof h.oyente) => { h.oyente = f; return () => {}; }) }));
 vi.mock('./voz.svelte', () => ({
   voz: h.voz,

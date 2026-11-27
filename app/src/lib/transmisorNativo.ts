@@ -1,6 +1,7 @@
 import { Channel, invoke } from '@tauri-apps/api/core';
 import { pb } from './pb';
 import { recortarRegistro } from './transmision';
+import { esWindows } from './plataforma.svelte';
 
 // Transmisor nativo (src-tauri/src/transmisor.rs): captura y comprime con la placa por fuera de WebView2.
 // Entra a la sala como `<usuario>.pantalla` (LiveKit no deja dos conexiones con la misma identidad).
@@ -16,7 +17,7 @@ export type Opciones = { url: string; token: string; que: string; fps: number; m
 const enTauri = () => '__TAURI_INTERNALS__' in globalThis;
 /** Transmite con el nativo: en el escritorio, o en los E2E de desarrollo que piden el simulado (`dm.simularNativo`).
  *  En el navegador se usa el compartir pantalla del navegador. */
-export const conNativo = () => enTauri() || (import.meta.env.DEV && localStorage.getItem('dm.simularNativo') === '1');
+export const conNativo = () => esWindows || (import.meta.env.DEV && localStorage.getItem('dm.simularNativo') === '1');
 
 /** Sube el registro de una transmisión al servidor para diagnosticar. Sin esperar y sin fallar: todo error se ignora (también el 429). */
 export async function subirDiagnostico(codigo: number, registro: string): Promise<void> {

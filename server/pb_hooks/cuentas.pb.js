@@ -282,6 +282,23 @@ routerAdd("GET", "/api/descarga/archivo", (e) => {
   return e.fileFS($os.dirFS($os.getenv("INSTALADORES_DIR") || "/opt/thunderop/instaladores"), archivo);
 });
 
+// Actualizaciones de la app (desde la 0.14.2): solo con sesión. Lee el latest*.json público y cambia el link por esta
+// misma ruta, que entrega el instalador de la carpeta privada (mismo archivo y misma firma que la copia de /descargas).
+routerAdd("GET", "/api/actualizacion/{archivo}", (e) => {
+  const archivo = e.request.pathValue("archivo");
+  const INSTALADOR = { "latest.json": "thunderop-setup.exe", "latest-beta.json": "thunderop-setup-beta.exe" };
+  if (INSTALADOR[archivo]) {
+    const descargas = $os.getenv("DESCARGAS_DIR") || "/opt/thunderop/descargas";
+    const j = JSON.parse(toString($os.readFile(`${descargas}/${archivo}`)));
+    const base = ($os.getenv("APP_URL") || e.app.settings().meta.appURL).replace(/\/+$/, "");
+    j.platforms["windows-x86_64"].url = `${base}/api/actualizacion/${INSTALADOR[archivo]}`;
+    return e.json(200, j);
+  }
+  if (!Object.values(INSTALADOR).includes(archivo)) throw new NotFoundError();
+  e.response.header().set("Content-Disposition", `attachment; filename="${archivo}"`);
+  return e.fileFS($os.dirFS($os.getenv("INSTALADORES_DIR") || "/opt/thunderop/instaladores"), archivo);
+}, $apis.requireAuth("users"));
+
 // Desactivar la cuenta: se ve desconectada, no recibe solicitudes de amistad y se cierran todas sus sesiones.
 // Iniciar sesión de nuevo (con contraseña o Google) la reactiva.
 routerAdd("POST", "/api/cuenta/desactivar", (e) => {

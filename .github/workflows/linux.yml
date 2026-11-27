@@ -1,0 +1,45 @@
+# App de Linux (AppImage y .deb): se arma a mano desde la pestaña Actions de GitHub ("Run workflow").
+# No se compila en el WSL de la PC: ese es el servidor de Thunderop y tiene poca memoria.
+name: Linux
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [linux]
+
+jobs:
+  linux:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Dependencias de Tauri y de la voz (WebKitGTK + GStreamer)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf \
+            gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-nice gstreamer1.0-pulseaudio
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: app/src-tauri
+
+      - run: npm ci
+        working-directory: app
+
+      - name: Compilar
+        run: node scripts/linux.mjs thunderop.duckdns.org
+        working-directory: app
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: thunderop-linux
+          path: app/release/linux/*
+          retention-days: 14

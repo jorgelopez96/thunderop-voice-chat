@@ -60,6 +60,7 @@ dependencies = [
  "tauri-plugin-single-instance",
  "tauri-plugin-updater",
  "wasapi",
+ "webkit2gtk",
  "webview2-com",
  "windows",
 ]

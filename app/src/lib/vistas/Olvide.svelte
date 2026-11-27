@@ -1,4 +1,5 @@
 <script lang="ts">
+  import CampoClave from './CampoClave.svelte';
   import LogoThunderop from './LogoThunderop.svelte';
   import { onMount } from 'svelte';
   import { pedirCodigo, restablecer } from '../cuenta.svelte';
@@ -70,7 +71,7 @@
           <input bind:value={codigo} required inputmode="numeric" maxlength="6" oninput={() => (codigo = soloDigitos(codigo))} onpaste={(e) => { e.preventDefault(); codigo = soloDigitos(e.clipboardData?.getData('text') ?? ''); }} autocomplete="one-time-code" placeholder="123456" />
         </label>
         <label>Contraseña nueva
-          <input type="password" bind:value={pass} required autocomplete="new-password" />
+          <CampoClave bind:value={pass} autocomplete="new-password" />
         </label>
         <Requisitos clave={pass} />
         {#if error}<p role="alert">{error}</p>{/if}

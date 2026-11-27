@@ -1,4 +1,5 @@
 import { esEscritorio } from './plataforma.svelte';
+import { pb } from './pb';
 import type { Update } from '@tauri-apps/plugin-updater';
 
 // Al abrir, si el servidor tiene una versión nueva se descarga e instala antes de dejar entrar
@@ -21,16 +22,18 @@ export async function buscarActualizacion(silenciosa = false) {
   if (silenciosa && bajada) return;
   try {
     const { check } = await import('@tauri-apps/plugin-updater');
-    const u = await check();
+    // Con la sesión: desde la 0.14.2 el servidor solo da actualizaciones a cuentas (sin sesión, se busca al entrar).
+    const headers = pb.authStore.token ? { Authorization: pb.authStore.token } : undefined;
+    const u = await check({ headers });
     if (!u) { if (!silenciosa) actualizacion.estado = 'lista'; return; }
-    if (silenciosa) { await u.download(); bajada = u; actualizacion.pendiente = u.version; return; }
+    if (silenciosa) { await u.download(undefined, { headers }); bajada = u; actualizacion.pendiente = u.version; return; }
     Object.assign(actualizacion, { estado: 'descargando', version: u.version, progreso: 0 });
     let total: number | undefined, bajado = 0;
     await u.downloadAndInstall((e) => {
       if (e.event === 'Started') total = e.data.contentLength;
       else if (e.event === 'Progress') { bajado += e.data.chunkLength; actualizacion.progreso = progresoDe(bajado, total); }
       else actualizacion.progreso = 1;
-    });
+    }, { headers });
   } catch (e) {
     console.error(e);
     if (silenciosa) { actualizacion.estado = 'lista'; return; }

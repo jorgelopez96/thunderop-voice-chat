@@ -25,7 +25,8 @@ const csp = conf.app.security.csp
 const extra = join(tmpdir(), 'thunderop-release.json');
 writeFileSync(extra, JSON.stringify({
   app: { security: { csp } },
-  plugins: { updater: { endpoints: [`https://${dominio}/descargas/latest${sufijo}.json`] } },
+  // Las versiones nuevas buscan con la sesión (ruta /api/actualizacion); las viejas siguen leyendo /descargas/latest*.json.
+  plugins: { updater: { endpoints: [`https://${dominio}/api/actualizacion/latest${sufijo}.json`] } },
 }));
 
 // Transmisor nativo: se compila y se copia donde lo busca `bundle.externalBin` (el target-dir .lkt de la raíz sale de nativo/transmisor/.cargo/config.toml).

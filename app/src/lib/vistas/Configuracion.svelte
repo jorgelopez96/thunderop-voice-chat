@@ -1,4 +1,5 @@
 <script lang="ts">
+  import CampoClave from './CampoClave.svelte';
   import { cerrarAfuera } from '../afuera';
   import { lleno } from '../rango';
   import { User, Mic, Monitor, Bell, Palette, Trash2, Check, X, Keyboard } from '@lucide/svelte';
@@ -14,7 +15,7 @@
   import { pb } from '../pb';
   import { bloquear, bloqueados } from '../amigos.svelte';
   import { pedirPermiso } from '../notifNavegador';
-  import { esEscritorio, esCelular } from '../plataforma.svelte';
+  import { esEscritorio, esWindows, esCelular } from '../plataforma.svelte';
   import { sesion, salir, mensajeError } from '../sesion.svelte';
   import { pedirCodigo, restablecer } from '../cuenta.svelte';
   import { errorClave, soloDigitos } from '../reglasCuenta';
@@ -39,7 +40,7 @@
   $effect(() => { if (!d.open) d.showModal(); dispositivos().then((x) => (lista = x)).catch(() => (error = 'No se pudieron listar los dispositivos de audio.')); });
   // Atajos: solo en la app de escritorio (los ganchos de teclado y mouse son de Windows).
   const SOLAPAS = ([['cuenta', 'Cuenta', User], ['audio', 'Audio', Mic], ['atajos', 'Atajos', Keyboard], ['transmision', 'Transmisión', Monitor],
-    ['notificaciones', 'Notificaciones', Bell], ['apariencia', 'Apariencia y rendimiento', Palette]] as const).filter(([id]) => id !== 'atajos' || esEscritorio);
+    ['notificaciones', 'Notificaciones', Bell], ['apariencia', 'Apariencia y rendimiento', Palette]] as const).filter(([id]) => id !== 'atajos' || esWindows);
   const ACCIONES: [Accion, string, string][] = [['silenciar', 'Silenciarme', 'Prende o apaga tu micrófono.'], ['ensordecer', 'Ensordecerme', 'Deja de escuchar a la sala (y te silencia).'],
     ['hablar', 'Pulsar para hablar', 'Estando silenciado, te escuchan mientras la mantenés apretada.']];
   // Asignando: la próxima tecla o botón del mouse que se apriete (Esc cancela). Otro clic en el mismo botón también.
@@ -121,9 +122,9 @@
         <form onsubmit={guardarClave}>
           <label>Código que te llegó a {u.email}
             <input value={codigo} inputmode="numeric" autocomplete="one-time-code" required oninput={(e) => (codigo = e.currentTarget.value = soloDigitos(e.currentTarget.value))} /></label>
-          <label>Contraseña nueva <input type="password" bind:value={nueva} required autocomplete="new-password" /></label>
+          <label>Contraseña nueva <CampoClave bind:value={nueva} autocomplete="new-password" /></label>
           <Requisitos clave={nueva} />
-          <label>Repetí la contraseña <input type="password" bind:value={repetida} required autocomplete="new-password" /></label>
+          <label>Repetí la contraseña <CampoClave bind:value={repetida} autocomplete="new-password" /></label>
           <div class="fila"><button type="submit" disabled={ocupado}>Guardar contraseña</button><button type="button" class="plano" onclick={() => (clave = 'nada')}>Cancelar</button></div>
         </form>
       {:else}

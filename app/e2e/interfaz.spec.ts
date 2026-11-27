@@ -307,3 +307,15 @@ test('perfil: estado personalizado, No molestar y la tarjeta (color, juegos, red
   for (const t of ['Jugando Fortnite', 'Fortnite', 'GTA IV', 'Instagram: osidis', '1 de enero', 'En Thunderop desde']) await expect(tarjeta).toContainText(t);
   await expect(tarjeta.locator('.nombre')).toHaveCSS('color', 'rgb(226, 92, 111)');
 });
+
+test('el ojito muestra y oculta la contraseña escrita', async ({ page }) => {
+  await page.goto('/');
+  const clave = page.getByLabel('Contraseña');
+  await clave.fill('mi-clave-123');
+  await expect(clave).toHaveAttribute('type', 'password');
+  await page.getByRole('button', { name: 'Mostrar la clave' }).click();
+  await expect(clave).toHaveAttribute('type', 'text');
+  await expect(clave).toHaveValue('mi-clave-123');
+  await page.getByRole('button', { name: 'Ocultar la clave' }).click();
+  await expect(clave).toHaveAttribute('type', 'password');
+});

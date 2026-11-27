@@ -51,8 +51,8 @@ pub fn run() {
         // Como Discord: la app se da sola el micrófono, pero solo a su propio origen (los ajustes de privacidad de Windows siguen mandando).
         .on_permission_request(|w, kind| match kind {
             PermissionKind::Microphone if w.url().is_ok_and(|u| es_origen_app(&u, dev_url(&w).as_ref())) => PermissionResponse::Allow,
-            // En el celular también la cámara: el permiso del sistema lo pide Android al instalar/usar (MainActivity).
-            PermissionKind::Camera if cfg!(mobile) && w.url().is_ok_and(|u| es_origen_app(&u, dev_url(&w).as_ref())) => PermissionResponse::Allow,
+            // Fuera de Windows también la cámara: WebKitGTK la niega sin preguntar; en Android el permiso del sistema lo pide MainActivity.
+            PermissionKind::Camera if !cfg!(windows) && w.url().is_ok_and(|u| es_origen_app(&u, dev_url(&w).as_ref())) => PermissionResponse::Allow,
             _ => PermissionResponse::Default,
         })
         .on_page_load(|w, p| {
@@ -68,10 +68,21 @@ pub fn run() {
         .setup(|app| {
             let cfg = app.config().app.windows[0].clone();
             let dev = dev_url(app);
-            WebviewWindowBuilder::from_config(app, &cfg)?
+            let ventana = WebviewWindowBuilder::from_config(app, &cfg)?
                 .on_navigation(move |u| es_origen_app(u, dev.as_ref()))
                 .on_new_window(|_, _| NewWindowResponse::Deny)
                 .build()?;
+            #[cfg(target_os = "linux")]
+            ventana.with_webview(|v| {
+                use webkit2gtk::{SettingsExt, WebViewExt};
+                if let Some(s) = v.inner().settings() {
+                    s.set_enable_webrtc(true);
+                    s.set_enable_media_stream(true);
+                    s.set_enable_mediasource(true);
+                }
+            })?;
+            #[cfg(not(target_os = "linux"))]
+            let _ = ventana;
             #[cfg(desktop)]
             bandeja(app)?;
             atajos::iniciar(app.handle().clone());

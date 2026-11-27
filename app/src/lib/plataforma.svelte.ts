@@ -4,6 +4,8 @@ import { isTauri } from '@tauri-apps/api/core';
 // y si la pantalla es de celular (768 px o menos). La app del celular se porta como la web en el celular.
 const sistemaMovil = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 export const esEscritorio = isTauri() && !sistemaMovil;
+/** App de escritorio en Windows: transmisor nativo, sonido de la PC, atajos globales e inactividad salen de ganchos de Windows. */
+export const esWindows = esEscritorio && /Windows/i.test(navigator.userAgent);
 
 // Celular: angosto, o pantalla táctil y bajita (celular apaisado). En el escritorio nunca (el zoom no lo cambia).
 const consulta = typeof matchMedia === 'function' && !esEscritorio ? matchMedia('(max-width: 768px), (pointer: coarse) and (max-height: 500px)') : null;
